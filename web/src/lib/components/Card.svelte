@@ -1,16 +1,19 @@
 <script lang="ts">
+  import { cn } from '$lib/utils/cn'
+
   export let title: string = ''
   export let subtitle: string = ''
+  export let className: string = ''
 </script>
 
-<div class="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-800">
+<div class={cn('rounded-lg border border-border bg-card p-6 shadow-sm', className)}>
   {#if title}
     <div class="mb-4">
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+      <h3 class="text-lg font-semibold text-card-foreground">
         {title}
       </h3>
       {#if subtitle}
-        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <p class="mt-1 text-sm text-muted-foreground">
           {subtitle}
         </p>
       {/if}
@@ -19,3 +22,4 @@
 
   <slot />
 </div>
+
