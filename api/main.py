@@ -4,12 +4,10 @@ from contextlib import asynccontextmanager
 
 from api.infrastructure.config import settings
 
-# Import routers (will be created in Phase 5)
-# from api.adapters.inbound.http import routers
+from api.adapters.inbound.http import portfolio_routes, trade_routes, goal_routes, asset_routes, benchmark_fx_routes
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifecycle"""
     print("Starting Folio API...")
     yield
     print("Shutting down Folio API...")
@@ -21,10 +19,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS.split(","),
+    allow_origins=settings.allowed_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,11 +29,14 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
     return {"status": "healthy"}
 
-# TODO: Include routers from api.adapters.inbound.http once implemented
-# app.include_router(...)
+app.include_router(portfolio_routes.router)
+app.include_router(trade_routes.router)
+app.include_router(goal_routes.router)
+app.include_router(asset_routes.router)
+app.include_router(benchmark_fx_routes.router_benchmarks)
+app.include_router(benchmark_fx_routes.router_fx)
 
 if __name__ == "__main__":
     import uvicorn
