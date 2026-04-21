@@ -1,3 +1,5 @@
+import axios, { AxiosInstance, AxiosError } from 'axios'
+
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
 export interface ApiResponse<T> {
@@ -5,79 +7,96 @@ export interface ApiResponse<T> {
   error?: { code: string; message: string; details?: Record<string, unknown> }
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(
-      errorData.detail || `API error: ${response.status} ${response.statusText}`
-    )
-  }
-
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  try {
-    return await response.json()
-  } catch {
-    return undefined as T
-  }
+export interface ApiError {
+  code: string
+  message: string
+  field?: string
+  details?: Record<string, unknown>
 }
 
+// Create axios instance
+const axiosInstance: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  validateStatus: () => true // Don't throw on any status code
+})
+
+// Response interceptor for error handling
+axiosInstance.interceptors.response.use(response => {
+  // Handle error responses from API
+  if (response.status >= 400) {
+    const errorData = response.data?.error || response.data
+    const error = new Error(
+      errorData?.message || `API error: ${response.status} ${response.statusText}`
+    ) as Error & { code?: string; details?: Record<string, unknown> }
+    error.code = errorData?.code
+    error.details = errorData?.details
+    throw error
+  }
+  return response
+})
+
 export const api = {
+  /**
+   * GET request
+   */
   async get<T>(path: string, params?: Record<string, unknown>): Promise<T> {
-    const url = new URL(`${API_BASE_URL}${path}`)
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          url.searchParams.append(key, String(value))
-        }
-      })
-    }
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+    const response = await axiosInstance.get<T>(path, {
+      params
     })
-
-    return handleResponse<T>(response)
+    return response.data
   },
 
+  /**
+   * POST request
+   */
   async post<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined
-    })
-
-    return handleResponse<T>(response)
+    const response = await axiosInstance.post<T>(path, body)
+    return response.data
   },
 
+  /**
+   * PUT request
+   */
   async put<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined
-    })
-
-    return handleResponse<T>(response)
+    const response = await axiosInstance.put<T>(path, body)
+    return response.data
   },
 
+  /**
+   * PATCH request
+   */
+  async patch<T>(path: string, body?: unknown): Promise<T> {
+    const response = await axiosInstance.patch<T>(path, body)
+    return response.data
+  },
+
+  /**
+   * DELETE request
+   */
   async delete<T>(path: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' }
-    })
-
-    return handleResponse<T>(response)
+    const response = await axiosInstance.delete<T>(path)
+    return response.data
   },
 
+  /**
+   * File upload with FormData
+   */
   async upload<T>(path: string, formData: FormData): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      body: formData
+    const response = await axiosInstance.post<T>(path, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
     })
+    return response.data
+  },
 
-    return handleResponse<T>(response)
+  /**
+   * Get axios instance for advanced usage
+   */
+  getInstance(): AxiosInstance {
+    return axiosInstance
   }
 }
