@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { cn } from '$lib/utils/cn'
+
   export let columns: { key: string; label: string; sortable?: boolean }[] = []
   export let rows: Record<string, unknown>[] = []
   export let onSort: ((key: string) => void) | null = null
@@ -20,20 +22,20 @@
   }
 </script>
 
-<div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-  <table class="w-full">
-    <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+<div class="w-full overflow-auto rounded-md border border-border">
+  <table class="w-full text-sm">
+    <thead class="border-b border-border bg-muted">
       <tr>
         {#each columns as col}
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+          <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">
             {#if col.sortable}
               <button
                 on:click={() => handleSort(col.key)}
-                class="flex items-center gap-2 hover:text-gray-900 dark:hover:text-white"
+                class="flex items-center gap-2 hover:text-foreground"
               >
                 {col.label}
                 {#if sortKey === col.key}
-                  <span>{sortDesc ? '↓' : '↑'}</span>
+                  <span class="text-xs">{sortDesc ? '↓' : '↑'}</span>
                 {/if}
               </button>
             {:else}
@@ -44,11 +46,11 @@
       </tr>
     </thead>
 
-    <tbody>
+    <tbody class="[&_tr:last-child]:border-0">
       {#each rows as row, i}
-        <tr class="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+        <tr class="border-b border-border hover:bg-muted/50 transition-colors data-[state=selected]:bg-muted">
           {#each columns as col}
-            <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0">
               <slot name={`cell-${col.key}`} {row}>
                 {row[col.key]}
               </slot>
@@ -60,8 +62,9 @@
   </table>
 
   {#if rows.length === 0}
-    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-      No data available
+    <div class="flex h-24 items-center justify-center text-muted-foreground">
+      <p>No data available</p>
     </div>
   {/if}
 </div>
+
