@@ -55,15 +55,15 @@
     : trades.filter(t => t.trade_type === tradeTypeFilter)
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-4 sm:gap-6 sm:items-start sm:justify-between md:flex-row md:items-center">
       <div class="space-y-2">
-        <h1 class="text-3xl font-bold text-foreground">Trades</h1>
-        <p class="text-muted-foreground">Transaction history for {$currentPortfolio?.name}</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-foreground">Trades</h1>
+        <p class="text-xs md:text-sm text-muted-foreground">Transaction history for {$currentPortfolio?.name}</p>
       </div>
-      <Button variant="default" on:click={() => (showNewModal = true)}>
+      <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -100,7 +100,9 @@
       </Card>
     {:else}
       <Card title="Trade History">
-        <TradeTable trades={filteredTrades} />
+        <div class="overflow-x-auto -mx-4 md:mx-0">
+          <TradeTable trades={filteredTrades} />
+        </div>
       </Card>
     {/if}
   </div>

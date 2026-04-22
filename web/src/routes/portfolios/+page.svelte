@@ -59,15 +59,15 @@
   }
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-4 sm:gap-6 sm:items-start sm:justify-between md:flex-row md:items-center">
       <div class="space-y-2">
-        <h1 class="text-3xl font-bold text-foreground">Portfolios</h1>
-        <p class="text-muted-foreground">Manage your investment portfolios</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-foreground">Portfolios</h1>
+        <p class="text-xs md:text-sm text-muted-foreground">Manage your investment portfolios</p>
       </div>
-      <Button variant="default" on:click={() => (showNewModal = true)}>
+      <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -91,7 +91,7 @@
         </div>
       </Card>
     {:else}
-      <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3">
         {#each $portfolios as portfolio}
           {@const stats = portfolioStats[portfolio.id]}
           <Card title={portfolio.name} subtitle={portfolio.base_currency}>
@@ -99,21 +99,21 @@
               {#if stats}
                 <div class="space-y-2">
                   <div class="flex justify-between">
-                    <span class="text-sm text-muted-foreground">Value</span>
-                    <span class="font-semibold text-foreground">
+                    <span class="text-xs md:text-sm text-muted-foreground">Value</span>
+                    <span class="text-sm md:text-base font-semibold text-foreground">
                       {formatCurrency(stats.current_value)}
                     </span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-sm text-muted-foreground">Cost Basis</span>
-                    <span class="font-semibold text-foreground">
+                    <span class="text-xs md:text-sm text-muted-foreground">Cost Basis</span>
+                    <span class="text-sm md:text-base font-semibold text-foreground">
                       {formatCurrency(stats.cost_basis)}
                     </span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-sm text-muted-foreground">Return</span>
+                    <span class="text-xs md:text-sm text-muted-foreground">Return</span>
                     <span
-                      class="font-semibold"
+                      class="text-sm md:text-base font-semibold"
                       class:text-positive={Number(stats.return_percent) >= 0}
                       class:text-negative={Number(stats.return_percent) < 0}
                     >
