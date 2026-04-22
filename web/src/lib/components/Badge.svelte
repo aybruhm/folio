@@ -1,13 +1,15 @@
 <script lang="ts">
   import { cn } from '$lib/utils/cn'
 
-  export let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'default'
+  export let variant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'danger' = 'default'
 
   const variants = {
     default: 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80',
     secondary: 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
     destructive: 'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
-    outline: 'text-foreground'
+    outline: 'text-foreground',
+    success: 'border-transparent bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-100',
+    danger: 'border-transparent bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-100'
   }
 </script>
 
