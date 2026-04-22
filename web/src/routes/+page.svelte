@@ -59,8 +59,8 @@
   <div class="mx-auto max-w-7xl space-y-6">
     <!-- Header -->
     <div class="space-y-2">
-      <h1 class="text-3xl font-bold text-foreground">Dashboard</h1>
-      <p class="text-muted-foreground">
+      <h1 class="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+      <p class="text-xs md:text-sm text-muted-foreground">
         {#if $currentPortfolio}
           <span>{$currentPortfolio.name}</span>
           {#if $currentPortfolio.description}
@@ -110,13 +110,47 @@
         </Card>
       </div>
 
-      <!-- Performance Chart (full width) -->
-      <Card title="Performance" subtitle="Portfolio value over time">
-        <LineChart
-          data={stats.performanceHistory}
-          title=""
-          height="h-64 md:h-[480px]"
-        />
+      <!-- Charts Section -->
+      <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
+        <div class="lg:col-span-2">
+          <Card title="Performance" subtitle="Portfolio value over time">
+            <LineChart
+              data={stats.performanceHistory}
+              title=""
+              height="h-80 md:h-96"
+            />
+          </Card>
+        </div>
+
+        <div>
+          <Card title="Allocation" subtitle="Asset class breakdown">
+            <DonutChart
+              data={stats.portfolioAllocation}
+              title=""
+            />
+          </Card>
+        </div>
+      </div>
+
+      <!-- Top Holdings -->
+      <Card title="Top Holdings" subtitle="5 largest positions">
+        <div class="space-y-2 md:space-y-3">
+          {#each stats.topHoldings as holding}
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between rounded-lg border border-border p-3 md:p-4">
+              <div class="flex flex-col gap-1">
+                <span class="text-sm md:text-base font-semibold text-foreground">{holding.ticker}</span>
+                <span class="text-xs md:text-sm text-muted-foreground">
+                  {formatPercent(holding.percent)} of portfolio
+                </span>
+              </div>
+              <div class="text-left md:text-right">
+                <div class="text-sm md:text-base font-semibold text-foreground">
+                  {formatCurrency(holding.value)}
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
       </Card>
 
       <!-- Allocation + Top Holdings (side by side) -->
@@ -131,7 +165,7 @@
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex flex-wrap gap-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button variant="default" href="/trades/new">
           <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />

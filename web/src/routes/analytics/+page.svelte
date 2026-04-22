@@ -60,10 +60,10 @@
 <div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-col gap-4 sm:gap-6 sm:items-center sm:justify-between">
       <div class="space-y-2">
-        <h1 class="text-3xl font-bold text-foreground">Analytics</h1>
-        <p class="text-muted-foreground">Performance analysis for {$currentPortfolio?.name}</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-foreground">Analytics</h1>
+        <p class="text-xs md:text-sm text-muted-foreground">Performance analysis for {$currentPortfolio?.name}</p>
       </div>
     </div>
 
@@ -110,26 +110,27 @@
         </Card>
       </div>
 
-      <!-- Performance History (full width) -->
-      <Card title="Performance History" subtitle="Portfolio value over time">
-        <LineChart
-          data={analyticsData.performance_history}
-          title=""
-          height="h-64 md:h-[480px]"
-        />
-      </Card>
+      <!-- Charts -->
+      <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+        <Card title="Performance History">
+          <LineChart
+            data={analyticsData.performance_history}
+            title=""
+            height="h-64 md:h-80"
+          />
+        </Card>
 
-      <!-- Contributions Over Time (full width) -->
-      <Card title="Contributions Over Time" subtitle="Monthly net investment activity">
-        <BarChart
-          data={contribChart}
-          title=""
-          height="h-64 md:h-[480px]"
-        />
-      </Card>
+        <Card title="Contributions Over Time">
+          <BarChart
+            data={analyticsData.contribution_history}
+            title=""
+            height="h-64 md:h-80"
+          />
+        </Card>
+      </div>
 
       <!-- Asset Allocation and Sector Breakdown -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
         <Card title="Asset Allocation">
           <DonutChart
             data={analyticsData.allocation}

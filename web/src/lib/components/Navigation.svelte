@@ -22,15 +22,14 @@
     return $page.url.pathname === href
   }
 
-  function closeMobileMenu() {
+  function handleNavClick() {
     showMobileMenu = false
   }
 </script>
 
 <nav class="border-b border-border bg-card">
-  <div class="flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
-    <!-- Logo + desktop nav -->
-    <div class="flex items-center gap-6">
+  <div class="flex h-16 items-center justify-between px-4 md:px-6">
+    <div class="flex items-center gap-4 md:gap-8">
       <a href="/" class="flex items-center gap-2">
         <svg class="h-5 w-5 text-primary md:h-6 md:w-6" fill="currentColor" viewBox="0 0 24 24">
           <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
@@ -52,11 +51,9 @@
       </div>
     </div>
 
-    <!-- Right side -->
-    <div class="flex items-center gap-2">
-      <!-- Portfolio selector (hidden on very small screens, shown from sm) -->
+    <div class="flex items-center gap-2 md:gap-4">
       {#if $currentPortfolio}
-        <div class="relative hidden sm:block">
+        <div class="relative hidden md:block">
           <button
             on:click={() => (showPortfolioMenu = !showPortfolioMenu)}
             class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm hover:bg-muted md:px-3 md:py-2"
@@ -70,7 +67,7 @@
           </button>
 
           {#if showPortfolioMenu}
-            <div class="absolute right-0 top-full z-50 mt-2 w-48 rounded-md border border-border bg-card py-1 shadow-lg">
+            <div class="absolute right-0 top-full mt-2 w-48 rounded-md border border-border bg-card py-1 shadow-lg z-10">
               {#each $portfolios as p}
                 <button
                   on:click={() => { currentPortfolio.set(p); showPortfolioMenu = false }}
@@ -99,25 +96,18 @@
         {/if}
       </Button>
 
-      <!-- Hamburger (mobile only) -->
       <button
-        class="flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
         on:click={() => (showMobileMenu = !showMobileMenu)}
-        aria-label="Toggle menu"
+        class="md:hidden rounded-md p-2 hover:bg-muted"
       >
-        {#if showMobileMenu}
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        {:else}
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        {/if}
+        <svg class="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
       </button>
     </div>
   </div>
 
+<<<<<<< HEAD
   <!-- Mobile menu drawer -->
   {#if showMobileMenu}
     <div class="border-t border-border bg-card px-4 pb-4 md:hidden">
@@ -153,12 +143,50 @@
             href={link.href}
             on:click={closeMobileMenu}
             class="rounded-md px-3 py-2.5 text-sm font-medium transition-colors {isActive(link.href)
+=======
+  {#if showMobileMenu}
+    <div class="border-t border-border bg-card md:hidden">
+      <div class="space-y-1 px-4 py-4">
+        {#each navLinks as link}
+          <a
+            href={link.href}
+            on:click={handleNavClick}
+            class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(
+              link.href
+            )
+>>>>>>> mobile-responsiveness
               ? 'bg-accent text-accent-foreground'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
           >
             {link.label}
           </a>
         {/each}
+<<<<<<< HEAD
+=======
+
+        {#if $currentPortfolio}
+          <div class="border-t border-border pt-4 mt-4">
+            <p class="px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
+              Current Portfolio
+            </p>
+            <div class="space-y-1">
+              {#each $portfolios as p}
+                <button
+                  on:click={() => {
+                    currentPortfolio.set(p)
+                    showMobileMenu = false
+                  }}
+                  class="block w-full px-3 py-2 text-left text-sm rounded-md hover:bg-muted {$currentPortfolio.id === p.id
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-foreground'}"
+                >
+                  {p.name}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+>>>>>>> mobile-responsiveness
       </div>
     </div>
   {/if}
