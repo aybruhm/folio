@@ -22,16 +22,16 @@
   }
 </script>
 
-<div class="w-full overflow-auto rounded-md border border-border">
-  <table class="w-full text-sm">
+<div class="w-full overflow-x-auto rounded-md border border-border">
+  <table class="w-full text-xs sm:text-sm">
     <thead class="border-b border-border bg-muted">
       <tr>
         {#each columns as col}
-          <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">
+          <th class="h-10 sm:h-12 px-2 sm:px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">
             {#if col.sortable}
               <button
                 on:click={() => handleSort(col.key)}
-                class="flex items-center gap-2 hover:text-foreground"
+                class="flex items-center gap-1 sm:gap-2 hover:text-foreground text-xs sm:text-sm"
               >
                 {col.label}
                 {#if sortKey === col.key}
@@ -50,7 +50,7 @@
       {#each rows as row, i}
         <tr class="border-b border-border hover:bg-muted/50 transition-colors data-[state=selected]:bg-muted">
           {#each columns as col}
-            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0">
+            <td class="p-2 sm:p-4 align-middle text-xs sm:text-sm [&:has([role=checkbox])]:pr-0">
               <slot name={`cell-${col.key}`} {row}>
                 {row[col.key]}
               </slot>

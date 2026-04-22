@@ -7,6 +7,7 @@
   export let onToggleTheme: (() => void) | undefined = undefined
 
   let showPortfolioMenu = false
+  let showMobileMenu = false
 
   const navLinks = [
     { label: 'Dashboard', href: '/' },
@@ -20,11 +21,15 @@
   function isActive(href: string): boolean {
     return $page.url.pathname === href
   }
+
+  function handleNavClick() {
+    showMobileMenu = false
+  }
 </script>
 
 <nav class="border-b border-border bg-card">
-  <div class="flex h-16 items-center justify-between px-6">
-    <div class="flex items-center gap-8">
+  <div class="flex h-16 items-center justify-between px-4 md:px-6">
+    <div class="flex items-center gap-4 md:gap-8">
       <a href="/" class="flex items-center gap-2">
         <svg class="h-6 w-6 text-primary" fill="currentColor" viewBox="0 0 24 24">
           <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
@@ -48,9 +53,9 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-2 md:gap-4">
       {#if $currentPortfolio}
-        <div class="relative">
+        <div class="relative hidden md:block">
           <button
             on:click={() => (showPortfolioMenu = !showPortfolioMenu)}
             class="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-muted"
@@ -62,7 +67,7 @@
           </button>
 
           {#if showPortfolioMenu}
-            <div class="absolute right-0 top-full mt-2 w-48 rounded-md border border-border bg-card py-1 shadow-lg">
+            <div class="absolute right-0 top-full mt-2 w-48 rounded-md border border-border bg-card py-1 shadow-lg z-10">
               {#each $portfolios as p}
                 <button
                   on:click={() => {
@@ -97,6 +102,58 @@
           </svg>
         {/if}
       </Button>
+
+      <button
+        on:click={() => (showMobileMenu = !showMobileMenu)}
+        class="md:hidden rounded-md p-2 hover:bg-muted"
+      >
+        <svg class="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
     </div>
   </div>
+
+  {#if showMobileMenu}
+    <div class="border-t border-border bg-card md:hidden">
+      <div class="space-y-1 px-4 py-4">
+        {#each navLinks as link}
+          <a
+            href={link.href}
+            on:click={handleNavClick}
+            class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(
+              link.href
+            )
+              ? 'bg-accent text-accent-foreground'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
+          >
+            {link.label}
+          </a>
+        {/each}
+
+        {#if $currentPortfolio}
+          <div class="border-t border-border pt-4 mt-4">
+            <p class="px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
+              Current Portfolio
+            </p>
+            <div class="space-y-1">
+              {#each $portfolios as p}
+                <button
+                  on:click={() => {
+                    currentPortfolio.set(p)
+                    showMobileMenu = false
+                  }}
+                  class="block w-full px-3 py-2 text-left text-sm rounded-md hover:bg-muted {$currentPortfolio.id === p.id
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-foreground'}"
+                >
+                  {p.name}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
 </nav>
