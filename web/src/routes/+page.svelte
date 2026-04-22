@@ -17,14 +17,19 @@
     gainLossPercent: '0',
     portfolioAllocation: [] as { label: string; value: number }[],
     performanceHistory: [] as { name: string; value: number }[],
-    topHoldings: [] as { ticker: string; value: number; percent: number }[]
+    topHoldings: [] as { ticker: string; value: string; percent: string }[]
   }
 
+  $: topHoldingsChart = stats.topHoldings.map(h => ({
+    label: h.ticker,
+    value: parseFloat(h.percent)
+  }))
+
   onMount(async () => {
-    if ($currentPortfolio) {
-      await loadDashboardData()
-    }
+    if ($currentPortfolio) await loadDashboardData()
   })
+
+  $: if ($currentPortfolio) loadDashboardData()
 
   async function loadDashboardData() {
     try {
@@ -47,10 +52,10 @@
     }
   }
 
-  const isPositive = Number(stats.gainLoss) >= 0
+  $: isPositive = Number(stats.gainLoss) >= 0
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-7xl space-y-6">
     <!-- Header -->
     <div class="space-y-2">
@@ -71,7 +76,7 @@
       </div>
     {:else}
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card title="Total Value" subtitle="Current portfolio value">
           <div class="text-3xl font-bold text-foreground">
             {formatCurrency(stats.totalValue)}
@@ -105,48 +110,25 @@
         </Card>
       </div>
 
-      <!-- Charts Section -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
-          <Card title="Performance" subtitle="Portfolio value over time">
-            <LineChart
-              data={stats.performanceHistory}
-              title=""
-              height="h-96"
-            />
-          </Card>
-        </div>
-
-        <div>
-          <Card title="Allocation" subtitle="Asset class breakdown">
-            <DonutChart
-              data={stats.portfolioAllocation}
-              title=""
-            />
-          </Card>
-        </div>
-      </div>
-
-      <!-- Top Holdings -->
-      <Card title="Top Holdings" subtitle="5 largest positions">
-        <div class="space-y-3">
-          {#each stats.topHoldings as holding}
-            <div class="flex items-center justify-between rounded-lg border border-border p-4">
-              <div class="flex flex-col gap-1">
-                <span class="font-semibold text-foreground">{holding.ticker}</span>
-                <span class="text-sm text-muted-foreground">
-                  {formatPercent(holding.percent)} of portfolio
-                </span>
-              </div>
-              <div class="text-right">
-                <div class="font-semibold text-foreground">
-                  {formatCurrency(holding.value)}
-                </div>
-              </div>
-            </div>
-          {/each}
-        </div>
+      <!-- Performance Chart (full width) -->
+      <Card title="Performance" subtitle="Portfolio value over time">
+        <LineChart
+          data={stats.performanceHistory}
+          title=""
+          height="h-64 md:h-[480px]"
+        />
       </Card>
+
+      <!-- Allocation + Top Holdings (side by side) -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card title="Allocation" subtitle="Asset class breakdown">
+          <DonutChart data={stats.portfolioAllocation} />
+        </Card>
+
+        <Card title="Top Holdings" subtitle="5 largest positions by portfolio weight">
+          <DonutChart data={topHoldingsChart} />
+        </Card>
+      </div>
 
       <!-- Action Buttons -->
       <div class="flex flex-wrap gap-3">
@@ -166,13 +148,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  :global(.text-positive) {
-    @apply text-positive;
-  }
-
-  :global(.text-negative) {
-    @apply text-negative;
-  }
-</style>

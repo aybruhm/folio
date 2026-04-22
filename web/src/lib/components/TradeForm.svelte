@@ -14,7 +14,7 @@
   } = {
     ticker: '',
     trade_type: 'buy',
-    trade_date: new Date().toISOString().split('T')[0],
+    trade_date: new Date().toISOString().slice(0, 16),
     quantity: '',
     price: '',
     trade_currency: 'USD',
@@ -74,14 +74,14 @@
   />
 
   <Input
-    label="Trade Date"
-    type="date"
+    label="Trade Date & Time"
+    type="datetime-local"
     bind:value={trade.trade_date}
     required
     error={errors.trade_date}
   />
 
-  <div class="grid grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <Input
       label="Quantity"
       type="number"
@@ -103,7 +103,7 @@
     />
   </div>
 
-  <div class="grid grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <Select
       label="Currency"
       bind:value={trade.trade_currency}

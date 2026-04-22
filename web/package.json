@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "svelte-kit sync && vite",
     "build": "svelte-kit sync && vite build",
     "preview": "vite preview",
     "lint": "eslint ."

@@ -68,7 +68,7 @@
   {/if}
 
   <div class="flex gap-3">
-    <Button type="submit" variant="primary" {disabled: isLoading}>
+    <Button type="submit" variant="primary" disabled={isLoading}>
       {isLoading ? 'Saving...' : 'Save Portfolio'}
     </Button>
   </div>

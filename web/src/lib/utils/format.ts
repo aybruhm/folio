@@ -48,6 +48,18 @@ export function formatDate(date: Date | string, format: string = 'en-US'): strin
   }).format(d)
 }
 
+export function formatDateTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(d)
+}
+
 export function parseDate(dateStr: string, format: string = 'YYYY-MM-DD'): Date {
   if (format === 'YYYY-MM-DD') {
     const [year, month, day] = dateStr.split('-').map(Number)

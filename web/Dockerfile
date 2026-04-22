@@ -1,16 +1,14 @@
-FROM node:18-alpine
+FROM dhi.io/node:25-debian13-sfw-dev
 
+# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install dependencies (using legacy-peer-deps for Svelte version compatibility)
 COPY web/package*.json ./
-
-# Install dependencies
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy application code
 COPY web/ .
 
+# Expose Vite dev server port
 EXPOSE 3000
-
-CMD ["npm", "run", "dev"]

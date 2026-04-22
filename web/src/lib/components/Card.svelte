@@ -6,7 +6,7 @@
   export let className: string = ''
 </script>
 
-<div class={cn('rounded-lg border border-border bg-card p-6 shadow-sm', className)}>
+<div class={cn('rounded-lg border border-border bg-card p-4 shadow-sm md:p-6', className)}>
   {#if title}
     <div class="mb-4">
       <h3 class="text-lg font-semibold text-card-foreground">

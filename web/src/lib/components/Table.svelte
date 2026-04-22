@@ -51,9 +51,7 @@
         <tr class="border-b border-border hover:bg-muted/50 transition-colors data-[state=selected]:bg-muted">
           {#each columns as col}
             <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0">
-              <slot name={`cell-${col.key}`} {row}>
-                {row[col.key]}
-              </slot>
+              {row[col.key]}
             </td>
           {/each}
         </tr>
