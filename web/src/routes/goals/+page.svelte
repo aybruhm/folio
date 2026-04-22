@@ -80,12 +80,12 @@
 <div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-col gap-4 sm:gap-6 sm:items-start sm:justify-between md:flex-row md:items-center">
       <div class="space-y-2">
-        <h1 class="text-3xl font-bold text-foreground">Goals</h1>
-        <p class="text-muted-foreground">Track financial goals and FIRE projections</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-foreground">Goals</h1>
+        <p class="text-xs md:text-sm text-muted-foreground">Track financial goals and FIRE projections</p>
       </div>
-      <Button variant="default" on:click={() => (showNewModal = true)}>
+      <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -117,14 +117,14 @@
             <div class="space-y-4">
               <div class="space-y-2">
                 <div class="flex justify-between">
-                  <span class="text-sm text-muted-foreground">Target</span>
-                  <span class="font-semibold text-foreground">
+                  <span class="text-xs md:text-sm text-muted-foreground">Target</span>
+                  <span class="text-sm md:text-base font-semibold text-foreground">
                     {formatCurrency(goal.target_amount)}
                   </span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm text-muted-foreground">Current</span>
-                  <span class="font-semibold text-foreground">
+                  <span class="text-xs md:text-sm text-muted-foreground">Current</span>
+                  <span class="text-sm md:text-base font-semibold text-foreground">
                     {formatCurrency(goal.current_value)}
                   </span>
                 </div>

@@ -16,14 +16,14 @@
 <svelte:window on:keydown={handleEscKey} />
 
 {#if open}
-  <div class="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm sm:items-center">
+  <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-0">
     <div
-      class="relative w-full overflow-hidden rounded-t-xl border border-border bg-card shadow-lg sm:max-w-lg sm:rounded-lg"
+      class="relative w-full sm:max-w-lg overflow-hidden rounded-t-lg sm:rounded-lg border border-border bg-card shadow-lg max-h-[90vh] sm:max-h-none overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out"
       role="dialog"
       aria-labelledby="modal-title"
     >
-      <div class="flex items-center justify-between border-b border-border p-4 md:p-6">
-        <h2 id="modal-title" class="text-lg font-semibold text-card-foreground">
+      <div class="flex items-center justify-between border-b border-border p-4 sm:p-6">
+        <h2 id="modal-title" class="text-base sm:text-lg font-semibold text-card-foreground">
           {title}
         </h2>
         <Button variant="ghost" size="icon" on:click={onClose} class="h-8 w-8">
@@ -33,11 +33,11 @@
         </Button>
       </div>
 
-      <div class="max-h-[70vh] overflow-y-auto p-4 md:p-6">
+      <div class="p-4 sm:p-6">
         <slot />
       </div>
 
-      <div class="flex justify-end gap-3 border-t border-border p-4 md:p-6">
+      <div class="flex gap-3 border-t border-border p-4 sm:p-6 justify-end flex-col-reverse sm:flex-row">
         <slot name="footer" />
       </div>
     </div>
