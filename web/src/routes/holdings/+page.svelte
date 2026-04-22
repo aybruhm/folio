@@ -13,10 +13,10 @@
   let filteredHoldings: any[] = []
 
   onMount(async () => {
-    if ($currentPortfolio) {
-      await loadHoldings()
-    }
+    if ($currentPortfolio) await loadHoldings()
   })
+
+  $: if ($currentPortfolio) loadHoldings()
 
   async function loadHoldings() {
     try {
@@ -49,10 +49,10 @@
   $: searchTerm, filterHoldings()
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="space-y-2">
         <h1 class="text-3xl font-bold text-foreground">Holdings</h1>
         <p class="text-muted-foreground">Current positions in {$currentPortfolio?.name}</p>
@@ -100,13 +100,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  :global(.text-positive) {
-    @apply text-positive;
-  }
-
-  :global(.text-negative) {
-    @apply text-negative;
-  }
-</style>

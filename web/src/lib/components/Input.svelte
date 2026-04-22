@@ -23,21 +23,101 @@
     </label>
   {/if}
 
-  <input
-    bind:this={input}
-    bind:value
-    {type}
-    {placeholder}
-    {disabled}
-    {required}
-    class={cn(
-      'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-      error ? 'border-destructive' : '',
-      className
-    )}
-    on:change
-    on:blur
-  />
+  {#if type === 'number'}
+    <input
+      bind:this={input}
+      type="number"
+      bind:value
+      {placeholder}
+      {disabled}
+      {required}
+      class={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        error ? 'border-destructive' : '',
+        className
+      )}
+      on:change
+      on:blur
+    />
+  {:else if type === 'password'}
+    <input
+      bind:this={input}
+      type="password"
+      bind:value
+      {placeholder}
+      {disabled}
+      {required}
+      class={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        error ? 'border-destructive' : '',
+        className
+      )}
+      on:change
+      on:blur
+    />
+  {:else if type === 'email'}
+    <input
+      bind:this={input}
+      type="email"
+      bind:value
+      {placeholder}
+      {disabled}
+      {required}
+      class={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        error ? 'border-destructive' : '',
+        className
+      )}
+      on:change
+      on:blur
+    />
+  {:else if type === 'date'}
+    <input
+      bind:this={input}
+      type="date"
+      bind:value
+      {disabled}
+      {required}
+      class={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        error ? 'border-destructive' : '',
+        className
+      )}
+      on:change
+      on:blur
+    />
+  {:else if type === 'datetime-local'}
+    <input
+      bind:this={input}
+      type="datetime-local"
+      bind:value
+      {disabled}
+      {required}
+      class={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        error ? 'border-destructive' : '',
+        className
+      )}
+      on:change
+      on:blur
+    />
+  {:else}
+    <input
+      bind:this={input}
+      type="text"
+      bind:value
+      {placeholder}
+      {disabled}
+      {required}
+      class={cn(
+        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        error ? 'border-destructive' : '',
+        className
+      )}
+      on:change
+      on:blur
+    />
+  {/if}
 
   {#if error}
     <span class="text-xs text-destructive">{error}</span>

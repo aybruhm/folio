@@ -1,92 +1,121 @@
 <script lang="ts">
   export let data: { label: string; value: number }[] = []
   export let title: string = ''
-  export let colors: string[] = [
-    '#3b82f6',
-    '#10b981',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
-    '#ec4899'
+  export let showLegend: boolean = true
+
+  const COLORS = [
+    'hsl(217, 91%, 60%)',
+    'hsl(160, 84%, 39%)',
+    'hsl(38, 92%, 50%)',
+    'hsl(346, 87%, 64%)',
+    'hsl(271, 81%, 66%)',
+    'hsl(196, 94%, 47%)',
+    'hsl(25, 95%, 53%)',
+    'hsl(142, 71%, 45%)',
   ]
 
-  $: total = data.reduce((sum, d) => sum + d.value, 0)
+  const CX = 100, CY = 100, R = 80, IR = 52
+
+  $: total = data.reduce((s, d) => s + d.value, 0)
   $: items = data.map((d, i) => ({
     ...d,
-    percentage: (d.value / total) * 100,
-    color: colors[i % colors.length]
+    pct: total > 0 ? (d.value / total) * 100 : 0,
+    color: COLORS[i % COLORS.length],
   }))
 
-  function getSlicePath(startAngle: number, endAngle: number): string {
-    const radius = 80
-    const innerRadius = 50
-    const startRad = (startAngle * Math.PI) / 180
-    const endRad = (endAngle * Math.PI) / 180
-
-    const x1 = 100 + radius * Math.cos(startRad)
-    const y1 = 100 + radius * Math.sin(startRad)
-    const x2 = 100 + radius * Math.cos(endRad)
-    const y2 = 100 + radius * Math.sin(endRad)
-
-    const ix1 = 100 + innerRadius * Math.cos(startRad)
-    const iy1 = 100 + innerRadius * Math.sin(startRad)
-    const ix2 = 100 + innerRadius * Math.cos(endRad)
-    const iy2 = 100 + innerRadius * Math.sin(endRad)
-
-    const largeArc = endAngle - startAngle > 180 ? 1 : 0
-
+  function slice(startDeg: number, endDeg: number): string {
+    const s = ((startDeg - 90) * Math.PI) / 180
+    const e = ((endDeg - 90) * Math.PI) / 180
+    const x1 = CX + R * Math.cos(s), y1 = CY + R * Math.sin(s)
+    const x2 = CX + R * Math.cos(e), y2 = CY + R * Math.sin(e)
+    const ix1 = CX + IR * Math.cos(s), iy1 = CY + IR * Math.sin(s)
+    const ix2 = CX + IR * Math.cos(e), iy2 = CY + IR * Math.sin(e)
+    const large = endDeg - startDeg > 180 ? 1 : 0
     return [
       `M ${x1} ${y1}`,
-      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+      `A ${R} ${R} 0 ${large} 1 ${x2} ${y2}`,
       `L ${ix2} ${iy2}`,
-      `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${ix1} ${iy1}`,
-      'Z'
+      `A ${IR} ${IR} 0 ${large} 0 ${ix1} ${iy1}`,
+      'Z',
     ].join(' ')
   }
 
-  let currentAngle = 0
-  $: slices = items.map(item => {
-    const startAngle = currentAngle
-    const endAngle = currentAngle + (item.percentage / 100) * 360
-    currentAngle = endAngle
-    return {
-      ...item,
-      startAngle,
-      endAngle,
-      path: getSlicePath(startAngle, endAngle)
-    }
-  })
+  $: slices = (() => {
+    let angle = 0
+    return items.map((item) => {
+      const start = angle
+      const end = angle + (item.pct / 100) * 360
+      angle = end
+      return { ...item, path: slice(start, end) }
+    })
+  })()
+
+  let hoveredIdx = -1
 </script>
 
-<div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
-  {#if title}
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{title}</h3>
-  {/if}
-
+<div class="flex flex-col gap-4">
   {#if data.length === 0}
-    <div class="flex items-center justify-center h-80 text-gray-500">
+    <div class="flex items-center justify-center h-40 text-muted-foreground text-sm">
       No data available
     </div>
   {:else}
-    <div class="flex gap-8">
-      <div class="flex-shrink-0">
+    <div class="flex items-center gap-6 flex-wrap">
+      <!-- Donut SVG -->
+      <div class="relative flex-shrink-0">
         <svg width="200" height="200" viewBox="0 0 200 200">
-          {#each slices as slice}
-            <path d={slice.path} fill={slice.color} opacity="0.8" />
+          {#each slices as s, i}
+            <path
+              d={s.path}
+              fill={s.color}
+              opacity={hoveredIdx === -1 || hoveredIdx === i ? 1 : 0.4}
+              class="transition-opacity duration-150 cursor-pointer"
+              on:mouseenter={() => (hoveredIdx = i)}
+              on:mouseleave={() => (hoveredIdx = -1)}
+            />
           {/each}
+          <!-- Center label -->
+          {#if hoveredIdx >= 0}
+            <text
+              x={CX} y={CY - 6}
+              text-anchor="middle" font-size="11"
+              fill="hsl(var(--muted-foreground))"
+            >{slices[hoveredIdx].label}</text>
+            <text
+              x={CX} y={CY + 12}
+              text-anchor="middle" font-size="16" font-weight="700"
+              fill="hsl(var(--foreground))"
+            >{slices[hoveredIdx].pct.toFixed(1)}%</text>
+          {:else}
+            <text
+              x={CX} y={CY + 6}
+              text-anchor="middle" font-size="13" font-weight="600"
+              fill="hsl(var(--muted-foreground))"
+            >Portfolio</text>
+          {/if}
         </svg>
       </div>
 
-      <div class="flex flex-col justify-center gap-2">
-        {#each items as item}
-          <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full" style="background-color: {item.color}" />
-            <span class="text-sm text-gray-700 dark:text-gray-300">
-              {item.label}: {item.percentage.toFixed(1)}%
-            </span>
-          </div>
-        {/each}
-      </div>
+      <!-- Legend -->
+      {#if showLegend}
+        <div class="flex flex-col gap-2 flex-1 min-w-0">
+          {#each items as item, i}
+            <button
+              class="flex items-center gap-2 text-left hover:opacity-80 transition-opacity w-full"
+              on:mouseenter={() => (hoveredIdx = i)}
+              on:mouseleave={() => (hoveredIdx = -1)}
+            >
+              <span
+                class="flex-shrink-0 w-2.5 h-2.5 rounded-full"
+                style="background-color: {item.color}"
+              />
+              <span class="text-sm text-foreground truncate flex-1">{item.label}</span>
+              <span class="text-sm font-semibold text-foreground flex-shrink-0">
+                {item.pct.toFixed(1)}%
+              </span>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

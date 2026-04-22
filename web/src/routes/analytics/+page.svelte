@@ -31,12 +31,11 @@
   ]
 
   onMount(async () => {
-    if ($currentPortfolio) {
-      await loadAnalytics()
-    }
+    if ($currentPortfolio) await loadAnalytics()
   })
 
   async function loadAnalytics() {
+    if (!$currentPortfolio) return
     try {
       loading = true
       const data = await api.get(`/portfolios/${$currentPortfolio.id}/analytics`, {
@@ -50,13 +49,18 @@
     }
   }
 
-  $: if (timeframe) loadAnalytics()
+  $: if ($currentPortfolio && timeframe) loadAnalytics()
+
+  $: contribChart = (analyticsData.contribution_history || []).map((d: any) => ({
+    label: d.name,
+    value: d.value
+  }))
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="space-y-2">
         <h1 class="text-3xl font-bold text-foreground">Analytics</h1>
         <p class="text-muted-foreground">Performance analysis for {$currentPortfolio?.name}</p>
@@ -81,45 +85,48 @@
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card title="Time-Weighted Return (TWR)" subtitle="Adjusted for cash flows">
           <div class="flex items-baseline gap-2">
-            <div class="text-4xl font-bold text-accent">
+            <div
+              class="text-4xl font-bold"
+              class:text-positive={parseFloat(analyticsData.twr) >= 0}
+              class:text-negative={parseFloat(analyticsData.twr) < 0}
+            >
               {formatPercent(analyticsData.twr)}
             </div>
-            <Badge variant="default">
-              Standard Measure
-            </Badge>
+            <Badge variant="default">Standard Measure</Badge>
           </div>
         </Card>
 
         <Card title="Money-Weighted Return (MWR)" subtitle="Including cash flow timing">
           <div class="flex items-baseline gap-2">
-            <div class="text-4xl font-bold text-accent">
+            <div
+              class="text-4xl font-bold"
+              class:text-positive={parseFloat(analyticsData.mwr) >= 0}
+              class:text-negative={parseFloat(analyticsData.mwr) < 0}
+            >
               {formatPercent(analyticsData.mwr)}
             </div>
-            <Badge variant="secondary">
-              IRR Method
-            </Badge>
+            <Badge variant="secondary">IRR Method</Badge>
           </div>
         </Card>
       </div>
 
-      <!-- Charts -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card title="Performance History">
-          <LineChart
-            data={analyticsData.performance_history}
-            title=""
-            height="h-80"
-          />
-        </Card>
+      <!-- Performance History (full width) -->
+      <Card title="Performance History" subtitle="Portfolio value over time">
+        <LineChart
+          data={analyticsData.performance_history}
+          title=""
+          height="h-64 md:h-[480px]"
+        />
+      </Card>
 
-        <Card title="Contributions Over Time">
-          <BarChart
-            data={analyticsData.contribution_history}
-            title=""
-            height="h-80"
-          />
-        </Card>
-      </div>
+      <!-- Contributions Over Time (full width) -->
+      <Card title="Contributions Over Time" subtitle="Monthly net investment activity">
+        <BarChart
+          data={contribChart}
+          title=""
+          height="h-64 md:h-[480px]"
+        />
+      </Card>
 
       <!-- Asset Allocation and Sector Breakdown -->
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -1,36 +1,74 @@
 <script lang="ts">
   export let data: { label: string; value: number }[] = []
   export let title: string = ''
-  export let color: string = '#3b82f6'
   export let height: string = 'h-80'
 
-  $: maxValue = Math.max(...data.map(d => d.value), 0)
+  const BAR_H = 340
+  const BAR_W = 52
+
+  $: maxAbs = data.length ? Math.max(...data.map(d => Math.abs(d.value)), 1) : 1
+
+  function barHeight(v: number): number {
+    return Math.max(2, (Math.abs(v) / maxAbs) * BAR_H)
+  }
+
+  function abbrev(val: number): string {
+    if (Math.abs(val) >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`
+    if (Math.abs(val) >= 1_000) return `${(val / 1_000).toFixed(0)}k`
+    return val.toFixed(0)
+  }
+
+  let hoveredIdx = -1
 </script>
 
-<div class="bg-white dark:bg-gray-900 rounded-lg shadow p-6">
-  {#if title}
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{title}</h3>
-  {/if}
-
+<div class="overflow-x-auto pb-2">
   {#if data.length === 0}
-    <div class="flex items-center justify-center {height} text-gray-500">
+    <div class="flex items-center justify-center {height} text-muted-foreground text-sm">
       No data available
     </div>
   {:else}
-    <div class={`flex items-end gap-4 ${height} justify-around p-4`}>
-      {#each data as item}
-        <div class="flex flex-col items-center gap-2 flex-1">
-          <div class="relative w-full h-full flex items-end justify-center">
+    <div class="flex items-end gap-2 px-4" style="min-width: {data.length * (BAR_W + 8)}px; height: {BAR_H + 72}px">
+      {#each data as item, i}
+        {@const h = barHeight(item.value)}
+        {@const isPos = item.value >= 0}
+        <div
+          class="flex flex-col items-center gap-1 cursor-default"
+          style="width: {BAR_W}px"
+          on:mouseenter={() => (hoveredIdx = i)}
+          on:mouseleave={() => (hoveredIdx = -1)}
+        >
+          <!-- Value label on hover -->
+          <div class="h-5 flex items-center justify-center">
+            {#if hoveredIdx === i}
+              <span
+                class="text-xs font-semibold px-1 rounded"
+                class:text-accent={isPos}
+                class:text-destructive={!isPos}
+              >
+                {isPos ? '+' : ''}{abbrev(item.value)}
+              </span>
+            {/if}
+          </div>
+
+          <!-- Bar area -->
+          <div class="flex items-end justify-center" style="height: {BAR_H}px; width: {BAR_W}px">
             <div
-              class="w-full rounded-t transition-all"
-              style="background-color: {color}; height: {maxValue > 0 ? (item.value / maxValue) * 100 : 0}%"
+              class="w-full rounded-t transition-all duration-150"
+              style="
+                height: {h}px;
+                background-color: {isPos ? 'hsl(var(--accent))' : 'hsl(var(--destructive))'};
+                opacity: {hoveredIdx === -1 || hoveredIdx === i ? 1 : 0.5};
+              "
             />
           </div>
-          <span class="text-xs text-gray-600 dark:text-gray-400 text-center truncate w-full">
+
+          <!-- Label -->
+          <span
+            class="text-center leading-tight"
+            style="font-size: 10px; color: hsl(var(--muted-foreground)); width: {BAR_W}px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;"
+            title={item.label}
+          >
             {item.label}
-          </span>
-          <span class="text-xs font-semibold text-gray-900 dark:text-white">
-            {item.value.toFixed(2)}
           </span>
         </div>
       {/each}

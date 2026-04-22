@@ -70,6 +70,15 @@
   }
 }
 
+@layer utilities {
+  .text-positive {
+    color: #22c55e;
+  }
+  .text-negative {
+    color: #ef4444;
+  }
+}
+
 html {
   color-scheme: dark;
 }

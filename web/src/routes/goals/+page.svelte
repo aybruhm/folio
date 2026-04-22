@@ -14,16 +14,20 @@
   let showNewModal = false
 
   onMount(async () => {
-    if ($currentPortfolio) {
-      await loadGoals()
-    }
+    if ($currentPortfolio) await loadGoals()
   })
+
+  $: if ($currentPortfolio) loadGoals()
 
   async function loadGoals() {
     try {
       loading = true
-      const data = await api.get(`/portfolios/${$currentPortfolio.id}/goals`)
-      goals = data || []
+      const [data, portfolioData] = await Promise.all([
+        api.get(`/goals`, { portfolio_id: $currentPortfolio.id }),
+        api.get(`/portfolios/${$currentPortfolio.id}`)
+      ])
+      const currentValue = portfolioData?.current_value || '0'
+      goals = (data || []).map((g: any) => ({ ...g, current_value: currentValue }))
     } catch (e) {
       console.error('Failed to load goals:', e)
     } finally {
@@ -73,10 +77,10 @@
   }
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="space-y-2">
         <h1 class="text-3xl font-bold text-foreground">Goals</h1>
         <p class="text-muted-foreground">Track financial goals and FIRE projections</p>

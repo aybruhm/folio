@@ -23,16 +23,16 @@
   ]
 
   onMount(async () => {
-    if ($currentPortfolio) {
-      await loadTrades()
-    }
+    if ($currentPortfolio) await loadTrades()
   })
+
+  $: if ($currentPortfolio) loadTrades()
 
   async function loadTrades() {
     try {
       loading = true
-      const data = await api.get(`/portfolios/${$currentPortfolio.id}/trades`)
-      trades = data || []
+      const data = await api.get(`/trades`, { portfolio_id: $currentPortfolio.id, limit: 500 })
+      trades = (data as any)?.data || data || []
     } catch (e) {
       console.error('Failed to load trades:', e)
     } finally {
@@ -55,10 +55,10 @@
     : trades.filter(t => t.trade_type === tradeTypeFilter)
 </script>
 
-<div class="min-h-screen bg-background p-6">
+<div class="min-h-screen bg-background p-4 md:p-6">
   <div class="mx-auto max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="space-y-2">
         <h1 class="text-3xl font-bold text-foreground">Trades</h1>
         <p class="text-muted-foreground">Transaction history for {$currentPortfolio?.name}</p>
@@ -116,7 +116,7 @@
     trade={{
       ticker: '',
       trade_type: 'buy',
-      trade_date: new Date().toISOString().split('T')[0],
+      trade_date: new Date().toISOString().slice(0, 16),
       quantity: '',
       price: '',
       trade_currency: 'USD',
