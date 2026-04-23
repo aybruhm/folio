@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 from dataclasses import dataclass
 
-from api.domain.value_objects.money import Currency, TradeType
+from domain.value_objects.money import Currency, TradeType
 
 @dataclass
 class CreatePortfolioRequest:
@@ -18,7 +18,7 @@ class CreateTradeRequest:
     portfolio_id: UUID
     ticker: str
     trade_type: TradeType
-    trade_date: date
+    trade_date: datetime
     quantity: Decimal
     price: Decimal
     trade_currency: Currency

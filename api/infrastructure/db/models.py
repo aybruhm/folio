@@ -56,7 +56,7 @@ class TradeModel(Base):
     asset_id = Column(UUID(as_uuid=True), ForeignKey('assets.id'), nullable=False)
     ticker = Column(String(20), nullable=False)
     trade_type = Column(String(20), nullable=False)
-    trade_date = Column(Date, nullable=False)
+    trade_date = Column(DateTime, nullable=False)
     quantity = Column(Numeric(20, 8), nullable=False)
     price = Column(Numeric(20, 8), nullable=False)
     trade_currency = Column(CHAR(3), nullable=False)

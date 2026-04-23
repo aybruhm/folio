@@ -3,16 +3,16 @@ from typing import List, Optional, Tuple
 from datetime import date, datetime
 from decimal import Decimal
 
-from api.domain.entities.models import Trade, Asset
-from api.domain.value_objects.money import Currency, TradeType, AssetMetadata
-from api.domain.ports.inbound.use_cases import ITradeUseCase, CreateTradeRequest
-from api.domain.ports.outbound.repositories import (
+from domain.entities.models import Trade, Asset
+from domain.value_objects.money import Currency, TradeType, AssetMetadata
+from domain.ports.inbound.use_cases import ITradeUseCase, CreateTradeRequest
+from domain.ports.outbound.repositories import (
     ITradeRepository, IAssetRepository, IPortfolioRepository
 )
-from api.adapters.outbound.persistence.trade_repository import TradeRepository
-from api.adapters.outbound.persistence.asset_repository import AssetRepository
-from api.adapters.outbound.persistence.portfolio_repository import PortfolioRepository
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from adapters.outbound.persistence.trade_repository import TradeRepository
+from adapters.outbound.persistence.asset_repository import AssetRepository
+from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class TradeInteractor(ITradeUseCase):
@@ -81,9 +81,9 @@ class TradeInteractor(ITradeUseCase):
         if trade_type:
             filtered_trades = [t for t in filtered_trades if t.trade_type == trade_type]
         if start_date:
-            filtered_trades = [t for t in filtered_trades if t.trade_date >= start_date]
+            filtered_trades = [t for t in filtered_trades if (t.trade_date.date() if hasattr(t.trade_date, 'date') else t.trade_date) >= start_date]
         if end_date:
-            filtered_trades = [t for t in filtered_trades if t.trade_date <= end_date]
+            filtered_trades = [t for t in filtered_trades if (t.trade_date.date() if hasattr(t.trade_date, 'date') else t.trade_date) <= end_date]
         
         return [self._trade_to_dict(t) for t in filtered_trades], len(filtered_trades)
     
