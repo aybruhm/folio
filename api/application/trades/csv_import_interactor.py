@@ -145,7 +145,7 @@ class CsvImportInteractor(ICsvImportUseCase):
         
         try:
             date_str = row.get(mapping.get('trade_date', 'Date'), '')
-            trade_date = dt.strptime(date_str, date_format).date()
+            trade_date = dt.strptime(date_str, date_format)
         except ValueError:
             raise ValueError(f"Cannot parse date: {date_str} with format {date_format}")
         
