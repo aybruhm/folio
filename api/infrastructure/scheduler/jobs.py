@@ -29,7 +29,7 @@ async def init_scheduler():
     
     scheduler = AsyncIOScheduler(jobstores=job_stores)
     
-    if settings.scheduler_enabled:
+    if settings.SCHEDULER_ENABLED:
         scheduler.add_job(
             refresh_prices_job,
             'cron',
