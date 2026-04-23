@@ -1,25 +1,39 @@
-FROM python:3.12-slim
+# Base stage - build dependencies
+FROM python:3.13-slim AS builder
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONIOENCODING=UTF-8 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY api/pyproject.toml .
+COPY api/uv.lock .
+RUN pip install uv && uv pip install --system -t /install -r pyproject.toml
+
+
+# Runtime stage - hardened image
+FROM dhi.io/python:3.13-debian12
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONIOENCODING=UTF-8
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    gcc \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+USER 78545:78545
 
-# Copy requirements
-COPY api/requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY api/ /app/api
-COPY alembic/ /app/alembic
-COPY alembic.ini /app/
+# Copy Python dependencies only (no build tools needed at runtime)
+COPY --chown=78545:78545 --from=builder /install /opt/python/lib/python3.13/site-packages
+COPY --chown=78545:78545 api/ .
 
 EXPOSE 8000
-
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
