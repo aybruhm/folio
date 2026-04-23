@@ -3,7 +3,7 @@ from decimal import Decimal
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID, uuid4
-from api.domain.value_objects.money import Money, Currency, TradeType, AssetClass, DateRange, ReturnMetric, AssetMetadata
+from domain.value_objects.money import Money, Currency, TradeType, AssetClass, DateRange, ReturnMetric, AssetMetadata
 
 @dataclass
 class Asset:
@@ -17,7 +17,7 @@ class Asset:
     industry: Optional[str] = None
     country: Optional[str] = None
     isin: Optional[str] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
     
     @classmethod
     def from_metadata(cls, ticker: str, metadata: AssetMetadata) -> 'Asset':
@@ -41,7 +41,7 @@ class Trade:
     asset_id: UUID
     ticker: str
     trade_type: TradeType
-    trade_date: date
+    trade_date: datetime
     quantity: Decimal
     price: Decimal
     trade_currency: Currency
@@ -49,7 +49,7 @@ class Trade:
     notes: Optional[str] = None
     source: str = 'manual'
     import_batch_id: Optional[UUID] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
     
     def total_cost(self) -> Money:
         return Money(self.quantity * self.price + self.fees, self.trade_currency)
@@ -82,15 +82,15 @@ class Portfolio:
     name: str
     base_currency: Currency
     description: Optional[str] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
     
     def update(self, name: Optional[str] = None, description: Optional[str] = None) -> None:
         if name:
             self.name = name
         if description is not None:
             self.description = description
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now()
 
 @dataclass
 class Goal:
@@ -101,8 +101,8 @@ class Goal:
     target_date: date
     monthly_savings: Money
     expected_annual_return: Decimal
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
     
     def __post_init__(self):
         if not isinstance(self.expected_annual_return, Decimal):
