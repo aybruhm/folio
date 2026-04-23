@@ -1,11 +1,13 @@
 <script lang="ts">
   import '../app.css'
   import Navigation from '$lib/components/Navigation.svelte'
+  import Sidebar from '$lib/components/Sidebar.svelte'
   import { onMount } from 'svelte'
   import { portfolios, currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
 
   let isDark = true
+  let sidebarOpen = false
 
   onMount(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -43,11 +45,14 @@
 </script>
 
 <div class="flex h-screen flex-col bg-background text-foreground">
-  <Navigation {isDark} on:toggleTheme={toggleTheme} />
+  <Navigation {isDark} on:toggleTheme={toggleTheme} on:toggleSidebar={() => sidebarOpen = !sidebarOpen} />
 
-  <main class="flex-1 overflow-auto">
-    <slot />
-  </main>
+  <div class="flex flex-1 overflow-hidden">
+    <Sidebar open={sidebarOpen} onClose={() => sidebarOpen = false} />
+    <main class="flex-1 overflow-auto">
+      <slot />
+    </main>
+  </div>
 </div>
 
 <style>

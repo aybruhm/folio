@@ -2,12 +2,13 @@
   import { page } from '$app/stores'
   import Button from './Button.svelte'
   import { portfolios, currentPortfolio } from '$lib/stores'
+  import { createEventDispatcher } from 'svelte'
+
+  const dispatch = createEventDispatcher()
 
   export let isDark: boolean
-  export let onToggleTheme: (() => void) | undefined = undefined
 
   let showPortfolioMenu = false
-  let showMobileMenu = false
 
   const navLinks = [
     { label: 'Dashboard', href: '/' },
@@ -22,8 +23,12 @@
     return $page.url.pathname === href
   }
 
-  function handleNavClick() {
-    showMobileMenu = false
+  function handleToggleSidebar() {
+    dispatch('toggleSidebar')
+  }
+
+  function handleToggleTheme() {
+    dispatch('toggleTheme')
   }
 </script>
 
@@ -36,19 +41,6 @@
         </svg>
         <span class="text-lg font-bold text-foreground md:text-xl">Folio</span>
       </a>
-
-      <div class="hidden gap-1 md:flex">
-        {#each navLinks as link}
-          <a
-            href={link.href}
-            class="rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(link.href)
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
-          >
-            {link.label}
-          </a>
-        {/each}
-      </div>
     </div>
 
     <div class="flex items-center gap-2 md:gap-4">
@@ -84,7 +76,7 @@
       {/if}
 
       <!-- Theme toggle -->
-      <Button variant="ghost" size="icon" on:click={onToggleTheme} title={isDark ? 'Light mode' : 'Dark mode'}>
+      <Button variant="ghost" size="icon" on:click={handleToggleTheme} title={isDark ? 'Light mode' : 'Dark mode'}>
         {#if isDark}
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -96,9 +88,11 @@
         {/if}
       </Button>
 
+      <!-- Hamburger menu for mobile -->
       <button
-        on:click={() => (showMobileMenu = !showMobileMenu)}
+        on:click={handleToggleSidebar}
         class="md:hidden rounded-md p-2 hover:bg-muted"
+        title="Toggle menu"
       >
         <svg class="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -106,88 +100,4 @@
       </button>
     </div>
   </div>
-
-<<<<<<< HEAD
-  <!-- Mobile menu drawer -->
-  {#if showMobileMenu}
-    <div class="border-t border-border bg-card px-4 pb-4 md:hidden">
-      <!-- Portfolio selector for mobile -->
-      {#if $currentPortfolio}
-        <div class="pt-3 pb-2">
-          <p class="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Portfolio</p>
-          <div class="flex flex-col gap-1">
-            {#each $portfolios as p}
-              <button
-                on:click={() => { currentPortfolio.set(p); closeMobileMenu() }}
-                class="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-muted {$currentPortfolio.id === p.id
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground'}"
-              >
-                {p.name}
-                {#if $currentPortfolio.id === p.id}
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                {/if}
-              </button>
-            {/each}
-          </div>
-        </div>
-        <div class="my-2 border-t border-border" />
-      {/if}
-
-      <!-- Nav links -->
-      <div class="flex flex-col gap-1 pt-2">
-        {#each navLinks as link}
-          <a
-            href={link.href}
-            on:click={closeMobileMenu}
-            class="rounded-md px-3 py-2.5 text-sm font-medium transition-colors {isActive(link.href)
-=======
-  {#if showMobileMenu}
-    <div class="border-t border-border bg-card md:hidden">
-      <div class="space-y-1 px-4 py-4">
-        {#each navLinks as link}
-          <a
-            href={link.href}
-            on:click={handleNavClick}
-            class="block rounded-md px-3 py-2 text-sm font-medium transition-colors {isActive(
-              link.href
-            )
->>>>>>> mobile-responsiveness
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
-          >
-            {link.label}
-          </a>
-        {/each}
-<<<<<<< HEAD
-=======
-
-        {#if $currentPortfolio}
-          <div class="border-t border-border pt-4 mt-4">
-            <p class="px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
-              Current Portfolio
-            </p>
-            <div class="space-y-1">
-              {#each $portfolios as p}
-                <button
-                  on:click={() => {
-                    currentPortfolio.set(p)
-                    showMobileMenu = false
-                  }}
-                  class="block w-full px-3 py-2 text-left text-sm rounded-md hover:bg-muted {$currentPortfolio.id === p.id
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-foreground'}"
-                >
-                  {p.name}
-                </button>
-              {/each}
-            </div>
-          </div>
-        {/if}
->>>>>>> mobile-responsiveness
-      </div>
-    </div>
-  {/if}
 </nav>
