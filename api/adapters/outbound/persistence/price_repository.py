@@ -6,9 +6,9 @@ from datetime import date
 from decimal import Decimal
 from typing import List, Optional, Tuple
 
-from api.domain.value_objects.money import Currency
-from api.domain.ports.outbound.repositories import IPriceHistoryRepository, IFxRateRepository
-from api.infrastructure.db.models import PriceHistoryModel, FxRateModel
+from domain.value_objects.money import Currency
+from domain.ports.outbound.repositories import IPriceHistoryRepository, IFxRateRepository
+from infrastructure.db.models import PriceHistoryModel, FxRateModel
 
 class PriceHistoryRepository(IPriceHistoryRepository):
     def __init__(self, session: AsyncSession):

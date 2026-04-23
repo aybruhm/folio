@@ -3,9 +3,9 @@ import logging
 from datetime import date, timedelta
 from uuid import UUID
 
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from api.adapters.outbound.persistence.price_repository import PriceHistoryRepository
-from api.infrastructure.db.session import async_session
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from adapters.outbound.persistence.price_repository import PriceHistoryRepository
+from infrastructure.db.session import async_session
 
 logger = logging.getLogger(__name__)
 

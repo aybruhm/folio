@@ -4,10 +4,10 @@ from uuid import UUID
 from typing import List, Optional
 from decimal import Decimal
 
-from api.domain.entities.models import Goal
-from api.domain.value_objects.money import Currency, Money
-from api.domain.ports.outbound.repositories import IGoalRepository
-from api.infrastructure.db.models import GoalModel
+from domain.entities.models import Goal
+from domain.value_objects.money import Currency, Money
+from domain.ports.outbound.repositories import IGoalRepository
+from infrastructure.db.models import GoalModel
 
 class GoalRepository(IGoalRepository):
     def __init__(self, session: AsyncSession):

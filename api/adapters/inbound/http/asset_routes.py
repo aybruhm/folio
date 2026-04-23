@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from datetime import date
 
-from api.adapters.outbound.persistence.asset_repository import AssetRepository
-from api.adapters.outbound.persistence.price_repository import PriceHistoryRepository
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from api.infrastructure.db.session import get_session
+from adapters.outbound.persistence.asset_repository import AssetRepository
+from adapters.outbound.persistence.price_repository import PriceHistoryRepository
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/assets", tags=["assets"])

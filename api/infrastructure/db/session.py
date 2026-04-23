@@ -2,7 +2,7 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from api.infrastructure.config import settings
+from infrastructure.config import settings
 
 engine = create_async_engine(
     settings.database_url,
@@ -27,7 +27,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db():
-    from api.infrastructure.db.models import Base
+    from infrastructure.db.models import Base
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

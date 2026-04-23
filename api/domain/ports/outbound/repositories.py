@@ -4,10 +4,10 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 
-from api.domain.entities.models import (
+from domain.entities.models import (
     Portfolio, Trade, Asset, Goal, FxRate, Holding
 )
-from api.domain.value_objects.money import Money, Currency, AssetMetadata, TradeType
+from domain.value_objects.money import Money, Currency, AssetMetadata, TradeType
 
 class IPortfolioRepository(ABC):
     @abstractmethod

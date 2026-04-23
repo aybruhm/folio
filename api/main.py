@@ -2,9 +2,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from api.infrastructure.config import settings
+from infrastructure.config import settings
 
-from api.adapters.inbound.http import portfolio_routes, trade_routes, goal_routes, asset_routes, benchmark_fx_routes
+from adapters.inbound.http import portfolio_routes, trade_routes, goal_routes, asset_routes, benchmark_fx_routes
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
