@@ -2,6 +2,9 @@
   import Input from './Input.svelte'
   import Select from './Select.svelte'
   import Button from './Button.svelte'
+  import { createEventDispatcher } from 'svelte'
+
+  const dispatch = createEventDispatcher()
 
   export let trade: {
     ticker: string
@@ -20,7 +23,6 @@
     trade_currency: 'USD',
     fees: '0'
   }
-  export let onSubmit: (data: typeof trade) => Promise<void> = async () => {}
   export let isLoading = false
 
   const tradeTypes = [
@@ -49,7 +51,7 @@
     if (Object.keys(errors).length > 0) return
 
     try {
-      await onSubmit(trade)
+      dispatch('submit', trade)
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'An error occurred'
       errors.submit = message
