@@ -1,7 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, timedelta
 from typing import List, Optional, Tuple
-from api.domain.value_objects.money import Money, Currency
+from domain.value_objects.money import Money, Currency
 
 class PerformanceService:
     @staticmethod
@@ -72,16 +72,22 @@ class PerformanceService:
         
         rate = Decimal('0.1')
         for _ in range(100):
-            npv_val = npv(rate)
-            if abs(npv_val) < Decimal('0.00000001'):
+            try:
+                npv_val = npv(rate)
+                if abs(npv_val) < Decimal('0.001'): 
+                    break
+                delta = Decimal('0.0001')
+                derivative = (npv(rate + delta) - npv_val) / delta
+                if abs(derivative) < Decimal('1e-10'): 
+                    break
+                rate = rate - npv_val / derivative
+                rate = max(Decimal('-0.9999'), min(rate, Decimal('5')))
+            except Exception:
                 break
-            
-            derivative = (npv(rate + Decimal('0.00000001')) - npv_val) / Decimal('0.00000001')
-            if derivative == 0:
-                break
-            
-            rate = rate - npv_val / derivative
         
+        if not (Decimal('-0.9999') <= rate <= Decimal('5')):
+            total_flows = sum(abs(f[1]) for f in cash_flows)
+            return (ending_value - total_flows) / total_flows if total_flows > 0 else Decimal('0')
         return rate
 
 class AllocationService:
