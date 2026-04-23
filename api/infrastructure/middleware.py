@@ -3,7 +3,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.infrastructure.errors import AppException, ErrorCode
+from infrastructure.errors import AppException, ErrorCode
 
 logger = logging.getLogger(__name__)
 

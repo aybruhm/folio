@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from typing import List
 
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from api.domain.value_objects.money import Currency
-from api.infrastructure.db.session import get_session
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from domain.value_objects.money import Currency
+from infrastructure.db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router_benchmarks = APIRouter(prefix="/api/v1/benchmarks", tags=["benchmarks"])

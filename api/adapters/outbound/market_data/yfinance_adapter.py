@@ -4,8 +4,8 @@ from decimal import Decimal
 from typing import List, Optional, Tuple
 import logging
 
-from api.domain.value_objects.money import Currency, AssetMetadata
-from api.domain.ports.outbound.repositories import IAssetPricePort, IFxRatePort
+from domain.value_objects.money import Currency, AssetMetadata
+from domain.ports.outbound.repositories import IAssetPricePort, IFxRatePort
 
 logger = logging.getLogger(__name__)
 

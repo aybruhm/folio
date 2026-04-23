@@ -3,12 +3,12 @@ from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 
-from api.domain.entities.models import Goal
-from api.domain.value_objects.money import Money, Currency
-from api.domain.ports.inbound.use_cases import IGoalUseCase, CreateGoalRequest
-from api.domain.ports.outbound.repositories import IGoalRepository
-from api.domain.services.performance import FIREService
-from api.adapters.outbound.persistence.goal_repository import GoalRepository
+from domain.entities.models import Goal
+from domain.value_objects.money import Money, Currency
+from domain.ports.inbound.use_cases import IGoalUseCase, CreateGoalRequest
+from domain.ports.outbound.repositories import IGoalRepository
+from domain.services.performance import FIREService
+from adapters.outbound.persistence.goal_repository import GoalRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class GoalInteractor(IGoalUseCase):

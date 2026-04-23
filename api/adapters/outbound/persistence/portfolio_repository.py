@@ -3,10 +3,10 @@ from sqlalchemy.future import select
 from uuid import UUID
 from typing import List, Optional
 
-from api.domain.entities.models import Portfolio
-from api.domain.value_objects.money import Currency
-from api.domain.ports.outbound.repositories import IPortfolioRepository
-from api.infrastructure.db.models import PortfolioModel
+from domain.entities.models import Portfolio
+from domain.value_objects.money import Currency
+from domain.ports.outbound.repositories import IPortfolioRepository
+from infrastructure.db.models import PortfolioModel
 
 class PortfolioRepository(IPortfolioRepository):
     def __init__(self, session: AsyncSession):

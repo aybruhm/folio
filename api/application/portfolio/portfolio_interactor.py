@@ -2,11 +2,11 @@ from uuid import UUID, uuid4
 from typing import List, Optional
 from datetime import datetime
 
-from api.domain.entities.models import Portfolio
-from api.domain.value_objects.money import Currency
-from api.domain.ports.inbound.use_cases import IPortfolioUseCase, CreatePortfolioRequest
-from api.domain.ports.outbound.repositories import IPortfolioRepository
-from api.adapters.outbound.persistence.portfolio_repository import PortfolioRepository
+from domain.entities.models import Portfolio
+from domain.value_objects.money import Currency
+from domain.ports.inbound.use_cases import IPortfolioUseCase, CreatePortfolioRequest
+from domain.ports.outbound.repositories import IPortfolioRepository
+from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class PortfolioInteractor(IPortfolioUseCase):

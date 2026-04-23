@@ -5,10 +5,10 @@ from uuid import UUID
 from typing import List, Optional, Tuple
 from decimal import Decimal
 
-from api.domain.entities.models import Trade
-from api.domain.value_objects.money import Currency, TradeType
-from api.domain.ports.outbound.repositories import ITradeRepository
-from api.infrastructure.db.models import TradeModel
+from domain.entities.models import Trade
+from domain.value_objects.money import Currency, TradeType
+from domain.ports.outbound.repositories import ITradeRepository
+from infrastructure.db.models import TradeModel
 
 class TradeRepository(ITradeRepository):
     def __init__(self, session: AsyncSession):

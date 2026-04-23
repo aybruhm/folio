@@ -4,10 +4,10 @@ from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional
 
-from api.domain.entities.models import Asset
-from api.domain.value_objects.money import Currency, AssetClass
-from api.domain.ports.outbound.repositories import IAssetRepository
-from api.infrastructure.db.models import AssetModel
+from domain.entities.models import Asset
+from domain.value_objects.money import Currency, AssetClass
+from domain.ports.outbound.repositories import IAssetRepository
+from infrastructure.db.models import AssetModel
 
 class AssetRepository(IAssetRepository):
     def __init__(self, session: AsyncSession):

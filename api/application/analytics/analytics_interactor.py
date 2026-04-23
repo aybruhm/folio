@@ -1,19 +1,19 @@
 from uuid import UUID
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from api.domain.entities.models import Holding
-from api.domain.value_objects.money import Currency, Money
-from api.domain.ports.inbound.use_cases import IAnalyticsUseCase
-from api.domain.ports.outbound.repositories import (
+from domain.entities.models import Holding
+from domain.value_objects.money import Currency, Money
+from domain.ports.inbound.use_cases import IAnalyticsUseCase
+from domain.ports.outbound.repositories import (
     ITradeRepository, IAssetRepository, IPriceHistoryRepository, IFxRateRepository
 )
-from api.domain.services.performance import PerformanceService, AllocationService
-from api.adapters.outbound.persistence.trade_repository import TradeRepository
-from api.adapters.outbound.persistence.asset_repository import AssetRepository
-from api.adapters.outbound.persistence.price_repository import PriceHistoryRepository, FxRateRepository
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from domain.services.performance import PerformanceService, AllocationService
+from adapters.outbound.persistence.trade_repository import TradeRepository
+from adapters.outbound.persistence.asset_repository import AssetRepository
+from adapters.outbound.persistence.price_repository import PriceHistoryRepository, FxRateRepository
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class AnalyticsInteractor(IAnalyticsUseCase):
@@ -81,11 +81,21 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if not trades:
             return {'twr': '0', 'mwr': '0'}
         
-        cash_flows = [(t.trade_date, t.quantity * t.price) for t in trades if t.trade_type.value in ['buy', 'sell']]
+        cash_flows = []
+        for t in trades:
+            if t.trade_type.value in ['buy', 'sell']:
+                trade_date = t.trade_date.date() if hasattr(t.trade_date, 'date') else t.trade_date
+                if t.trade_type.value == 'buy':
+                    cash_flows.append((trade_date, -(t.quantity * t.price + t.fees)))
+                else:
+                    cash_flows.append((trade_date, t.quantity * t.price - t.fees))
+        
         beginning_value = Decimal('0')
         ending_value = Decimal('0')
         
-        actual_start = start_date or trades[0].trade_date
+        first_trade_date = trades[0].trade_date
+        first_trade_date = first_trade_date.date() if hasattr(first_trade_date, 'date') else first_trade_date
+        actual_start = start_date or first_trade_date
         actual_end = end_date or date.today()
         
         twr = PerformanceService.calculate_twr(
@@ -96,8 +106,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         )
         
         return {
-            'twr': str(twr),
-            'mwr': str(mwr),
+            'twr': str(round(twr * 100, 2)),
+            'mwr': str(round(mwr * 100, 2)),
             'start_date': actual_start.isoformat(),
             'end_date': actual_end.isoformat(),
         }

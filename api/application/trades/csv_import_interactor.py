@@ -5,13 +5,13 @@ from decimal import Decimal
 import csv
 import io
 
-from api.domain.entities.models import Trade
-from api.domain.value_objects.money import TradeType, Currency
-from api.domain.ports.inbound.use_cases import ICsvImportUseCase
-from api.domain.ports.outbound.repositories import ITradeRepository, IAssetRepository
-from api.adapters.outbound.persistence.trade_repository import TradeRepository
-from api.adapters.outbound.persistence.asset_repository import AssetRepository
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from domain.entities.models import Trade
+from domain.value_objects.money import TradeType, Currency
+from domain.ports.inbound.use_cases import ICsvImportUseCase
+from domain.ports.outbound.repositories import ITradeRepository, IAssetRepository
+from adapters.outbound.persistence.trade_repository import TradeRepository
+from adapters.outbound.persistence.asset_repository import AssetRepository
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class CsvImportInteractor(ICsvImportUseCase):

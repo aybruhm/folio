@@ -3,11 +3,11 @@ from uuid import UUID
 from typing import List, Optional
 from datetime import date
 
-from api.domain.value_objects.money import TradeType, Currency
-from api.domain.ports.inbound.use_cases import CreateTradeRequest
-from api.application.trades.trade_interactor import TradeInteractor
-from api.application.trades.csv_import_interactor import CsvImportInteractor
-from api.infrastructure.db.session import get_session
+from domain.value_objects.money import TradeType, Currency
+from domain.ports.inbound.use_cases import CreateTradeRequest
+from application.trades.trade_interactor import TradeInteractor
+from application.trades.csv_import_interactor import CsvImportInteractor
+from infrastructure.db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/trades", tags=["trades"])

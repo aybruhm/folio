@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from typing import List
 
-from api.application.goals.goal_interactor import GoalInteractor
-from api.domain.ports.inbound.use_cases import CreateGoalRequest
-from api.infrastructure.db.session import get_session
+from application.goals.goal_interactor import GoalInteractor
+from domain.ports.inbound.use_cases import CreateGoalRequest
+from infrastructure.db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/goals", tags=["goals"])

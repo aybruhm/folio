@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from uuid import UUID
 from typing import List, Optional
 
-from api.domain.value_objects.money import Currency
-from api.domain.ports.inbound.use_cases import CreatePortfolioRequest
-from api.application.portfolio.portfolio_interactor import PortfolioInteractor
-from api.adapters.outbound.persistence.portfolio_repository import PortfolioRepository
-from api.infrastructure.db.session import get_session
+from domain.value_objects.money import Currency
+from domain.ports.inbound.use_cases import CreatePortfolioRequest
+from application.portfolio.portfolio_interactor import PortfolioInteractor
+from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
+from infrastructure.db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/portfolios", tags=["portfolios"])
@@ -96,8 +96,8 @@ async def get_holdings(
     in_currency: Optional[str] = None,
     session: AsyncSession = Depends(get_session)
 ):
-    from api.application.analytics.analytics_interactor import AnalyticsInteractor
-    from api.infrastructure.db.session import async_session
+    from application.analytics.analytics_interactor import AnalyticsInteractor
+    from infrastructure.db.session import async_session
     
     try:
         base_currency = Currency.USD
@@ -114,7 +114,7 @@ async def get_performance(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session)
 ):
-    from api.application.analytics.analytics_interactor import AnalyticsInteractor
+    from application.analytics.analytics_interactor import AnalyticsInteractor
     
     try:
         interactor = AnalyticsInteractor(session, Currency.USD)
@@ -129,7 +129,7 @@ async def get_allocation(
     group_by: str = "asset_class",
     session: AsyncSession = Depends(get_session)
 ):
-    from api.application.analytics.analytics_interactor import AnalyticsInteractor
+    from application.analytics.analytics_interactor import AnalyticsInteractor
     
     try:
         interactor = AnalyticsInteractor(session, Currency.USD)

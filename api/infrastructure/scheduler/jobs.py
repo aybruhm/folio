@@ -3,11 +3,11 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from datetime import date, timedelta
 import logging
 
-from api.infrastructure.config import settings
-from api.adapters.outbound.persistence.trade_repository import TradeRepository
-from api.adapters.outbound.persistence.price_repository import PriceHistoryRepository
-from api.adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from api.infrastructure.db.session import engine
+from infrastructure.config import settings
+from adapters.outbound.persistence.trade_repository import TradeRepository
+from adapters.outbound.persistence.price_repository import PriceHistoryRepository
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.db.session import engine
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ async def refresh_prices_job():
     logger.info("Starting price refresh job")
     try:
         from sqlalchemy.ext.asyncio import create_async_engine
-        from api.infrastructure.db.session import async_session
+        from infrastructure.db.session import async_session
         
         async with async_session() as session:
             yfinance = YFinanceAdapter()
@@ -108,8 +108,8 @@ async def refresh_prices_job():
 async def refresh_fx_rates_job():
     logger.info("Starting FX refresh job")
     try:
-        from api.infrastructure.db.session import async_session
-        from api.domain.value_objects.money import Currency
+        from infrastructure.db.session import async_session
+        from domain.value_objects.money import Currency
         
         async with async_session() as session:
             yfinance = YFinanceAdapter()
@@ -138,7 +138,7 @@ async def refresh_fx_rates_job():
 async def refresh_benchmarks_job():
     logger.info("Starting benchmark refresh job")
     try:
-        from api.infrastructure.db.session import async_session
+        from infrastructure.db.session import async_session
         
         async with async_session() as session:
             yfinance = YFinanceAdapter()
