@@ -4,12 +4,15 @@
   import DonutChart from '$lib/components/DonutChart.svelte'
   import Button from '$lib/components/Button.svelte'
   import Badge from '$lib/components/Badge.svelte'
+  import TradeForm from '$lib/components/TradeForm.svelte'
   import { formatCurrency, formatPercent } from '$lib/utils/format'
   import { currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
   import { onMount } from 'svelte'
 
   let loading = true
+  let fabOpen = false
+  let showTradeModal = false
   let stats = {
     totalValue: '0',
     totalCostBasis: '0',
@@ -51,6 +54,27 @@
       loading = false
     }
   }
+
+  async function handleCreateTrade(event: CustomEvent) {
+    const trade = event.detail
+    try {
+      await api.post(`/portfolios/${$currentPortfolio.id}/trades`, {
+        ticker: trade.ticker,
+        trade_type: trade.trade_type,
+        trade_date: trade.trade_date,
+        quantity: parseFloat(trade.quantity),
+        price: parseFloat(trade.price),
+        trade_currency: trade.trade_currency,
+        fees: parseFloat(trade.fees) || 0,
+      })
+      showTradeModal = false
+      fabOpen = false
+      await loadDashboardData()
+    } catch (e) {
+      console.error('Failed to create trade:', e)
+    }
+  }
+
 
   $: isPositive = Number(stats.gainLoss) >= 0
 </script>
@@ -163,22 +187,67 @@
           <DonutChart data={topHoldingsChart} />
         </Card>
       </div>
-
-      <!-- Action Buttons -->
-      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Button variant="default" href="/trades/new">
-          <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          Add Trade
-        </Button>
-        <Button variant="outline" href="/portfolios">
-          Manage Portfolios
-        </Button>
-        <Button variant="outline" href="/analytics">
-          View Analytics
-        </Button>
-      </div>
     {/if}
   </div>
 </div>
+
+<!-- Floating Action Button -->
+<div class="fixed bottom-6 right-6 z-30 flex flex-col-reverse gap-2">
+  {#if fabOpen}
+    <a
+      href="/trades/new"
+      class="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+      title="New Trade"
+    >
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+    </a>
+    <a
+      href="/portfolios"
+      class="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+      title="Manage Portfolios"
+    >
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    </a>
+    <a
+      href="/analytics"
+      class="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
+      title="View Analytics"
+    >
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    </a>
+  {/if}
+  
+  <button
+    on:click={() => fabOpen = !fabOpen}
+    class="h-10 w-10 rounded-full bg-accent text-accent-foreground flex items-center justify-center hover:bg-accent/90 transition-all {fabOpen ? 'rotate-45' : ''}"
+    title="Actions"
+  >
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+    </svg>
+  </button>
+</div>
+
+<!-- Trade Modal -->
+{#if showTradeModal}
+  <div class="fixed inset-0 z-40 bg-black/50 flex items-end sm:items-center justify-center" on:click={() => showTradeModal = false}>
+    <div class="bg-card rounded-t-lg sm:rounded-lg w-full sm:max-w-md p-6 space-y-4" on:click|stopPropagation>
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Add Trade</h2>
+        <button on:click={() => showTradeModal = false} class="text-muted-foreground hover:text-foreground">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <TradeForm on:submit={handleCreateTrade} />
+    </div>
+  </div>
+{/if}
