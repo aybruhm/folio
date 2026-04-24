@@ -7,11 +7,13 @@
   import Badge from '$lib/components/Badge.svelte'
   import { currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
+  import { PortfolioController } from '$lib/api/controllers'
   import { formatPercent, formatCurrency } from '$lib/utils/format'
   import { onMount } from 'svelte'
 
   let loading = true
   let timeframe = '1y'
+  let portfolioController: PortfolioController
   let analyticsData: any = {
     twr: '0',
     mwr: '0',
@@ -31,6 +33,7 @@
   ]
 
   onMount(async () => {
+    portfolioController = new PortfolioController(api.getInstance())
     if ($currentPortfolio) await loadAnalytics()
   })
 
@@ -38,10 +41,15 @@
     if (!$currentPortfolio) return
     try {
       loading = true
-      const data = await api.get(`/portfolios/${$currentPortfolio.id}/analytics`, {
+      const response = await portfolioController.getPortfolioAnalytics({
+        portfolio_id: $currentPortfolio.id,
         timeframe
       })
-      analyticsData = data || {}
+      analyticsData = {
+        contribution_history: [],
+        sector_breakdown: [],
+        ...response,
+      }
     } catch (e) {
       console.error('Failed to load analytics:', e)
     } finally {
@@ -49,7 +57,7 @@
     }
   }
 
-  $: if ($currentPortfolio && timeframe) loadAnalytics()
+  $: if ($currentPortfolio && timeframe && portfolioController) loadAnalytics()
 
   $: contribChart = (analyticsData.contribution_history || []).map((d: any) => ({
     label: d.name,
@@ -110,24 +118,23 @@
         </Card>
       </div>
 
-      <!-- Charts -->
-      <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
-        <Card title="Performance History">
-          <LineChart
-            data={analyticsData.performance_history}
-            title=""
-            height="h-64 md:h-80"
-          />
-        </Card>
+      <!-- Performance History -->
+      <Card title="Performance History">
+        <LineChart
+          data={analyticsData.performance_history}
+          title=""
+          height="h-72 md:h-96"
+        />
+      </Card>
 
-        <Card title="Contributions Over Time">
-          <BarChart
-            data={analyticsData.contribution_history}
-            title=""
-            height="h-64 md:h-80"
-          />
-        </Card>
-      </div>
+      <!-- Contributions Over Time -->
+      <Card title="Contributions Over Time">
+        <BarChart
+          data={contribChart}
+          title=""
+          height="h-72 md:h-96"
+        />
+      </Card>
 
       <!-- Asset Allocation and Sector Breakdown -->
       <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">

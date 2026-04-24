@@ -5,15 +5,19 @@
   import { onMount } from 'svelte'
   import { portfolios, currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
+  import { PortfolioController } from '$lib/api/controllers'
+  import type { Portfolio } from '$lib/api/types'
 
   let isDark = true
   let sidebarOpen = false
+  let portfolioController: PortfolioController
 
   onMount(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     isDark = localStorage.getItem('theme') === 'light' ? false : prefersDark || true
     applyTheme()
 
+    portfolioController = new PortfolioController(api.getInstance())
     loadPortfolios()
   })
 
@@ -33,7 +37,7 @@
 
   async function loadPortfolios() {
     try {
-      const data = await api.get<any[]>('/portfolios')
+      const data = await portfolioController.listPortfolios()
       portfolios.set(data || [])
       if (data && data.length > 0) {
         currentPortfolio.set(data[0])

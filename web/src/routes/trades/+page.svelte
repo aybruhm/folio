@@ -7,12 +7,17 @@
   import Select from '$lib/components/Select.svelte'
   import { currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
+  import { TradeController } from '$lib/api/controllers'
+  import type { CreateTradeRequest, Trade } from '$lib/api/types'
   import { onMount } from 'svelte'
 
   let loading = true
-  let trades: any[] = []
+  let trades: Trade[] = []
   let showNewModal = false
+  let showEditModal = false
+  let editingTrade: any = null
   let tradeTypeFilter = 'all'
+  let tradeController: TradeController
 
   const tradeTypeOptions = [
     { label: 'All Types', value: 'all' },
@@ -23,16 +28,20 @@
   ]
 
   onMount(async () => {
+    tradeController = new TradeController(api.getInstance())
     if ($currentPortfolio) await loadTrades()
   })
 
-  $: if ($currentPortfolio) loadTrades()
+  $: if ($currentPortfolio && tradeController) loadTrades()
 
   async function loadTrades() {
     try {
       loading = true
-      const data = await api.get(`/trades`, { portfolio_id: $currentPortfolio.id, limit: 500 })
-      trades = (data as any)?.data || data || []
+      const response = await tradeController.listTrades({
+        portfolio_id: $currentPortfolio.id,
+        limit: 500
+      })
+      trades = (response.data as Trade[]) || []
     } catch (e) {
       console.error('Failed to load trades:', e)
     } finally {
@@ -42,7 +51,17 @@
 
   async function handleCreateTrade(trade: any) {
     try {
-      await api.post(`/portfolios/${$currentPortfolio.id}/trades`, trade)
+      const tradeRequest: CreateTradeRequest = {
+        portfolio_id: $currentPortfolio.id,
+        ticker: trade.ticker,
+        trade_type: trade.trade_type,
+        trade_date: trade.trade_date,
+        quantity: parseFloat(trade.quantity),
+        price: parseFloat(trade.price),
+        trade_currency: trade.trade_currency,
+        fees: parseFloat(trade.fees) || 0,
+      }
+      await tradeController.createTrade(tradeRequest)
       await loadTrades()
       showNewModal = false
     } catch (e) {
@@ -50,8 +69,53 @@
     }
   }
 
-  $: filteredTrades = tradeTypeFilter === 'all' 
-    ? trades 
+  function handleEditTrade(row: any) {
+    editingTrade = {
+      id: row.id,
+      ticker: row.ticker,
+      trade_type: row.trade_type,
+      trade_date: row.trade_date.slice(0, 16),
+      quantity: String(row.quantity),
+      price: String(row.price),
+      trade_currency: row.trade_currency,
+      fees: String(row.fees ?? 0),
+    }
+    showEditModal = true
+  }
+
+  async function handleUpdateTrade(trade: any) {
+    try {
+      const tradeRequest: CreateTradeRequest = {
+        portfolio_id: $currentPortfolio.id,
+        ticker: trade.ticker,
+        trade_type: trade.trade_type,
+        trade_date: trade.trade_date,
+        quantity: parseFloat(trade.quantity),
+        price: parseFloat(trade.price),
+        trade_currency: trade.trade_currency,
+        fees: parseFloat(trade.fees) || 0,
+      }
+      await tradeController.updateTrade(editingTrade.id, tradeRequest)
+      await loadTrades()
+      showEditModal = false
+      editingTrade = null
+    } catch (e) {
+      console.error('Failed to update trade:', e)
+    }
+  }
+
+  async function handleDeleteTrade(tradeId: string) {
+    if (!confirm('Delete this trade? This cannot be undone.')) return
+    try {
+      await tradeController.deleteTrade(tradeId)
+      await loadTrades()
+    } catch (e) {
+      console.error('Failed to delete trade:', e)
+    }
+  }
+
+  $: filteredTrades = tradeTypeFilter === 'all'
+    ? trades
     : trades.filter(t => t.trade_type === tradeTypeFilter)
 </script>
 
@@ -89,8 +153,8 @@
       <Card title="No trades" subtitle="Create your first trade to track investments">
         <div class="py-8 text-center">
           <p class="mb-4 text-muted-foreground">
-            {tradeTypeFilter === 'all' 
-              ? "You don't have any trades yet." 
+            {tradeTypeFilter === 'all'
+              ? "You don't have any trades yet."
               : `No ${tradeTypeFilter} trades found.`}
           </p>
           <Button variant="default" on:click={() => (showNewModal = true)}>
@@ -101,20 +165,25 @@
     {:else}
       <Card title="Trade History">
         <div class="overflow-x-auto -mx-4 md:mx-0">
-          <TradeTable trades={filteredTrades} />
+          <TradeTable
+            trades={filteredTrades}
+            on:edit={(e) => handleEditTrade(e.detail)}
+            on:delete={(e) => handleDeleteTrade(e.detail)}
+          />
         </div>
       </Card>
     {/if}
   </div>
 </div>
 
+<!-- New Trade Modal -->
 <Modal
   open={showNewModal}
   title="Create Trade"
   onClose={() => (showNewModal = false)}
 >
   <TradeForm
-    onSubmit={handleCreateTrade}
+    on:submit={(e) => handleCreateTrade(e.detail)}
     trade={{
       ticker: '',
       trade_type: 'buy',
@@ -131,3 +200,22 @@
     </Button>
   </svelte:fragment>
 </Modal>
+
+<!-- Edit Trade Modal -->
+{#if editingTrade}
+  <Modal
+    open={showEditModal}
+    title="Edit Trade"
+    onClose={() => { showEditModal = false; editingTrade = null }}
+  >
+    <TradeForm
+      on:submit={(e) => handleUpdateTrade(e.detail)}
+      trade={editingTrade}
+    />
+    <svelte:fragment slot="footer">
+      <Button variant="outline" on:click={() => { showEditModal = false; editingTrade = null }}>
+        Cancel
+      </Button>
+    </svelte:fragment>
+  </Modal>
+{/if}
