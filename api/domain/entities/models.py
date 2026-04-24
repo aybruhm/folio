@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
-from decimal import Decimal
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID, uuid4
-from domain.value_objects.money import Money, Currency, TradeType, AssetClass, DateRange, ReturnMetric, AssetMetadata
+from domain.value_objects.money import Currency, TradeType, AssetClass, DateRange, AssetMetadata
 
 @dataclass
 class Asset:
@@ -18,7 +17,7 @@ class Asset:
     country: Optional[str] = None
     isin: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
-    
+
     @classmethod
     def from_metadata(cls, ticker: str, metadata: AssetMetadata) -> 'Asset':
         return cls(
@@ -42,39 +41,39 @@ class Trade:
     ticker: str
     trade_type: TradeType
     trade_date: datetime
-    quantity: Decimal
-    price: Decimal
+    quantity: int  # ×100 scale (e.g. 10 shares → 1000)
+    price: int     # ×100 scale (e.g. $185.20 → 18520)
     trade_currency: Currency
-    fees: Decimal = Decimal('0')
+    fees: int = 0  # ×100 scale
     notes: Optional[str] = None
     source: str = 'manual'
     import_batch_id: Optional[UUID] = None
     created_at: datetime = field(default_factory=datetime.now)
-    
-    def total_cost(self) -> Money:
-        return Money(self.quantity * self.price + self.fees, self.trade_currency)
+
+    def total_cost(self) -> int:
+        return (self.quantity * self.price) // 100 + self.fees
 
 @dataclass
 class Holding:
     asset_id: UUID
     ticker: str
-    quantity: Decimal
-    current_price: Money
-    cost_basis: Money
-    market_value: Money
-    total_return: Money
-    unrealised_pnl: Money
-    realised_pnl: Money = field(default_factory=lambda: Money(Decimal('0'), Currency.USD))
-    
+    quantity: int       # ×100
+    current_price: int  # ×100
+    cost_basis: int     # ×100
+    market_value: int   # ×100
+    total_return: int   # ×100
+    unrealised_pnl: int # ×100
+    realised_pnl: int = 0  # ×100
+
     @property
-    def total_return_percent(self) -> Decimal:
-        if self.cost_basis.amount == 0:
-            return Decimal('0')
-        return (self.total_return.amount / self.cost_basis.amount) * Decimal('100')
-    
+    def total_return_percent(self) -> float:
+        if self.cost_basis == 0:
+            return 0.0
+        return (self.total_return / self.cost_basis) * 100
+
     @property
-    def weight(self) -> Decimal:
-        return self.market_value.amount
+    def weight(self) -> int:
+        return self.market_value
 
 @dataclass
 class Portfolio:
@@ -84,7 +83,7 @@ class Portfolio:
     description: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    
+
     def update(self, name: Optional[str] = None, description: Optional[str] = None) -> None:
         if name:
             self.name = name
@@ -97,29 +96,21 @@ class Goal:
     id: UUID
     portfolio_id: UUID
     name: str
-    target_net_worth: Money
+    target_net_worth: int           # ×100
+    target_net_worth_currency: Currency
     target_date: date
-    monthly_savings: Money
-    expected_annual_return: Decimal
+    monthly_savings: int            # ×100
+    monthly_savings_currency: Currency
+    expected_annual_return: int     # ×100 (e.g. 7% → 7)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
-    
-    def __post_init__(self):
-        if not isinstance(self.expected_annual_return, Decimal):
-            object.__setattr__(self, 'expected_annual_return', Decimal(str(self.expected_annual_return)))
-        if self.monthly_savings.currency != self.target_net_worth.currency:
-            raise ValueError("Monthly savings and target net worth must use same currency")
 
 @dataclass
 class FxRate:
     from_currency: Currency
     to_currency: Currency
     date: date
-    rate: Decimal
-    
-    def convert(self, amount: Decimal) -> Decimal:
-        return amount * self.rate
-    
-    def __post_init__(self):
-        if not isinstance(self.rate, Decimal):
-            object.__setattr__(self, 'rate', Decimal(str(self.rate)))
+    rate: int  # ×100
+
+    def convert(self, amount: int) -> int:
+        return (amount * self.rate) // 100
