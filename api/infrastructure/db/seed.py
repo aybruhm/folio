@@ -3,7 +3,6 @@ import logging
 import math
 import random
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -16,7 +15,7 @@ from infrastructure.db.models import (
     PriceHistoryModel,
     TradeModel,
 )
-from infrastructure.db.session import AsyncSession
+from infrastructure.db.session import async_session
 
 log = logging.getLogger(__name__)
 
@@ -135,21 +134,21 @@ def _weekdays(start: date, end: date) -> list[date]:
 
 def _gbm_prices(
     base: float, drift: float, vol: float, days: list[date], rng: random.Random
-) -> dict[date, Decimal]:
-    """Geometric Brownian Motion discretised at daily frequency."""
+) -> dict[date, int]:
+    """Geometric Brownian Motion discretised at daily frequency. Returns price ×100 as int."""
     dt = 1 / 252
     price = base
-    result: dict[date, Decimal] = {}
+    result: dict[date, int] = {}
     for d in days:
-        result[d] = Decimal(str(round(price, 4)))
+        result[d] = round(price * 100)
         price *= math.exp(
             (drift - 0.5 * vol**2) * dt + vol * math.sqrt(dt) * rng.gauss(0, 1)
         )
     return result
 
 
-def _price_on(prices: dict[date, Decimal], d: date) -> Decimal:
-    """Last available close price on or before date d."""
+def _price_on(prices: dict[date, int], d: date) -> int:
+    """Last available close price (×100) on or before date d."""
     while d >= _START:
         if d in prices:
             return prices[d]
@@ -165,13 +164,13 @@ def _price_on(prices: dict[date, Decimal], d: date) -> Decimal:
 def _build_trades(
     portfolio_id,
     asset_map: dict[str, uuid4],
-    price_map: dict[str, dict[date, Decimal]],
+    price_map: dict[str, dict[date, int]],
 ) -> list[dict]:
 
     trades: list[dict] = []
 
-    def _t(ticker, ttype, d: date, qty, fee=Decimal("4.95")):
-        price = _price_on(price_map[ticker], d)
+    def _t(ticker, ttype, d: date, qty, fee_dollars: float = 4.95):
+        price = _price_on(price_map[ticker], d)  # already ×100
         trades.append(
             dict(
                 id=uuid4(),
@@ -180,10 +179,10 @@ def _build_trades(
                 ticker=ticker,
                 trade_type=ttype,
                 trade_date=datetime(d.year, d.month, d.day, 9, 30),
-                quantity=Decimal(str(qty)),
+                quantity=round(qty * 100),
                 price=price,
                 trade_currency="USD",
-                fees=fee,
+                fees=round(fee_dollars * 100),
                 source="manual",
             )
         )
@@ -195,7 +194,7 @@ def _build_trades(
         _t(ticker, "sell", d, qty)
 
     def div(ticker, d, qty, amt):
-        _t(ticker, "dividend", d, qty, fee=Decimal(str(amt)))
+        _t(ticker, "dividend", d, qty, fee_dollars=amt)
 
     # ── 2024 Q1 — initial positions ──────────────────────────────────────
     buy("VOO", date(2024, 1, 5), 10)
@@ -264,7 +263,7 @@ def _build_trades(
 
 async def seed() -> None:
     try:
-        async with AsyncSession() as session:
+        async with async_session() as session:
             existing = await session.execute(
                 select(PortfolioModel).where(PortfolioModel.name == "Demo Portfolio")
             )
@@ -288,7 +287,7 @@ async def seed() -> None:
             # Assets + price history
             rng = random.Random(_RNG_SEED)
             weekdays = _weekdays(_START, _END)
-            price_map: dict[str, dict[date, Decimal]] = {}
+            price_map: dict[str, dict[date, int]] = {}
             asset_map: dict[str, uuid4] = {}
 
             for a in _ASSETS:
@@ -335,12 +334,12 @@ async def seed() -> None:
                     id=uuid4(),
                     portfolio_id=portfolio_id,
                     name="FIRE by 2040",
-                    target_net_worth=Decimal("2000000"),
+                    target_net_worth=200000000,   # $2,000,000 × 100
                     target_net_worth_currency="USD",
                     target_date=date(2040, 1, 1),
-                    monthly_savings=Decimal("3000"),
+                    monthly_savings=300000,        # $3,000 × 100
                     monthly_savings_currency="USD",
-                    expected_annual_return=Decimal("0.07"),
+                    expected_annual_return=7,      # 7% × 100 = 7 (÷100 → 0.07)
                 )
             )
 
