@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from "axios";
+import { envUtils } from "@/utils/env";
 
-const API_BASE_URL =
-    import.meta.env.PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1/";
+const API_BASE_URL = envUtils.getBaseUrl();
 
 export interface ApiResponse<T> {
     data?: T;
