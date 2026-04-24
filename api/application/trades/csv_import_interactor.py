@@ -1,7 +1,6 @@
 from uuid import UUID, uuid4
 from typing import List, Optional
 from datetime import datetime
-from decimal import Decimal
 import csv
 import io
 
@@ -99,7 +98,7 @@ class CsvImportInteractor(ICsvImportUseCase):
                         quantity=trade_data['quantity'],
                         price=trade_data['price'],
                         trade_currency=trade_data['currency'],
-                        fees=trade_data.get('fees', Decimal('0')),
+                        fees=trade_data.get('fees', 0),
                         notes=trade_data.get('notes'),
                         source='csv_import',
                         import_batch_id=import_batch_id,
@@ -150,17 +149,21 @@ class CsvImportInteractor(ICsvImportUseCase):
             raise ValueError(f"Cannot parse date: {date_str} with format {date_format}")
         
         try:
-            quantity = Decimal(row.get(mapping.get('quantity', 'Quantity'), '0'))
+            quantity = round(float(row.get(mapping.get('quantity', 'Quantity'), '0')) * 100)
             if quantity < 0:
                 raise ValueError("Quantity cannot be negative")
-        except:
+        except ValueError:
+            raise
+        except Exception:
             raise ValueError("Invalid quantity")
-        
+
         try:
-            price = Decimal(row.get(mapping.get('price', 'Price'), '0'))
+            price = round(float(row.get(mapping.get('price', 'Price'), '0')) * 100)
             if price <= 0:
                 raise ValueError("Price must be positive")
-        except:
+        except ValueError:
+            raise
+        except Exception:
             raise ValueError("Invalid price")
         
         currency_str = row.get(mapping.get('trade_currency', 'Currency'), 'USD')
@@ -176,6 +179,6 @@ class CsvImportInteractor(ICsvImportUseCase):
             'quantity': quantity,
             'price': price,
             'currency': currency,
-            'fees': Decimal(row.get(mapping.get('fees', 'Fees'), '0') or '0'),
+            'fees': round(float(row.get(mapping.get('fees', 'Fees'), '0') or '0') * 100),
             'notes': row.get(mapping.get('notes', 'Notes')),
         }
