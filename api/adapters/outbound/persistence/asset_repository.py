@@ -47,6 +47,13 @@ class AssetRepository(IAssetRepository):
         model = await self.session.get(AssetModel, asset_id)
         return self._to_domain(model) if model else None
     
+    async def update_classification(self, asset_id: UUID, asset_class: str, currency: str) -> None:
+        model = await self.session.get(AssetModel, asset_id)
+        if model:
+            model.asset_class = asset_class
+            model.currency = currency
+            await self.session.flush()
+
     async def search_by_ticker(self, query: str, limit: int = 10) -> List[Asset]:
         search_query = f"%{query}%"
         result = await self.session.execute(

@@ -3,7 +3,6 @@ from sqlalchemy.future import select
 from sqlalchemy import and_
 from uuid import UUID
 from datetime import date
-from decimal import Decimal
 from typing import List, Optional, Tuple
 
 from domain.value_objects.money import Currency
@@ -13,9 +12,9 @@ from infrastructure.db.models import PriceHistoryModel, FxRateModel
 class PriceHistoryRepository(IPriceHistoryRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def add(
-        self, asset_id: UUID, date_val: date, close: Decimal, currency: Currency
+        self, asset_id: UUID, date_val: date, close: int, currency: Currency
     ) -> None:
         model = PriceHistoryModel(
             asset_id=asset_id,
@@ -25,10 +24,10 @@ class PriceHistoryRepository(IPriceHistoryRepository):
         )
         self.session.add(model)
         await self.session.flush()
-    
+
     async def get_history(
         self, asset_id: UUID, start: date, end: date
-    ) -> List[Tuple[date, Decimal]]:
+    ) -> List[Tuple[date, int]]:
         result = await self.session.execute(
             select(PriceHistoryModel)
             .where(
@@ -41,9 +40,9 @@ class PriceHistoryRepository(IPriceHistoryRepository):
             .order_by(PriceHistoryModel.date.asc())
         )
         models = result.scalars().all()
-        return [(m.date, Decimal(str(m.close))) for m in models]
-    
-    async def get_latest(self, asset_id: UUID) -> Optional[Tuple[date, Decimal]]:
+        return [(m.date, int(m.close)) for m in models]
+
+    async def get_latest(self, asset_id: UUID) -> Optional[Tuple[date, int]]:
         result = await self.session.execute(
             select(PriceHistoryModel)
             .where(PriceHistoryModel.asset_id == asset_id)
@@ -51,14 +50,14 @@ class PriceHistoryRepository(IPriceHistoryRepository):
             .limit(1)
         )
         model = result.scalar_one_or_none()
-        return (model.date, Decimal(str(model.close))) if model else None
+        return (model.date, int(model.close)) if model else None
 
 class FxRateRepository(IFxRateRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def add(
-        self, from_currency: Currency, to_currency: Currency, date_val: date, rate: Decimal
+        self, from_currency: Currency, to_currency: Currency, date_val: date, rate: int
     ) -> None:
         model = FxRateModel(
             from_currency=from_currency.value,
@@ -68,10 +67,10 @@ class FxRateRepository(IFxRateRepository):
         )
         self.session.add(model)
         await self.session.flush()
-    
+
     async def get_rate(
         self, from_currency: Currency, to_currency: Currency, date_val: date
-    ) -> Optional[Decimal]:
+    ) -> Optional[int]:
         result = await self.session.execute(
             select(FxRateModel).where(
                 and_(
@@ -82,11 +81,11 @@ class FxRateRepository(IFxRateRepository):
             )
         )
         model = result.scalar_one_or_none()
-        return Decimal(str(model.rate)) if model else None
-    
+        return int(model.rate) if model else None
+
     async def get_latest_rate(
         self, from_currency: Currency, to_currency: Currency
-    ) -> Optional[Decimal]:
+    ) -> Optional[int]:
         result = await self.session.execute(
             select(FxRateModel)
             .where(
@@ -99,4 +98,4 @@ class FxRateRepository(IFxRateRepository):
             .limit(1)
         )
         model = result.scalar_one_or_none()
-        return Decimal(str(model.rate)) if model else None
+        return int(model.rate) if model else None
