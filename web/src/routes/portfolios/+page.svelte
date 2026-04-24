@@ -5,27 +5,34 @@
   import PortfolioForm from '$lib/components/PortfolioForm.svelte'
   import { portfolios } from '$lib/stores'
   import { api } from '$lib/api/client'
+  import { PortfolioController } from '$lib/api/controllers'
+  import type { CreatePortfolioRequest, Portfolio } from '$lib/api/types'
   import { onMount } from 'svelte'
   import { formatCurrency } from '$lib/utils/format'
 
   let loading = true
   let showNewModal = false
+  let portfolioController: PortfolioController
   let portfolioStats: Record<string, any> = {}
 
   onMount(async () => {
+    portfolioController = new PortfolioController(api.getInstance())
     await loadPortfolios()
   })
 
   async function loadPortfolios() {
     try {
       loading = true
-      const data = await api.get('/portfolios')
+      const data = await portfolioController.listPortfolios()
       portfolios.set(data || [])
 
       for (const p of data || []) {
         try {
-          const stats = await api.get(`/portfolios/${p.id}`)
-          portfolioStats[p.id] = stats
+          const analytics = await portfolioController.getPortfolioAnalytics({
+            portfolio_id: p.id,
+            timeframe: '1y'
+          })
+          portfolioStats[p.id] = analytics
         } catch (e) {
           console.error(`Failed to load stats for portfolio ${p.id}:`, e)
         }
@@ -39,7 +46,12 @@
 
   async function handleCreatePortfolio(portfolio: any) {
     try {
-      const result = await api.post('/portfolios', portfolio)
+      const request: CreatePortfolioRequest = {
+        name: portfolio.name,
+        base_currency: portfolio.base_currency,
+        description: portfolio.description
+      }
+      await portfolioController.createPortfolio(request)
       await loadPortfolios()
       showNewModal = false
     } catch (e) {
@@ -51,7 +63,7 @@
     if (!confirm('Are you sure you want to delete this portfolio?')) return
 
     try {
-      await api.delete(`/portfolios/${id}`)
+      await portfolioController.deletePortfolio(id)
       await loadPortfolios()
     } catch (e) {
       console.error('Failed to delete portfolio:', e)
@@ -97,27 +109,32 @@
           <Card title={portfolio.name} subtitle={portfolio.base_currency}>
             <div class="space-y-4">
               {#if stats}
+                {@const currentValue = stats.current_value ?? 0}
                 <div class="space-y-2">
                   <div class="flex justify-between">
                     <span class="text-xs md:text-sm text-muted-foreground">Value</span>
                     <span class="text-sm md:text-base font-semibold text-foreground">
-                      {formatCurrency(stats.current_value)}
+                      {formatCurrency(currentValue)}
                     </span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-xs md:text-sm text-muted-foreground">Cost Basis</span>
-                    <span class="text-sm md:text-base font-semibold text-foreground">
-                      {formatCurrency(stats.cost_basis)}
-                    </span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-xs md:text-sm text-muted-foreground">Return</span>
+                    <span class="text-xs md:text-sm text-muted-foreground">TWR</span>
                     <span
                       class="text-sm md:text-base font-semibold"
-                      class:text-positive={Number(stats.return_percent) >= 0}
-                      class:text-negative={Number(stats.return_percent) < 0}
+                      class:text-positive={parseFloat(stats.twr) >= 0}
+                      class:text-negative={parseFloat(stats.twr) < 0}
                     >
-                      {stats.return_percent}%
+                      {stats.twr}%
+                    </span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-xs md:text-sm text-muted-foreground">MWR</span>
+                    <span
+                      class="text-sm md:text-base font-semibold"
+                      class:text-positive={parseFloat(stats.mwr) >= 0}
+                      class:text-negative={parseFloat(stats.mwr) < 0}
+                    >
+                      {stats.mwr}%
                     </span>
                   </div>
                 </div>

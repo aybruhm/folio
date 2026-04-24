@@ -6,28 +6,43 @@
   import Badge from '$lib/components/Badge.svelte'
   import { currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
+  import { PortfolioController, GoalController } from '$lib/api/controllers'
+  import type { CreateGoalRequest, Goal } from '$lib/api/types'
   import { formatCurrency, formatDate, getMonthsFromNow } from '$lib/utils/format'
   import { onMount } from 'svelte'
 
+  type GoalFormData = {
+    name: string
+    target_amount: string
+    target_date: string
+    expected_annual_return: string
+    description: string
+  }
+
   let loading = true
-  let goals: any[] = []
+  let goals: Goal[] = []
+  let currentPortfolioValue = 0
   let showNewModal = false
+  let portfolioController: PortfolioController
+  let goalController: GoalController
 
   onMount(async () => {
+    portfolioController = new PortfolioController(api.getInstance())
+    goalController = new GoalController(api.getInstance())
     if ($currentPortfolio) await loadGoals()
   })
 
-  $: if ($currentPortfolio) loadGoals()
+  $: if ($currentPortfolio && goalController) loadGoals()
 
   async function loadGoals() {
     try {
       loading = true
-      const [data, portfolioData] = await Promise.all([
-        api.get(`/goals`, { portfolio_id: $currentPortfolio.id }),
-        api.get(`/portfolios/${$currentPortfolio.id}`)
+      const [goalsResponse, analyticsData] = await Promise.all([
+        goalController.listGoals($currentPortfolio.id),
+        portfolioController.getPortfolioAnalytics({ portfolio_id: $currentPortfolio.id, timeframe: '1y' })
       ])
-      const currentValue = portfolioData?.current_value || '0'
-      goals = (data || []).map((g: any) => ({ ...g, current_value: currentValue }))
+      goals = goalsResponse
+      currentPortfolioValue = analyticsData.current_value ?? 0
     } catch (e) {
       console.error('Failed to load goals:', e)
     } finally {
@@ -35,9 +50,19 @@
     }
   }
 
-  async function handleCreateGoal(goal: any) {
+  async function handleCreateGoal(goal: GoalFormData) {
     try {
-      await api.post(`/portfolios/${$currentPortfolio.id}/goals`, goal)
+      const goalRequest: CreateGoalRequest = {
+        portfolio_id: $currentPortfolio.id,
+        name: goal.name,
+        target_net_worth: goal.target_amount,
+        target_net_worth_currency: 'USD',
+        target_date: goal.target_date,
+        monthly_savings: 0,
+        monthly_savings_currency: 'USD',
+        expected_annual_return: goal.expected_annual_return || '0.07'
+      }
+      await goalController.createGoal(goalRequest)
       await loadGoals()
       showNewModal = false
     } catch (e) {
@@ -48,17 +73,17 @@
   async function handleDeleteGoal(id: string) {
     if (!confirm('Delete this goal?')) return
     try {
-      await api.delete(`/goals/${id}`)
+      await goalController.deleteGoal(id)
       await loadGoals()
     } catch (e) {
       console.error('Failed to delete goal:', e)
     }
   }
 
-  function getGoalStatus(goal: any): 'on_track' | 'behind' | 'ahead' {
+  function getGoalStatus(goal: Goal): 'on_track' | 'behind' | 'ahead' {
     const monthsLeft = getMonthsFromNow(goal.target_date)
-    const progressPercent = (goal.current_value / goal.target_amount) * 100
-    const expectedPercent = Math.max(0, 100 - (monthsLeft / (getMonthsFromNow(goal.target_date) + 12)) * 100)
+    const progressPercent = (currentPortfolioValue / Number(goal.target_net_worth)) * 100
+    const expectedPercent = Math.max(0, 100 - (monthsLeft / (monthsLeft + 12)) * 100)
 
     if (progressPercent >= expectedPercent) return 'ahead'
     if (progressPercent >= expectedPercent * 0.8) return 'on_track'
@@ -67,12 +92,9 @@
 
   function getStatusBadge(status: string): 'default' | 'secondary' | 'destructive' {
     switch (status) {
-      case 'ahead':
-        return 'secondary'
-      case 'on_track':
-        return 'default'
-      default:
-        return 'destructive'
+      case 'ahead': return 'secondary'
+      case 'on_track': return 'default'
+      default: return 'destructive'
     }
   }
 </script>
@@ -112,20 +134,20 @@
       <div class="space-y-4">
         {#each goals as goal}
           {@const status = getGoalStatus(goal)}
-          {@const progressPercent = Math.min(100, (goal.current_value / goal.target_amount) * 100)}
-          <Card title={goal.name} subtitle={goal.description || formatDate(goal.target_date)}>
+          {@const progressPercent = Math.min(100, (currentPortfolioValue / Number(goal.target_net_worth)) * 100)}
+          <Card title={goal.name} subtitle={formatDate(goal.target_date)}>
             <div class="space-y-4">
               <div class="space-y-2">
                 <div class="flex justify-between">
                   <span class="text-xs md:text-sm text-muted-foreground">Target</span>
                   <span class="text-sm md:text-base font-semibold text-foreground">
-                    {formatCurrency(goal.target_amount)}
+                    {formatCurrency(goal.target_net_worth)}
                   </span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-xs md:text-sm text-muted-foreground">Current</span>
                   <span class="text-sm md:text-base font-semibold text-foreground">
-                    {formatCurrency(goal.current_value)}
+                    {formatCurrency(currentPortfolioValue)}
                   </span>
                 </div>
               </div>

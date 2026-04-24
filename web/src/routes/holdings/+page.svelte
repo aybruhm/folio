@@ -3,26 +3,46 @@
   import HoldingsTable from '$lib/components/HoldingsTable.svelte'
   import Button from '$lib/components/Button.svelte'
   import Input from '$lib/components/Input.svelte'
+  import Modal from '$lib/components/Modal.svelte'
+  import TradeForm from '$lib/components/TradeForm.svelte'
   import { currentPortfolio } from '$lib/stores'
   import { api } from '$lib/api/client'
+  import { PortfolioController, TradeController } from '$lib/api/controllers'
+  import type { CreateTradeRequest, Holding } from '$lib/api/types'
   import { onMount } from 'svelte'
 
   let loading = true
-  let holdings: any[] = []
+  let holdings: Holding[] = []
   let searchTerm = ''
-  let filteredHoldings: any[] = []
+  let filteredHoldings: Holding[] = []
+  let portfolioController: PortfolioController
+  let tradeController: TradeController
+  let showNewModal = false
 
   onMount(async () => {
+    portfolioController = new PortfolioController(api.getInstance())
+    tradeController = new TradeController(api.getInstance())
     if ($currentPortfolio) await loadHoldings()
   })
 
-  $: if ($currentPortfolio) loadHoldings()
+  $: if ($currentPortfolio && portfolioController) loadHoldings()
 
   async function loadHoldings() {
     try {
       loading = true
-      const data = await api.get(`/portfolios/${$currentPortfolio.id}/holdings`)
-      holdings = data || []
+      const response = await portfolioController.getHoldings({
+        portfolio_id: $currentPortfolio.id
+      })
+      holdings = (response.data || []).map((h: any) => ({
+        ticker: h.ticker,
+        quantity: h.quantity,
+        average_cost: h.avg_price,
+        current_price: h.current_price,
+        current_value: h.total_value,
+        gain_loss: h.gain_loss,
+        return_pct: h.gain_loss_percent,
+        currency: response.currency ?? 'USD'
+      }))
       filterHoldings()
     } catch (e) {
       console.error('Failed to load holdings:', e)
@@ -36,14 +56,46 @@
       filteredHoldings = holdings
     } else {
       const term = searchTerm.toLowerCase()
-      filteredHoldings = holdings.filter(h => 
+      filteredHoldings = holdings.filter(h =>
         h.ticker.toLowerCase().includes(term)
       )
     }
   }
 
-  function handleSelectHolding(ticker: string) {
-    // Navigate to holding detail
+  async function handleCreateTrade(trade: any) {
+    try {
+      const tradeRequest: CreateTradeRequest = {
+        portfolio_id: $currentPortfolio.id,
+        ticker: trade.ticker,
+        trade_type: trade.trade_type,
+        trade_date: trade.trade_date,
+        quantity: parseFloat(trade.quantity),
+        price: parseFloat(trade.price),
+        trade_currency: trade.trade_currency,
+        fees: parseFloat(trade.fees) || 0,
+      }
+      await tradeController.createTrade(tradeRequest)
+      await loadHoldings()
+      showNewModal = false
+    } catch (e) {
+      console.error('Failed to create trade:', e)
+    }
+  }
+
+  async function handleDeleteHolding(ticker: string) {
+    if (!confirm(`Delete all trades for ${ticker}? This cannot be undone.`)) return
+    try {
+      const response = await tradeController.listTrades({
+        portfolio_id: $currentPortfolio.id,
+        ticker,
+        limit: 1000,
+      })
+      const tradesForTicker = (response.data as any[]) || []
+      await Promise.all(tradesForTicker.map((t: any) => tradeController.deleteTrade(t.id)))
+      await loadHoldings()
+    } catch (e) {
+      console.error('Failed to delete holding:', e)
+    }
   }
 
   $: searchTerm, filterHoldings()
@@ -57,7 +109,7 @@
         <h1 class="text-2xl md:text-3xl font-bold text-foreground">Holdings</h1>
         <p class="text-xs md:text-sm text-muted-foreground">Current positions in {$currentPortfolio?.name}</p>
       </div>
-      <Button variant="default" href="/trades/new" class="w-full sm:w-auto">
+      <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -85,7 +137,7 @@
           <p class="mb-4 text-muted-foreground">
             You don't have any positions yet.
           </p>
-          <Button variant="default" href="/trades/new">
+          <Button variant="default" on:click={() => (showNewModal = true)}>
             Create First Trade
           </Button>
         </div>
@@ -95,10 +147,35 @@
         <div class="overflow-x-auto -mx-4 md:mx-0">
           <HoldingsTable
             holdings={filteredHoldings}
-            onSelectHolding={handleSelectHolding}
+            on:deleteHolding={(e) => handleDeleteHolding(e.detail)}
           />
         </div>
       </Card>
     {/if}
   </div>
 </div>
+
+<!-- Add Trade Modal -->
+<Modal
+  open={showNewModal}
+  title="Add Trade"
+  onClose={() => (showNewModal = false)}
+>
+  <TradeForm
+    on:submit={(e) => handleCreateTrade(e.detail)}
+    trade={{
+      ticker: '',
+      trade_type: 'buy',
+      trade_date: new Date().toISOString().slice(0, 16),
+      quantity: '',
+      price: '',
+      trade_currency: 'USD',
+      fees: '0'
+    }}
+  />
+  <svelte:fragment slot="footer">
+    <Button variant="outline" on:click={() => (showNewModal = false)}>
+      Cancel
+    </Button>
+  </svelte:fragment>
+</Modal>
