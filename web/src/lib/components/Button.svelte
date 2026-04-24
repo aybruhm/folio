@@ -5,7 +5,9 @@
   export let size: 'default' | 'sm' | 'lg' | 'icon' = 'default'
   export let disabled = false
   export let type: 'button' | 'submit' | 'reset' = 'button'
-  export let asChild = false
+  export let href: string | undefined = undefined
+  let className = ''
+  export { className as class }
 
   const baseClasses =
     'inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs sm:text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50'
@@ -26,16 +28,16 @@
     icon: 'h-10 w-10'
   }
 
-  const buttonClasses = cn(baseClasses, variants[variant], sizes[size])
+  $: buttonClasses = cn(baseClasses, variants[variant], sizes[size], className)
 </script>
 
-<button
-  {type}
-  {disabled}
-  class={buttonClasses}
-  on:click
-  {...$$restProps}
->
-  <slot />
-</button>
+{#if href}
+  <a {href} class={buttonClasses} {...$$restProps}>
+    <slot />
+  </a>
+{:else}
+  <button {type} {disabled} class={buttonClasses} on:click {...$$restProps}>
+    <slot />
+  </button>
+{/if}
 
