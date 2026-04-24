@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Numeric, Date, ForeignKey, Index, UniqueConstraint, JSON, Enum as SQLEnum, CHAR
+from sqlalchemy import Column, String, DateTime, BigInteger, Date, ForeignKey, Index, UniqueConstraint, JSON, Enum as SQLEnum, CHAR
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
@@ -57,10 +57,10 @@ class TradeModel(Base):
     ticker = Column(String(20), nullable=False)
     trade_type = Column(String(20), nullable=False)
     trade_date = Column(DateTime, nullable=False)
-    quantity = Column(Numeric(20, 8), nullable=False)
-    price = Column(Numeric(20, 8), nullable=False)
+    quantity = Column(BigInteger, nullable=False)
+    price = Column(BigInteger, nullable=False)
     trade_currency = Column(CHAR(3), nullable=False)
-    fees = Column(Numeric(20, 8), default=0)
+    fees = Column(BigInteger, default=0)
     notes = Column(String, nullable=True)
     source = Column(String(20), default='manual')
     import_batch_id = Column(UUID(as_uuid=True), nullable=True)
@@ -82,7 +82,7 @@ class PriceHistoryModel(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     asset_id = Column(UUID(as_uuid=True), ForeignKey('assets.id'), nullable=False)
     date = Column(Date, nullable=False)
-    close = Column(Numeric(20, 8), nullable=False)
+    close = Column(BigInteger, nullable=False)
     currency = Column(CHAR(3), nullable=False)
     
     asset = relationship('AssetModel', back_populates='price_history')
@@ -100,7 +100,7 @@ class FxRateModel(Base):
     from_currency = Column(CHAR(3), nullable=False)
     to_currency = Column(CHAR(3), nullable=False)
     date = Column(Date, nullable=False)
-    rate = Column(Numeric(20, 8), nullable=False)
+    rate = Column(BigInteger, nullable=False)
     
     __table_args__ = (
         UniqueConstraint('from_currency', 'to_currency', 'date', name='uq_fx_rates_currencies_date'),
@@ -126,12 +126,12 @@ class GoalModel(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     portfolio_id = Column(UUID(as_uuid=True), ForeignKey('portfolios.id'), nullable=False)
     name = Column(String(255), nullable=False)
-    target_net_worth = Column(Numeric(20, 2), nullable=False)
+    target_net_worth = Column(BigInteger, nullable=False)
     target_net_worth_currency = Column(CHAR(3), nullable=False)
     target_date = Column(Date, nullable=False)
-    monthly_savings = Column(Numeric(20, 2), nullable=False)
+    monthly_savings = Column(BigInteger, nullable=False)
     monthly_savings_currency = Column(CHAR(3), nullable=False)
-    expected_annual_return = Column(Numeric(5, 4), nullable=False)
+    expected_annual_return = Column(BigInteger, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
