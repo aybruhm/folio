@@ -3,7 +3,6 @@ from sqlalchemy.future import select
 from sqlalchemy import func
 from uuid import UUID
 from typing import List, Optional, Tuple
-from decimal import Decimal
 
 from domain.entities.models import Trade
 from domain.value_objects.money import Currency, TradeType
@@ -67,8 +66,13 @@ class TradeRepository(ITradeRepository):
     async def update(self, trade: Trade) -> None:
         model = await self.session.get(TradeModel, trade.id)
         if model:
+            model.asset_id = trade.asset_id
+            model.ticker = trade.ticker
+            model.trade_type = trade.trade_type.value
+            model.trade_date = trade.trade_date
             model.quantity = trade.quantity
             model.price = trade.price
+            model.trade_currency = trade.trade_currency.value
             model.fees = trade.fees
             model.notes = trade.notes
             await self.session.flush()
@@ -88,10 +92,10 @@ class TradeRepository(ITradeRepository):
             ticker=model.ticker,
             trade_type=TradeType(model.trade_type),
             trade_date=model.trade_date,
-            quantity=Decimal(str(model.quantity)),
-            price=Decimal(str(model.price)),
+            quantity=int(model.quantity),
+            price=int(model.price),
             trade_currency=Currency(model.trade_currency),
-            fees=Decimal(str(model.fees)) if model.fees else Decimal('0'),
+            fees=int(model.fees) if model.fees else 0,
             notes=model.notes,
             source=model.source,
             import_batch_id=model.import_batch_id,
