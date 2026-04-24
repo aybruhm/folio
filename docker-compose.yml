@@ -1,114 +1,116 @@
-version: '3.8'
-
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: folio-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER:-folio}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-folio_dev_password}
-      POSTGRES_DB: ${DB_NAME:-folio}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-folio}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - folio-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    db:
+        image: postgres:16-alpine
+        container_name: folio-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${DB_USER:-folio}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-folio_dev_password}
+            POSTGRES_DB: ${DB_NAME:-folio}
+            PGDATA: /var/lib/postgresql/data/pgdata
+        ports:
+            - "${DB_PORT:-5432}:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-folio}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        networks:
+            - folio-network
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
-  api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
-      cache_from:
-        - folio-api:latest
-    image: folio-api:latest
-    container_name: folio-api
-    restart: unless-stopped
-    env_file: ./api/.env
-    environment:
-      # Override for Docker networking
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-folio}:${DB_PASSWORD:-folio_dev_password}@db:5432/${DB_NAME:-folio}
-    ports:
-      - "${API_PORT:-8000}:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./api:/app/api
-      - ./alembic:/app/alembic
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn api.main:app 
-             --host ${API_HOST:-0.0.0.0} 
-             --port ${API_PORT:-8000}
-             --reload"
-    networks:
-      - folio-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    api:
+        build:
+            context: .
+            dockerfile: api/Dockerfile
+            cache_from:
+                - folio-api:latest
+        image: folio-api:latest
+        container_name: folio-api
+        restart: unless-stopped
+        env_file: ./api/.env
+        environment:
+            # Override for Docker networking
+            DATABASE_URL: postgresql+asyncpg://${DB_USER:-folio}:${DB_PASSWORD:-folio_dev_password}@db:5432/${DB_NAME:-folio}
+        ports:
+            - "${API_PORT:-8000}:8000"
+        depends_on:
+            db:
+                condition: service_healthy
+        volumes:
+            - ./api:/app
+        command: >
+            python -m uvicorn main:app
+            --host ${API_HOST:-0.0.0.0}
+            --port ${API_PORT:-8000}
+            --reload
+        networks:
+            - folio-network
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "/opt/python/bin/python",
+                    "-c",
+                    "import urllib.request; r=urllib.request.urlopen('http://localhost:8000/health', timeout=5); exit(0 if r.status==200 else 1)",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
-  web:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-      cache_from:
-        - folio-web:latest
-    image: folio-web:latest
-    container_name: folio-web
-    restart: unless-stopped
-    env_file: ./web/.env.local
-    ports:
-      - "${WEB_PORT:-3000}:3000"
-    depends_on:
-      api:
-        condition: service_healthy
-    volumes:
-      - ./web:/app
-      - /app/node_modules
-    command: npm run dev
-    networks:
-      - folio-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    web:
+        build:
+            context: .
+            dockerfile: web/Dockerfile
+            cache_from:
+                - folio-web:latest
+        image: folio-web:latest
+        container_name: folio-web
+        restart: unless-stopped
+        env_file: ./web/.env.local
+        ports:
+            - "${WEB_PORT:-3000}:3000"
+        depends_on:
+            api:
+                condition: service_healthy
+        volumes:
+            - ./web:/app
+            - /app/node_modules
+        command: npm run dev
+        networks:
+            - folio-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:3000"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
 volumes:
-  postgres_data:
-    driver: local
+    postgres_data:
+        driver: local
 
 networks:
-  folio-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.24.0.0/16
+    folio-network:
+        driver: bridge
+        ipam:
+            config:
+                - subnet: 172.24.0.0/16

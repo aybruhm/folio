@@ -113,7 +113,7 @@ db-reset:
 	echo ""; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
 		docker compose exec -T db psql -U folio -d folio -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" && \
-		docker compose exec api alembic upgrade head && \
+		docker compose exec api python -m alembic upgrade head && \
 		echo "✓ Database reset and migrated"; \
 	else \
 		echo "Cancelled"; \
@@ -121,12 +121,12 @@ db-reset:
 
 db-migrate:
 	@echo "Running database migrations..."
-	@docker compose exec api alembic upgrade head
+	@docker compose exec api python -m alembic upgrade head
 	@echo "✓ Migrations complete"
 
 db-seed:
 	@echo "Seeding database with sample data..."
-	@docker compose exec api python -m api.infrastructure.db.seed
+	@docker compose exec api python -m infrastructure.db.seed
 	@echo "✓ Database seeded"
 
 # API Operations
