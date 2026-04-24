@@ -1,43 +1,52 @@
-import { writable, derived } from 'svelte/store'
+import { writable, derived } from "svelte/store";
 
 export interface Portfolio {
-  id: string
-  name: string
-  base_currency: string
-  description?: string
-  created_at: string
-  updated_at: string
+    id: string;
+    name: string;
+    base_currency: string;
+    description?: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface Trade {
-  id: string
-  portfolio_id: string
-  ticker: string
-  trade_type: string
-  trade_date: string
-  quantity: string
-  price: string
-  trade_currency: string
-  fees: string
+    id: string;
+    portfolio_id: string;
+    ticker: string;
+    trade_type: string;
+    trade_date: string;
+    quantity: string;
+    price: string;
+    trade_currency: string;
+    fees: string;
 }
 
 export interface UserPreferences {
-  displayCurrency: string
-  dateFormat: string
-  theme: 'dark' | 'light'
+    displayCurrency: string;
+    dateFormat: string;
+    theme: "dark" | "light";
 }
 
-export const portfolios = writable<Portfolio[]>([])
-export const currentPortfolio = writable<Portfolio | null>(null)
-export const trades = writable<Trade[]>([])
+export const portfolios = writable<Portfolio[]>([]);
+export const currentPortfolio = writable<Portfolio>({
+    id: "",
+    name: "",
+    base_currency: "USD",
+    created_at: "",
+    updated_at: "",
+});
+export const trades = writable<Trade[]>([]);
 
 export const userPreferences = writable<UserPreferences>({
-  displayCurrency: 'USD',
-  dateFormat: 'YYYY-MM-DD',
-  theme: 'dark'
-})
+    displayCurrency: "USD",
+    dateFormat: "YYYY-MM-DD",
+    theme: "dark",
+});
 
-export const isLoading = writable(false)
-export const error = writable<string | null>(null)
+export const isLoading = writable(false);
+export const error = writable<string | null>(null);
 
-export const portfolioCount = derived(portfolios, $portfolios => $portfolios.length)
+export const portfolioCount = derived(
+    portfolios,
+    ($portfolios) => $portfolios.length,
+);

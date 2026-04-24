@@ -1,6 +1,9 @@
 <script lang="ts">
   import Badge from './Badge.svelte'
   import { formatCurrency, formatNumber, formatPercent } from '$lib/utils/format'
+  import { createEventDispatcher } from 'svelte'
+
+  const dispatch = createEventDispatcher()
 
   export let holdings: any[] = []
   export let loading = false
@@ -13,7 +16,8 @@
     { key: 'current_price', label: 'Current Price', sortable: true },
     { key: 'current_value', label: 'Current Value', sortable: true },
     { key: 'gain_loss', label: 'Gain/Loss', sortable: true },
-    { key: 'return_pct', label: 'Return %', sortable: true }
+    { key: 'return_pct', label: 'Return %', sortable: true },
+    { key: 'actions', label: '', sortable: false }
   ]
 
   let sortKey: string | null = null
@@ -85,6 +89,17 @@
                 <Badge variant={getReturnBadge(row.return_pct)}>
                   {formatPercent(row.return_pct)}
                 </Badge>
+              </td>
+              <td class="p-4 align-middle">
+                <button
+                  on:click={() => dispatch('deleteHolding', row.ticker)}
+                  class="text-muted-foreground hover:text-destructive transition-colors"
+                  title="Delete all trades for this holding"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </td>
             </tr>
           {/each}
