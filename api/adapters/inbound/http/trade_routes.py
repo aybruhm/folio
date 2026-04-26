@@ -2,14 +2,15 @@ from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+import json
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from application.trades.csv_import_interactor import CsvImportInteractor
 from application.trades.trade_interactor import TradeInteractor
 from domain.ports.inbound.use_cases import CreateTradeRequest
-from domain.value_objects.money import Currency, TradeType
+from domain.value_objects.money import Currency, TradeType, AssetClass
 from infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -25,6 +26,7 @@ class TradeBody(BaseModel):
     trade_currency: str
     fees: float = 0.0
     notes: Optional[str] = None
+    asset_class: Optional[str] = None
 
 
 def _body_to_request(body: TradeBody) -> CreateTradeRequest:
@@ -38,6 +40,7 @@ def _body_to_request(body: TradeBody) -> CreateTradeRequest:
         trade_currency=Currency(body.trade_currency),
         fees=round(body.fees * 100),
         notes=body.notes,
+        asset_class=AssetClass(body.asset_class) if body.asset_class else None,
     )
 
 
@@ -128,31 +131,19 @@ async def delete_trade(trade_id: UUID, session: AsyncSession = Depends(get_sessi
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/import/preview")
-async def preview_csv(
-    file: UploadFile = File(...), session: AsyncSession = Depends(get_session)
-):
-    try:
-        content = await file.read()
-        interactor = CsvImportInteractor(session)
-        preview = await interactor.preview_csv(content, file.filename)
-        return preview
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 @router.post("/import/validate")
 async def validate_csv(
-    mapping: dict,
-    date_format: str,
     file: UploadFile = File(...),
+    mapping: str = Form(...),
+    date_format: str = Form(...),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         content = await file.read()
+        mapping_dict = json.loads(mapping)
         interactor = CsvImportInteractor(session)
         validation = await interactor.validate_mapping(
-            content, file.filename, mapping, date_format
+            content, file.filename, mapping_dict, date_format
         )
         return validation
     except Exception as e:
@@ -161,18 +152,19 @@ async def validate_csv(
 
 @router.post("/import/confirm")
 async def confirm_import(
-    portfolio_id: UUID,
-    mapping: dict,
-    date_format: str,
-    profile_name: Optional[str] = None,
     file: UploadFile = File(...),
+    mapping: str = Form(...),
+    portfolio_id: UUID = Form(...),
+    date_format: str = Form(...),
+    profile_name: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         content = await file.read()
+        mapping_dict = json.loads(mapping)
         interactor = CsvImportInteractor(session)
         result = await interactor.confirm_import(
-            content, file.filename, mapping, date_format, portfolio_id, profile_name
+            content, file.filename, mapping_dict, date_format, portfolio_id, profile_name
         )
         await session.commit()
         return result
