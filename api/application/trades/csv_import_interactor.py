@@ -5,7 +5,7 @@ import csv
 import io
 
 from domain.entities.models import Trade
-from domain.value_objects.money import TradeType, Currency
+from domain.value_objects.money import TradeType, Currency, AssetClass
 from domain.ports.inbound.use_cases import ICsvImportUseCase
 from domain.ports.outbound.repositories import ITradeRepository, IAssetRepository
 from adapters.outbound.persistence.trade_repository import TradeRepository
@@ -88,11 +88,35 @@ class CsvImportInteractor(ICsvImportUseCase):
                 try:
                     trade_data = self._map_row(row, mapping, date_format)
                     
+                    ticker = trade_data['ticker']
+                    asset_class_str = trade_data.get('asset_class', '')
+                    asset = await self.asset_repo.get_by_ticker(ticker)
+                    if not asset:
+                        from domain.entities.models import Asset
+                        if asset_class_str == 'cash':
+                            asset = Asset(
+                                id=uuid4(),
+                                ticker=ticker,
+                                name=ticker,
+                                asset_class=AssetClass.CASH,
+                                currency=trade_data['currency'],
+                            )
+                            await self.asset_repo.add(asset)
+                        else:
+                            metadata = await self.yfinance.get_asset_metadata(
+                                ticker, trade_data['currency'].value
+                            )
+                            if metadata:
+                                asset = Asset.from_metadata(ticker, metadata)
+                                await self.asset_repo.add(asset)
+                            else:
+                                raise ValueError(f"Cannot resolve asset for ticker: {ticker}")
+
                     trade = Trade(
                         id=uuid4(),
                         portfolio_id=portfolio_id,
-                        asset_id=uuid4(),
-                        ticker=trade_data['ticker'],
+                        asset_id=asset.id,
+                        ticker=ticker,
                         trade_type=trade_data['trade_type'],
                         trade_date=trade_data['trade_date'],
                         quantity=trade_data['quantity'],
@@ -172,6 +196,8 @@ class CsvImportInteractor(ICsvImportUseCase):
         except ValueError:
             raise ValueError(f"Invalid currency: {currency_str}")
         
+        asset_class_raw = row.get(mapping.get('asset_class', 'Asset Class'), '').strip().lower()
+
         return {
             'ticker': ticker,
             'trade_type': trade_type,
@@ -181,4 +207,5 @@ class CsvImportInteractor(ICsvImportUseCase):
             'currency': currency,
             'fees': round(float(row.get(mapping.get('fees', 'Fees'), '0') or '0') * 100),
             'notes': row.get(mapping.get('notes', 'Notes')),
+            'asset_class': asset_class_raw,
         }
