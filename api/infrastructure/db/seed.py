@@ -115,6 +115,32 @@ _ASSETS = [
         drift=0.09,
         vol=0.17,
     ),
+    dict(
+        ticker="BTC-USD",
+        name="Bitcoin",
+        asset_class="crypto",
+        exchange="Crypto",
+        currency="USD",
+        sector=None,
+        industry=None,
+        country=None,
+        base=43000.0,
+        drift=0.60,
+        vol=0.65,
+    ),
+]
+
+_CASH_ASSETS = [
+    dict(
+        ticker="HYSA",
+        name="High-Yield Savings Account",
+        asset_class="cash",
+        exchange=None,
+        currency="USD",
+        sector=None,
+        industry=None,
+        country="US",
+    ),
 ]
 
 
@@ -196,6 +222,24 @@ def _build_trades(
     def div(ticker, d, qty, amt):
         _t(ticker, "dividend", d, qty, fee_dollars=amt)
 
+    def deposit(ticker, d, amount_dollars):
+        # Cash: quantity = dollar amount (each "share" = $1.00)
+        trades.append(
+            dict(
+                id=uuid4(),
+                portfolio_id=portfolio_id,
+                asset_id=asset_map[ticker],
+                ticker=ticker,
+                trade_type="buy",
+                trade_date=datetime(d.year, d.month, d.day, 9, 30),
+                quantity=round(amount_dollars * 100),
+                price=100,  # $1.00 × 100
+                trade_currency="USD",
+                fees=0,
+                source="manual",
+            )
+        )
+
     # ── 2024 Q1 — initial positions ──────────────────────────────────────
     buy("VOO", date(2024, 1, 5), 10)
     buy("BND", date(2024, 1, 5), 30)
@@ -252,6 +296,25 @@ def _build_trades(
     buy("VOO", date(2026, 1, 6), 5)
     buy("AAPL", date(2026, 1, 15), 5)
     buy("GOOGL", date(2026, 2, 3), 8)
+
+    # ── BTC-USD — crypto position ─────────────────────────────────────────
+    buy("BTC-USD", date(2024, 1, 12), 0.10)   # initial entry ~$43k
+    buy("BTC-USD", date(2024, 5, 10), 0.05)   # add after halving
+    buy("BTC-USD", date(2024, 11, 12), 0.10)  # post-election rally
+    buy("BTC-USD", date(2025, 1, 20), 0.05)   # DCA
+    sell("BTC-USD", date(2025, 5, 15), 0.05)  # partial profit-taking
+    buy("BTC-USD", date(2026, 1, 15), 0.05)   # buy the dip
+
+    # ── HYSA — cash savings ───────────────────────────────────────────────
+    deposit("HYSA", date(2024, 1, 3), 5000)    # initial deposit
+    deposit("HYSA", date(2024, 4, 1), 2000)
+    deposit("HYSA", date(2024, 7, 1), 2000)
+    deposit("HYSA", date(2024, 10, 1), 2000)
+    deposit("HYSA", date(2025, 1, 6), 2000)
+    deposit("HYSA", date(2025, 4, 1), 2000)
+    deposit("HYSA", date(2025, 7, 1), 2000)
+    deposit("HYSA", date(2025, 10, 1), 2000)
+    deposit("HYSA", date(2026, 1, 6), 2000)
 
     return trades
 
@@ -321,6 +384,25 @@ async def seed() -> None:
                         )
                     )
                 log.info(f"  {a['ticker']}  {len(prices)} price records")
+
+            # Cash assets (no price history — market value = cost basis)
+            for c in _CASH_ASSETS:
+                asset_id = uuid4()
+                session.add(
+                    AssetModel(
+                        id=asset_id,
+                        ticker=c["ticker"],
+                        name=c["name"],
+                        asset_class=c["asset_class"],
+                        exchange=c.get("exchange"),
+                        currency=c["currency"],
+                        sector=c.get("sector"),
+                        industry=c.get("industry"),
+                        country=c.get("country"),
+                    )
+                )
+                asset_map[c["ticker"]] = asset_id
+                log.info(f"  {c['ticker']}  cash asset")
 
             # Trades
             trade_rows = _build_trades(portfolio_id, asset_map, price_map)
