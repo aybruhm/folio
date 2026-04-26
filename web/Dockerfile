@@ -11,4 +11,8 @@ RUN npm ci --legacy-peer-deps
 COPY web/ .
 
 # Expose Vite dev server port
+LABEL org.opencontainers.image.source=https://github.com/aybruhm/folio
+LABEL org.opencontainers.image.description="Folio Web — self-hosted investment portfolio tracking frontend built with SvelteKit"
+LABEL org.opencontainers.image.licenses=GPL-2.0
+
 EXPOSE 3000
