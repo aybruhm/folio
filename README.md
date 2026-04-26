@@ -23,6 +23,12 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 - FIRE projection calculations
 - Visual progress tracking
 
+## Preview
+
+![Dashboard](static/images/01-dashboard.png)
+
+![Dashboard](static/images/02-dashboard.png)
+
 ## Stack
 
 | Layer    | Technology                        |
