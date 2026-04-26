@@ -7,14 +7,14 @@ from dataclasses import dataclass, field
 from domain.value_objects.money import Currency, TradeType, AssetClass
 
 
-@dataclass
+@dataclass(frozen=True)
 class CreatePortfolioRequest:
     name: str
     base_currency: Currency
     description: Optional[str] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class CreateTradeRequest:
     portfolio_id: UUID
     ticker: str
@@ -28,7 +28,7 @@ class CreateTradeRequest:
     asset_class: Optional[AssetClass] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class CreateGoalRequest:
     portfolio_id: UUID
     name: str

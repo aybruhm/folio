@@ -11,7 +11,7 @@ from domain.value_objects.money import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Asset:
     id: UUID
     ticker: str
@@ -41,7 +41,7 @@ class Asset:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Trade:
     id: UUID
     portfolio_id: UUID
@@ -62,7 +62,7 @@ class Trade:
         return (self.quantity * self.price) // 100 + self.fees
 
 
-@dataclass
+@dataclass(frozen=True)
 class Holding:
     asset_id: UUID
     ticker: str
@@ -104,7 +104,7 @@ class Portfolio:
         self.updated_at = datetime.now()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Goal:
     id: UUID
     portfolio_id: UUID
@@ -119,7 +119,7 @@ class Goal:
     updated_at: datetime = field(default_factory=datetime.now)
 
 
-@dataclass
+@dataclass(frozen=True)
 class FxRate:
     from_currency: Currency
     to_currency: Currency
