@@ -108,7 +108,9 @@ async def get_portfolio_analytics(
         holdings = await interactor.get_holdings(portfolio_id)
         performance = await interactor.calculate_performance(portfolio_id)
         allocation_raw = await interactor.get_allocation(portfolio_id)
-        performance_history = await interactor.get_performance_history(portfolio_id, timeframe)
+        performance_history = await interactor.get_performance_history(
+            portfolio_id, timeframe
+        )
         contribution_history = await interactor.get_contribution_history(portfolio_id)
         sector_breakdown = await interactor.get_sector_breakdown(portfolio_id)
 
@@ -120,8 +122,7 @@ async def get_portfolio_analytics(
         )
 
         allocation = [
-            {"label": a["name"], "value": float(a["value"])}
-            for a in allocation_raw
+            {"label": a["name"], "value": float(a["value"])} for a in allocation_raw
         ]
 
         return {

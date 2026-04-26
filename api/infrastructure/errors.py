@@ -32,7 +32,7 @@ class AppException(Exception):
         message: str,
         field: Optional[str] = None,
         details: Optional[dict[str, Any]] = None,
-        status_code: int = 400
+        status_code: int = 400,
     ):
         self.code = code
         self.message = message
@@ -47,7 +47,7 @@ class AppException(Exception):
                 "code": self.code.value,
                 "message": self.message,
                 "field": self.field,
-                "details": self.details or {}
+                "details": self.details or {},
             }
         }
 
@@ -57,14 +57,14 @@ class ValidationError(AppException):
         self,
         message: str,
         field: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None,
     ):
         super().__init__(
             code=ErrorCode.VALIDATION_ERROR,
             message=message,
             field=field,
             details=details,
-            status_code=422
+            status_code=422,
         )
 
 
@@ -73,35 +73,23 @@ class NotFoundError(AppException):
         super().__init__(
             code=ErrorCode.NOT_FOUND,
             message=f"{resource} with ID {resource_id} not found",
-            status_code=404
+            status_code=404,
         )
 
 
 class ConflictError(AppException):
     def __init__(self, message: str):
-        super().__init__(
-            code=ErrorCode.CONFLICT,
-            message=message,
-            status_code=409
-        )
+        super().__init__(code=ErrorCode.CONFLICT, message=message, status_code=409)
 
 
 class UnauthorizedError(AppException):
     def __init__(self, message: str = "Authentication required"):
-        super().__init__(
-            code=ErrorCode.UNAUTHORIZED,
-            message=message,
-            status_code=401
-        )
+        super().__init__(code=ErrorCode.UNAUTHORIZED, message=message, status_code=401)
 
 
 class ForbiddenError(AppException):
     def __init__(self, message: str = "Access denied"):
-        super().__init__(
-            code=ErrorCode.FORBIDDEN,
-            message=message,
-            status_code=403
-        )
+        super().__init__(code=ErrorCode.FORBIDDEN, message=message, status_code=403)
 
 
 class ExternalAPIError(AppException):
@@ -110,7 +98,7 @@ class ExternalAPIError(AppException):
             code=ErrorCode.EXTERNAL_API_ERROR,
             message=f"{service} API error: {message}",
             details={"service": service},
-            status_code=503
+            status_code=503,
         )
 
 
@@ -119,7 +107,7 @@ class CsvImportError(AppException):
         self,
         message: str,
         row_number: Optional[int] = None,
-        field: Optional[str] = None
+        field: Optional[str] = None,
     ):
         details = {}
         if row_number:
@@ -132,5 +120,5 @@ class CsvImportError(AppException):
             message=message,
             field=field,
             details=details if details else None,
-            status_code=400
+            status_code=400,
         )

@@ -6,8 +6,12 @@ from datetime import date
 from typing import List, Optional, Tuple
 
 from domain.value_objects.money import Currency
-from domain.ports.outbound.repositories import IPriceHistoryRepository, IFxRateRepository
+from domain.ports.outbound.repositories import (
+    IPriceHistoryRepository,
+    IFxRateRepository,
+)
 from infrastructure.db.models import PriceHistoryModel, FxRateModel
+
 
 class PriceHistoryRepository(IPriceHistoryRepository):
     def __init__(self, session: AsyncSession):
@@ -51,6 +55,7 @@ class PriceHistoryRepository(IPriceHistoryRepository):
         )
         model = result.scalar_one_or_none()
         return (model.date, int(model.close)) if model else None
+
 
 class FxRateRepository(IFxRateRepository):
     def __init__(self, session: AsyncSession):

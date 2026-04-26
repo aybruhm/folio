@@ -19,15 +19,14 @@ class ErrorMiddleware(BaseHTTPMiddleware):
                     "code": e.code.value,
                     "message": e.message,
                     "path": request.url.path,
-                    "method": request.method
-                }
+                    "method": request.method,
+                },
             )
-            return JSONResponse(
-                status_code=e.status_code,
-                content=e.to_dict()
-            )
+            return JSONResponse(status_code=e.status_code, content=e.to_dict())
         except ValueError as e:
-            logger.warning(f"Validation error: {str(e)}", extra={"path": request.url.path})
+            logger.warning(
+                f"Validation error: {str(e)}", extra={"path": request.url.path}
+            )
             return JSONResponse(
                 status_code=422,
                 content={
@@ -35,15 +34,15 @@ class ErrorMiddleware(BaseHTTPMiddleware):
                         "code": ErrorCode.VALIDATION_ERROR.value,
                         "message": str(e),
                         "field": None,
-                        "details": {}
+                        "details": {},
                     }
-                }
+                },
             )
         except Exception as e:
             logger.error(
                 f"Unexpected error: {str(e)}",
                 exc_info=True,
-                extra={"path": request.url.path, "method": request.method}
+                extra={"path": request.url.path, "method": request.method},
             )
             return JSONResponse(
                 status_code=500,
@@ -52,7 +51,7 @@ class ErrorMiddleware(BaseHTTPMiddleware):
                         "code": ErrorCode.INTERNAL_ERROR.value,
                         "message": "An unexpected error occurred",
                         "field": None,
-                        "details": {}
+                        "details": {},
                     }
-                }
+                },
             )

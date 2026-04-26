@@ -82,7 +82,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 )
                 total_return_int = 0
             else:
-                current_price_int = await self._resolve_price(holding_data["asset_id"], ticker)
+                current_price_int = await self._resolve_price(
+                    holding_data["asset_id"], ticker
+                )
                 if current_price_int == 0:
                     latest = await self.price_repo.get_latest(holding_data["asset_id"])
                     if latest:
@@ -297,7 +299,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         for t in trades:
             if t.trade_type.value not in ("buy", "sell"):
                 continue
-            t_date = t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
+            t_date = (
+                t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
+            )
             key = t_date.strftime("%b %Y")
             amount = (t.quantity * t.price) // 100 / 100
             if t.trade_type.value == "buy":
@@ -307,6 +311,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
         # Sort chronologically
         from datetime import datetime
+
         return sorted(
             [{"name": k, "value": round(v, 2)} for k, v in monthly.items()],
             key=lambda x: datetime.strptime(x["name"], "%b %Y"),
