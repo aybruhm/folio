@@ -36,4 +36,8 @@ USER 78545:78545
 COPY --chown=78545:78545 --from=builder /install /opt/python/lib/python3.13/site-packages
 COPY --chown=78545:78545 api/ .
 
+LABEL org.opencontainers.image.source=https://github.com/aybruhm/folio
+LABEL org.opencontainers.image.description="Folio API — self-hosted investment portfolio tracking backend built with FastAPI"
+LABEL org.opencontainers.image.licenses=GPL-2.0
+
 EXPOSE 8000
