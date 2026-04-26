@@ -4,5 +4,6 @@
 	"/goals": [],
 	"/holdings": [],
 	"/portfolios": [],
-	"/trades": []
+	"/trades": [],
+	"/trades/import": []
 }
