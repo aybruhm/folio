@@ -2,6 +2,8 @@
 
 A self-hosted investment tracking platform for managing portfolios, analyzing performance, and tracking financial goals.
 
+> **Disclaimer:** This is a personal vibe-coded project and my second public attempt at vibe coding. The current implementation may not reflect best practices in architecture or code design, that's intentional for now. A refactor is planned in the coming weeks to address that, given that my intentions for this project is to make use of it as my own portfolio tracking tool.
+
 ## Features
 
 **Portfolio Management**
@@ -25,7 +27,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 
 | Layer    | Technology                        |
 |----------|-----------------------------------|
-| Frontend | SvelteKit, TypeScript, Tailwind   |
+| Frontend | SvelteKit, TypeScript, Tailwind, shadcn-svelte, bits-ui |
 | Backend  | FastAPI, SQLAlchemy (async)       |
 | Database | PostgreSQL                        |
 | Data     | yfinance                          |
