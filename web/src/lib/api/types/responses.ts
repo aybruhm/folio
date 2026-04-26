@@ -91,34 +91,18 @@ export interface AddBenchmarkResponse {
   data: Benchmark;
 }
 
-export interface PreviewCsvResponse {
-  headers: string[];
-  rows: Record<string, unknown>[];
-  total_rows: number;
-}
-
 export interface ValidateCsvResponse {
-  valid: boolean;
-  errors: Array<{
-    row: number;
-    column: string;
-    error: string;
-  }>;
-  warnings?: Array<{
-    row: number;
-    column: string;
-    warning: string;
-  }>;
-  total_rows: number;
+  valid_count: number;
+  error_count: number;
+  errors: Array<{ row: number; error: string }>;
+  sample_valid_rows: Record<string, unknown>[];
 }
 
 export interface ConfirmImportResponse {
-  imported: number;
-  failed: number;
-  errors: Array<{
-    row: number;
-    error: string;
-  }>;
+  import_batch_id: string;
+  imported_count: number;
+  rejected_count: number;
+  rejection_details: Array<{ row: number; error: string }>;
 }
 
 export interface GetProjectionResponse {
