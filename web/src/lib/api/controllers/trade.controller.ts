@@ -4,7 +4,6 @@ import type {
   CreateTradeRequest,
   ListTradesQuery,
   ListTradesResponse,
-  PreviewCsvResponse,
   ValidateCsvResponse,
   ConfirmImportResponse,
 } from '../types';
@@ -46,22 +45,6 @@ export class TradeController {
     await this.client.delete(`/trades/${tradeId}`);
   }
 
-  async previewCsv(file: File): Promise<PreviewCsvResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await this.client.post(
-      '/trades/import/preview',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-    return response.data;
-  }
-
   async validateCsv(
     file: File,
     mapping: Record<string, unknown>,
@@ -70,19 +53,11 @@ export class TradeController {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mapping', JSON.stringify(mapping));
+    formData.append('date_format', dateFormat);
 
-    const response = await this.client.post(
-      '/trades/import/validate',
-      formData,
-      {
-        params: {
-          date_format: dateFormat,
-        },
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+    const response = await this.client.post('/trades/import/validate', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   }
 
@@ -96,21 +71,13 @@ export class TradeController {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mapping', JSON.stringify(mapping));
+    formData.append('portfolio_id', portfolioId);
+    formData.append('date_format', dateFormat);
+    if (profileName) formData.append('profile_name', profileName);
 
-    const response = await this.client.post(
-      '/trades/import/confirm',
-      formData,
-      {
-        params: {
-          portfolio_id: portfolioId,
-          date_format: dateFormat,
-          profile_name: profileName,
-        },
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+    const response = await this.client.post('/trades/import/confirm', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   }
 }

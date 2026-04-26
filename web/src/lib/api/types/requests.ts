@@ -21,6 +21,7 @@ export interface CreateTradeRequest {
   trade_currency: Currency;
   fees?: number | string;
   notes?: string | null;
+  asset_class?: string;
 }
 
 export interface ListTradesQuery {
@@ -42,10 +43,6 @@ export interface CreateGoalRequest {
   monthly_savings: number | string;
   monthly_savings_currency: Currency;
   expected_annual_return: number | string;
-}
-
-export interface PreviewCsvRequest {
-  file: File;
 }
 
 export interface ValidateCsvRequest {
