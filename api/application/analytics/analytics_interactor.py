@@ -68,16 +68,29 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             if holding_data["quantity"] <= 0:
                 continue
 
-            current_price_int = await self._resolve_price(holding_data["asset_id"], ticker)
-            if current_price_int == 0:
-                latest = await self.price_repo.get_latest(holding_data["asset_id"])
-                if latest:
-                    current_price_int = latest[1]
-
-            # quantity×100 * price×100 → ÷100 → ×100
-            market_value_int = (holding_data["quantity"] * current_price_int) // 100
+            asset = await self.asset_repo.get_by_id(holding_data["asset_id"])
+            is_cash = asset and asset.asset_class.value == "cash"
             cost_basis_int = holding_data["cost_basis"]
-            total_return_int = market_value_int - cost_basis_int
+
+            if is_cash:
+                # Cash is always worth face value — market value equals cost basis
+                market_value_int = cost_basis_int
+                current_price_int = (
+                    (cost_basis_int * 100) // holding_data["quantity"]
+                    if holding_data["quantity"] > 0
+                    else 0
+                )
+                total_return_int = 0
+            else:
+                current_price_int = await self._resolve_price(holding_data["asset_id"], ticker)
+                if current_price_int == 0:
+                    latest = await self.price_repo.get_latest(holding_data["asset_id"])
+                    if latest:
+                        current_price_int = latest[1]
+
+                # quantity×100 * price×100 → ÷100 → ×100
+                market_value_int = (holding_data["quantity"] * current_price_int) // 100
+                total_return_int = market_value_int - cost_basis_int
 
             result.append(
                 {

@@ -4,7 +4,7 @@ from typing import Optional, List
 from uuid import UUID
 from dataclasses import dataclass, field
 
-from domain.value_objects.money import Currency, TradeType
+from domain.value_objects.money import Currency, TradeType, AssetClass
 
 @dataclass
 class CreatePortfolioRequest:
@@ -23,6 +23,7 @@ class CreateTradeRequest:
     trade_currency: Currency
     fees: int = 0   # ×100
     notes: Optional[str] = None
+    asset_class: Optional[AssetClass] = None
 
 @dataclass
 class CreateGoalRequest:
