@@ -9,10 +9,11 @@ from domain.value_objects.money import Currency, TradeType
 from domain.ports.outbound.repositories import ITradeRepository
 from infrastructure.db.models import TradeModel
 
+
 class TradeRepository(ITradeRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def add(self, trade: Trade) -> None:
         model = TradeModel(
             id=trade.id,
@@ -32,28 +33,30 @@ class TradeRepository(ITradeRepository):
         )
         self.session.add(model)
         await self.session.flush()
-    
+
     async def get_by_id(self, trade_id: UUID) -> Optional[Trade]:
         model = await self.session.get(TradeModel, trade_id)
         return self._to_domain(model) if model else None
-    
+
     async def list_by_portfolio(
         self, portfolio_id: UUID, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Trade], int]:
         query = select(TradeModel).where(TradeModel.portfolio_id == portfolio_id)
-        
+
         count_result = await self.session.execute(
-            select(func.count(TradeModel.id)).where(TradeModel.portfolio_id == portfolio_id)
+            select(func.count(TradeModel.id)).where(
+                TradeModel.portfolio_id == portfolio_id
+            )
         )
         total = count_result.scalar()
-        
+
         result = await self.session.execute(
             query.order_by(TradeModel.trade_date.desc()).offset(skip).limit(limit)
         )
         models = result.scalars().all()
-        
+
         return [self._to_domain(m) for m in models], total
-    
+
     async def list_by_asset(self, asset_id: UUID) -> List[Trade]:
         result = await self.session.execute(
             select(TradeModel)
@@ -62,7 +65,7 @@ class TradeRepository(ITradeRepository):
         )
         models = result.scalars().all()
         return [self._to_domain(m) for m in models]
-    
+
     async def update(self, trade: Trade) -> None:
         model = await self.session.get(TradeModel, trade.id)
         if model:
@@ -76,13 +79,13 @@ class TradeRepository(ITradeRepository):
             model.fees = trade.fees
             model.notes = trade.notes
             await self.session.flush()
-    
+
     async def delete(self, trade_id: UUID) -> None:
         model = await self.session.get(TradeModel, trade_id)
         if model:
             await self.session.delete(model)
             await self.session.flush()
-    
+
     @staticmethod
     def _to_domain(model: TradeModel) -> Trade:
         return Trade(

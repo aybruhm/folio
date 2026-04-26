@@ -8,10 +8,11 @@ from domain.value_objects.money import Currency
 from domain.ports.outbound.repositories import IPortfolioRepository
 from infrastructure.db.models import PortfolioModel
 
+
 class PortfolioRepository(IPortfolioRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def add(self, portfolio: Portfolio) -> None:
         model = PortfolioModel(
             id=portfolio.id,
@@ -23,16 +24,16 @@ class PortfolioRepository(IPortfolioRepository):
         )
         self.session.add(model)
         await self.session.flush()
-    
+
     async def get_by_id(self, portfolio_id: UUID) -> Optional[Portfolio]:
         result = await self.session.execute(
             select(PortfolioModel).where(PortfolioModel.id == portfolio_id)
         )
         model = result.scalar_one_or_none()
-        
+
         if not model:
             return None
-        
+
         return Portfolio(
             id=model.id,
             name=model.name,
@@ -41,11 +42,11 @@ class PortfolioRepository(IPortfolioRepository):
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
-    
+
     async def list_all(self) -> List[Portfolio]:
         result = await self.session.execute(select(PortfolioModel))
         models = result.scalars().all()
-        
+
         return [
             Portfolio(
                 id=m.id,
@@ -57,7 +58,7 @@ class PortfolioRepository(IPortfolioRepository):
             )
             for m in models
         ]
-    
+
     async def update(self, portfolio: Portfolio) -> None:
         model = await self.session.get(PortfolioModel, portfolio.id)
         if model:
@@ -65,7 +66,7 @@ class PortfolioRepository(IPortfolioRepository):
             model.description = portfolio.description
             model.updated_at = portfolio.updated_at
             await self.session.flush()
-    
+
     async def delete(self, portfolio_id: UUID) -> None:
         model = await self.session.get(PortfolioModel, portfolio_id)
         if model:

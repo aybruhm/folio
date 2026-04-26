@@ -2,7 +2,14 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID, uuid4
-from domain.value_objects.money import Currency, TradeType, AssetClass, DateRange, AssetMetadata
+from domain.value_objects.money import (
+    Currency,
+    TradeType,
+    AssetClass,
+    DateRange,
+    AssetMetadata,
+)
+
 
 @dataclass
 class Asset:
@@ -19,7 +26,7 @@ class Asset:
     created_at: datetime = field(default_factory=datetime.now)
 
     @classmethod
-    def from_metadata(cls, ticker: str, metadata: AssetMetadata) -> 'Asset':
+    def from_metadata(cls, ticker: str, metadata: AssetMetadata) -> "Asset":
         return cls(
             id=uuid4(),
             ticker=ticker,
@@ -30,8 +37,9 @@ class Asset:
             sector=metadata.sector,
             industry=metadata.industry,
             country=metadata.country,
-            isin=metadata.isin
+            isin=metadata.isin,
         )
+
 
 @dataclass
 class Trade:
@@ -42,27 +50,28 @@ class Trade:
     trade_type: TradeType
     trade_date: datetime
     quantity: int  # ×100 scale (e.g. 10 shares → 1000)
-    price: int     # ×100 scale (e.g. $185.20 → 18520)
+    price: int  # ×100 scale (e.g. $185.20 → 18520)
     trade_currency: Currency
     fees: int = 0  # ×100 scale
     notes: Optional[str] = None
-    source: str = 'manual'
+    source: str = "manual"
     import_batch_id: Optional[UUID] = None
     created_at: datetime = field(default_factory=datetime.now)
 
     def total_cost(self) -> int:
         return (self.quantity * self.price) // 100 + self.fees
 
+
 @dataclass
 class Holding:
     asset_id: UUID
     ticker: str
-    quantity: int       # ×100
+    quantity: int  # ×100
     current_price: int  # ×100
-    cost_basis: int     # ×100
-    market_value: int   # ×100
-    total_return: int   # ×100
-    unrealised_pnl: int # ×100
+    cost_basis: int  # ×100
+    market_value: int  # ×100
+    total_return: int  # ×100
+    unrealised_pnl: int  # ×100
     realised_pnl: int = 0  # ×100
 
     @property
@@ -75,6 +84,7 @@ class Holding:
     def weight(self) -> int:
         return self.market_value
 
+
 @dataclass
 class Portfolio:
     id: UUID
@@ -84,26 +94,30 @@ class Portfolio:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
-    def update(self, name: Optional[str] = None, description: Optional[str] = None) -> None:
+    def update(
+        self, name: Optional[str] = None, description: Optional[str] = None
+    ) -> None:
         if name:
             self.name = name
         if description is not None:
             self.description = description
         self.updated_at = datetime.now()
 
+
 @dataclass
 class Goal:
     id: UUID
     portfolio_id: UUID
     name: str
-    target_net_worth: int           # ×100
+    target_net_worth: int  # ×100
     target_net_worth_currency: Currency
     target_date: date
-    monthly_savings: int            # ×100
+    monthly_savings: int  # ×100
     monthly_savings_currency: Currency
-    expected_annual_return: int     # ×100 (e.g. 7% → 7)
+    expected_annual_return: int  # ×100 (e.g. 7% → 7)
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
+
 
 @dataclass
 class FxRate:

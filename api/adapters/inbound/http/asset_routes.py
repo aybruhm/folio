@@ -56,7 +56,8 @@ async def get_price_history(
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "data": [
-                {"date": d.isoformat(), "close": str(price / 100)} for d, price in history
+                {"date": d.isoformat(), "close": str(price / 100)}
+                for d, price in history
             ],
         }
     except Exception as e:

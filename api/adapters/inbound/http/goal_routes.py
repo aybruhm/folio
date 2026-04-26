@@ -48,9 +48,7 @@ async def list_goals(portfolio_id: UUID, session: AsyncSession = Depends(get_ses
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_goal(
-    body: GoalBody, session: AsyncSession = Depends(get_session)
-):
+async def create_goal(body: GoalBody, session: AsyncSession = Depends(get_session)):
     try:
         interactor = GoalInteractor(session)
         goal_id = await interactor.create_goal(_body_to_request(body))

@@ -3,10 +3,9 @@ from datetime import date
 from typing import Optional, List
 from uuid import UUID
 
-from domain.entities.models import (
-    Portfolio, Trade, Asset, Goal, FxRate, Holding
-)
+from domain.entities.models import Portfolio, Trade, Asset, Goal, FxRate, Holding
 from domain.value_objects.money import Currency, AssetMetadata, TradeType
+
 
 class IPortfolioRepository(ABC):
     @abstractmethod
@@ -23,6 +22,7 @@ class IPortfolioRepository(ABC):
 
     @abstractmethod
     async def delete(self, portfolio_id: UUID) -> None: ...
+
 
 class ITradeRepository(ABC):
     @abstractmethod
@@ -45,6 +45,7 @@ class ITradeRepository(ABC):
     @abstractmethod
     async def delete(self, trade_id: UUID) -> None: ...
 
+
 class IAssetRepository(ABC):
     @abstractmethod
     async def add(self, asset: Asset) -> None: ...
@@ -57,6 +58,7 @@ class IAssetRepository(ABC):
 
     @abstractmethod
     async def search_by_ticker(self, query: str, limit: int = 10) -> List[Asset]: ...
+
 
 class IGoalRepository(ABC):
     @abstractmethod
@@ -74,6 +76,7 @@ class IGoalRepository(ABC):
     @abstractmethod
     async def delete(self, goal_id: UUID) -> None: ...
 
+
 class IAssetPricePort(ABC):
     @abstractmethod
     async def get_price_history(
@@ -86,6 +89,7 @@ class IAssetPricePort(ABC):
     @abstractmethod
     async def get_asset_metadata(self, ticker: str) -> Optional[AssetMetadata]: ...
 
+
 class IFxRatePort(ABC):
     @abstractmethod
     async def get_fx_rate(
@@ -96,6 +100,7 @@ class IFxRatePort(ABC):
     async def get_current_rate(
         self, from_currency: Currency, to_currency: Currency
     ) -> Optional[int]: ...
+
 
 class IPriceHistoryRepository(ABC):
     @abstractmethod
@@ -110,6 +115,7 @@ class IPriceHistoryRepository(ABC):
 
     @abstractmethod
     async def get_latest(self, asset_id: UUID) -> Optional[tuple[date, int]]: ...
+
 
 class IFxRateRepository(ABC):
     @abstractmethod

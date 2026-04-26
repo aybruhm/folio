@@ -298,15 +298,15 @@ def _build_trades(
     buy("GOOGL", date(2026, 2, 3), 8)
 
     # ── BTC-USD — crypto position ─────────────────────────────────────────
-    buy("BTC-USD", date(2024, 1, 12), 0.10)   # initial entry ~$43k
-    buy("BTC-USD", date(2024, 5, 10), 0.05)   # add after halving
+    buy("BTC-USD", date(2024, 1, 12), 0.10)  # initial entry ~$43k
+    buy("BTC-USD", date(2024, 5, 10), 0.05)  # add after halving
     buy("BTC-USD", date(2024, 11, 12), 0.10)  # post-election rally
-    buy("BTC-USD", date(2025, 1, 20), 0.05)   # DCA
+    buy("BTC-USD", date(2025, 1, 20), 0.05)  # DCA
     sell("BTC-USD", date(2025, 5, 15), 0.05)  # partial profit-taking
-    buy("BTC-USD", date(2026, 1, 15), 0.05)   # buy the dip
+    buy("BTC-USD", date(2026, 1, 15), 0.05)  # buy the dip
 
     # ── HYSA — cash savings ───────────────────────────────────────────────
-    deposit("HYSA", date(2024, 1, 3), 5000)    # initial deposit
+    deposit("HYSA", date(2024, 1, 3), 5000)  # initial deposit
     deposit("HYSA", date(2024, 4, 1), 2000)
     deposit("HYSA", date(2024, 7, 1), 2000)
     deposit("HYSA", date(2024, 10, 1), 2000)
@@ -416,12 +416,12 @@ async def seed() -> None:
                     id=uuid4(),
                     portfolio_id=portfolio_id,
                     name="FIRE by 2040",
-                    target_net_worth=200000000,   # $2,000,000 × 100
+                    target_net_worth=200000000,  # $2,000,000 × 100
                     target_net_worth_currency="USD",
                     target_date=date(2040, 1, 1),
-                    monthly_savings=300000,        # $3,000 × 100
+                    monthly_savings=300000,  # $3,000 × 100
                     monthly_savings_currency="USD",
-                    expected_annual_return=7,      # 7% × 100 = 7 (÷100 → 0.07)
+                    expected_annual_return=7,  # 7% × 100 = 7 (÷100 → 0.07)
                 )
             )
 

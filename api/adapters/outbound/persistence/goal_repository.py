@@ -8,6 +8,7 @@ from domain.value_objects.money import Currency
 from domain.ports.outbound.repositories import IGoalRepository
 from infrastructure.db.models import GoalModel
 
+
 class GoalRepository(IGoalRepository):
     def __init__(self, session: AsyncSession):
         self.session = session

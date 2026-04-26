@@ -1,6 +1,7 @@
 from datetime import date
 from typing import List, Optional, Tuple
 
+
 class PerformanceService:
     @staticmethod
     def calculate_twr(
@@ -8,7 +9,7 @@ class PerformanceService:
         ending_value: float,
         cash_flows: List[Tuple[date, float]],
         start_date: date,
-        end_date: date
+        end_date: date,
     ) -> float:
         """
         Calculate Time-Weighted Return using Modified Dietz method.
@@ -45,7 +46,7 @@ class PerformanceService:
         ending_value: float,
         cash_flows: List[Tuple[date, float]],
         start_date: date,
-        end_date: date
+        end_date: date,
     ) -> float:
         """
         Calculate Money-Weighted Return (IRR) using Newton-Raphson method.
@@ -85,16 +86,15 @@ class PerformanceService:
 
         if not (-0.9999 <= rate <= 5.0):
             total_flows = sum(abs(f[1]) for f in cash_flows)
-            return (ending_value - total_flows) / total_flows if total_flows > 0 else 0.0
+            return (
+                (ending_value - total_flows) / total_flows if total_flows > 0 else 0.0
+            )
         return rate
 
 
 class AllocationService:
     @staticmethod
-    def group_by_attribute(
-        holdings: List[dict],
-        attribute: str
-    ) -> List[dict]:
+    def group_by_attribute(holdings: List[dict], attribute: str) -> List[dict]:
         """
         Group holdings by specified attribute.
         Returns list of {name, value, weight_percent}
@@ -103,8 +103,8 @@ class AllocationService:
         total_value = 0.0
 
         for holding in holdings:
-            group_name = holding.get(attribute, 'Unknown')
-            value = float(holding['market_value'])
+            group_name = holding.get(attribute, "Unknown")
+            value = float(holding["market_value"])
 
             if group_name not in groups:
                 groups[group_name] = 0.0
@@ -115,11 +115,7 @@ class AllocationService:
         result = []
         for name, value in sorted(groups.items(), key=lambda x: x[1], reverse=True):
             weight = round(value / total_value * 100, 2) if total_value > 0 else 0.0
-            result.append({
-                'name': name,
-                'value': value,
-                'weight_percent': weight
-            })
+            result.append({"name": name, "value": value, "weight_percent": weight})
 
         return result
 
@@ -127,10 +123,7 @@ class AllocationService:
 class FIREService:
     @staticmethod
     def calculate_future_value(
-        present_value: float,
-        monthly_savings: float,
-        annual_return: float,
-        months: int
+        present_value: float, monthly_savings: float, annual_return: float, months: int
     ) -> float:
         """
         Calculate future value with monthly compounding.
@@ -153,7 +146,7 @@ class FIREService:
         target_value: float,
         monthly_savings: float,
         annual_return: float,
-        target_months: int
+        target_months: int,
     ) -> dict:
         """
         Calculate FIRE projection to target date.
@@ -161,13 +154,21 @@ class FIREService:
         monthly_rate = annual_return / 12
 
         if monthly_rate == 0:
-            months_needed = (target_value - current_value) / monthly_savings if monthly_savings > 0 else None
+            months_needed = (
+                (target_value - current_value) / monthly_savings
+                if monthly_savings > 0
+                else None
+            )
             projected = current_value + (monthly_savings * target_months)
             return {
-                'months_to_target': int(months_needed) if months_needed is not None else None,
-                'projected_value': projected,
-                'shortfall': max(0.0, target_value - projected),
-                'progress_percent': round(current_value / target_value * 100, 2) if target_value > 0 else 0.0,
+                "months_to_target": int(months_needed)
+                if months_needed is not None
+                else None,
+                "projected_value": projected,
+                "shortfall": max(0.0, target_value - projected),
+                "progress_percent": round(current_value / target_value * 100, 2)
+                if target_value > 0
+                else 0.0,
             }
 
         projected_value = FIREService.calculate_future_value(
@@ -175,13 +176,15 @@ class FIREService:
         )
 
         shortfall = max(0.0, target_value - projected_value)
-        progress = round(current_value / target_value * 100, 2) if target_value > 0 else 0.0
+        progress = (
+            round(current_value / target_value * 100, 2) if target_value > 0 else 0.0
+        )
 
         return {
-            'projected_value': projected_value,
-            'shortfall': shortfall,
-            'progress_percent': progress,
-            'will_reach_target': projected_value >= target_value
+            "projected_value": projected_value,
+            "shortfall": shortfall,
+            "progress_percent": progress,
+            "will_reach_target": projected_value >= target_value,
         }
 
     @staticmethod
@@ -189,7 +192,7 @@ class FIREService:
         current_value: float,
         target_value: float,
         monthly_savings: float,
-        target_months: int
+        target_months: int,
     ) -> Optional[float]:
         """
         Calculate required annual return to hit target given current savings.

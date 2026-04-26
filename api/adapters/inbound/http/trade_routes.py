@@ -164,7 +164,12 @@ async def confirm_import(
         mapping_dict = json.loads(mapping)
         interactor = CsvImportInteractor(session)
         result = await interactor.confirm_import(
-            content, file.filename, mapping_dict, date_format, portfolio_id, profile_name
+            content,
+            file.filename,
+            mapping_dict,
+            date_format,
+            portfolio_id,
+            profile_name,
         )
         await session.commit()
         return result

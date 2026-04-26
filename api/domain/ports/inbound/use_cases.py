@@ -6,11 +6,13 @@ from dataclasses import dataclass, field
 
 from domain.value_objects.money import Currency, TradeType, AssetClass
 
+
 @dataclass
 class CreatePortfolioRequest:
     name: str
     base_currency: Currency
     description: Optional[str] = None
+
 
 @dataclass
 class CreateTradeRequest:
@@ -18,23 +20,25 @@ class CreateTradeRequest:
     ticker: str
     trade_type: TradeType
     trade_date: datetime
-    quantity: int   # ×100
-    price: int      # ×100
+    quantity: int  # ×100
+    price: int  # ×100
     trade_currency: Currency
-    fees: int = 0   # ×100
+    fees: int = 0  # ×100
     notes: Optional[str] = None
     asset_class: Optional[AssetClass] = None
+
 
 @dataclass
 class CreateGoalRequest:
     portfolio_id: UUID
     name: str
-    target_net_worth: int           # ×100
+    target_net_worth: int  # ×100
     target_net_worth_currency: Currency
     target_date: date
-    monthly_savings: int            # ×100
+    monthly_savings: int  # ×100
     monthly_savings_currency: Currency
-    expected_annual_return: int     # ×100 (e.g. 7% → 7)
+    expected_annual_return: int  # ×100 (e.g. 7% → 7)
+
 
 class IPortfolioUseCase(ABC):
     @abstractmethod
@@ -48,11 +52,15 @@ class IPortfolioUseCase(ABC):
 
     @abstractmethod
     async def update_portfolio(
-        self, portfolio_id: UUID, name: Optional[str] = None, description: Optional[str] = None
+        self,
+        portfolio_id: UUID,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
     ) -> None: ...
 
     @abstractmethod
     async def delete_portfolio(self, portfolio_id: UUID) -> None: ...
+
 
 class ITradeUseCase(ABC):
     @abstractmethod
@@ -70,14 +78,17 @@ class ITradeUseCase(ABC):
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
     ) -> tuple[List[dict], int]: ...
 
     @abstractmethod
-    async def update_trade(self, trade_id: UUID, request: CreateTradeRequest) -> None: ...
+    async def update_trade(
+        self, trade_id: UUID, request: CreateTradeRequest
+    ) -> None: ...
 
     @abstractmethod
     async def delete_trade(self, trade_id: UUID) -> None: ...
+
 
 class IAnalyticsUseCase(ABC):
     @abstractmethod
@@ -87,18 +98,25 @@ class IAnalyticsUseCase(ABC):
 
     @abstractmethod
     async def calculate_performance(
-        self, portfolio_id: UUID, start_date: Optional[date] = None, end_date: Optional[date] = None
+        self,
+        portfolio_id: UUID,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
     ) -> dict: ...
 
     @abstractmethod
     async def get_allocation(
-        self, portfolio_id: UUID, group_by: str = 'asset_class'
+        self, portfolio_id: UUID, group_by: str = "asset_class"
     ) -> List[dict]: ...
 
     @abstractmethod
     async def get_benchmark_comparison(
-        self, portfolio_id: UUID, benchmark_tickers: List[str], start_date: Optional[date] = None
+        self,
+        portfolio_id: UUID,
+        benchmark_tickers: List[str],
+        start_date: Optional[date] = None,
     ) -> dict: ...
+
 
 class IGoalUseCase(ABC):
     @abstractmethod
@@ -119,6 +137,7 @@ class IGoalUseCase(ABC):
     @abstractmethod
     async def get_projection(self, goal_id: UUID) -> dict: ...
 
+
 class ICsvImportUseCase(ABC):
     @abstractmethod
     async def preview_csv(self, file_content: bytes, filename: str) -> dict: ...
@@ -130,6 +149,11 @@ class ICsvImportUseCase(ABC):
 
     @abstractmethod
     async def confirm_import(
-        self, file_content: bytes, filename: str, mapping: dict, date_format: str,
-        portfolio_id: UUID, profile_name: Optional[str] = None
+        self,
+        file_content: bytes,
+        filename: str,
+        mapping: dict,
+        date_format: str,
+        portfolio_id: UUID,
+        profile_name: Optional[str] = None,
     ) -> dict: ...
