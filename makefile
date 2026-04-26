@@ -211,6 +211,32 @@ status:
 	@echo "Service Status:"
 	@docker compose ps
 
+TAG ?= v0.1.0
+
+test_ci_workflow:
+	@command -v act > /dev/null 2>&1 || (echo "Error: 'act' is not installed or not in PATH. See https://github.com/nektos/act" && exit 1)
+	@if [ -z "$(GH_TOKEN)" ]; then \
+		echo "Error: Please provide a github token. Usage: make test_ci_workflow GH_TOKEN=<your-github-pat>"; \
+		exit 1; \
+	fi
+	@if [ -z "$(DHI_USERNAME)" ]; then \
+		echo "Error: Please provide a DHI username. Usage: make test_ci_workflow DHI_USERNAME=<your-dhi-username>"; \
+		exit 1; \
+	fi
+	@if [ -z "$(DHI_PATOKEN)" ]; then \
+		echo "Error: Please provide a DHI PAT token. Usage: make test_ci_workflow DHI_PATOKEN=<your-dhi-pat>"; \
+		exit 1; \
+	fi
+	@echo "Running CI workflow with tag $(TAG)..."
+	@printf '{"action":"published","release":{"tag_name":"$(TAG)","name":"$(TAG)","draft":false,"prerelease":false},"ref":"refs/tags/$(TAG)"}' > /tmp/act-release-event.json
+	@act release \
+		-e /tmp/act-release-event.json \
+		--secret GH_TOKEN=$(GH_TOKEN) \
+		--secret DHI_USERNAME=$(DHI_USERNAME) \
+		--secret DHI_PATOKEN=$(DHI_PATOKEN) \
+		--artifact-server-path /tmp/act-artifacts \
+		--dryrun
+
 backup:
 	@echo "Backing up database..."
 	@docker compose exec -T db pg_dump -U folio folio > backups/folio_$(shell date +%Y%m%d_%H%M%S).sql
