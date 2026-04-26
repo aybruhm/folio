@@ -73,6 +73,7 @@
         price: parseFloat(trade.price),
         trade_currency: trade.trade_currency,
         fees: parseFloat(trade.fees) || 0,
+        asset_class: trade.asset_class || undefined,
       }
       await tradeController.createTrade(tradeRequest)
       await loadHoldings()
