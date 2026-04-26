@@ -117,20 +117,20 @@
             <!-- Stats Cards -->
             <div class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                 <Card title="Total Value" subtitle="Current portfolio value">
-                    <div class="text-3xl font-bold text-foreground">
+                    <div class="text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight break-all">
                         {formatCurrency(stats.current_value)}
                     </div>
                 </Card>
 
                 <Card title="Cost Basis" subtitle="Total amount invested">
-                    <div class="text-3xl font-bold text-foreground">
+                    <div class="text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight break-all">
                         {formatCurrency(stats.cost_basis)}
                     </div>
                 </Card>
 
                 <Card title="Gain/Loss" subtitle="Unrealized P&L">
                     <div
-                        class="text-3xl font-bold"
+                        class="text-xl sm:text-2xl md:text-3xl font-bold leading-tight break-all"
                         class:text-positive={isPositive}
                         class:text-negative={!isPositive}
                     >
@@ -140,7 +140,7 @@
 
                 <Card title="Return" subtitle="Total return %">
                     <div
-                        class="text-3xl font-bold"
+                        class="text-xl sm:text-2xl md:text-3xl font-bold leading-tight"
                         class:text-positive={isPositive}
                         class:text-negative={!isPositive}
                     >
@@ -154,7 +154,7 @@
                 <LineChart
                     data={stats.performance_history}
                     title=""
-                    height="h-80 md:h-96"
+                    height="h-72 md:h-96"
                 />
             </Card>
 
@@ -174,26 +174,19 @@
 
             <!-- Top Holdings List -->
             <Card title="Top Holdings" subtitle="5 largest positions">
-                <div class="space-y-2 md:space-y-3">
+                <div class="space-y-2">
                     {#each stats.top_holdings ?? [] as holding}
-                        <div
-                            class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between rounded-lg border border-border p-3 md:p-4"
-                        >
-                            <div class="flex flex-col gap-1">
-                                <span
-                                    class="text-sm md:text-base font-semibold text-foreground"
-                                    >{holding.ticker}</span
-                                >
-                                <span
-                                    class="text-xs md:text-sm text-muted-foreground"
-                                >
+                        <div class="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 md:px-4 md:py-3">
+                            <div class="flex flex-col gap-0.5 min-w-0">
+                                <span class="text-sm md:text-base font-semibold text-foreground truncate">
+                                    {holding.ticker}
+                                </span>
+                                <span class="text-xs text-muted-foreground">
                                     {formatPercent(holding.percent)} of portfolio
                                 </span>
                             </div>
-                            <div class="text-left md:text-right">
-                                <div
-                                    class="text-sm md:text-base font-semibold text-foreground"
-                                >
+                            <div class="text-right ml-2 shrink-0">
+                                <div class="text-sm md:text-base font-semibold text-foreground">
                                     {formatCurrency(holding.value)}
                                 </div>
                             </div>

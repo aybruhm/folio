@@ -46,8 +46,8 @@
         timeframe
       })
       analyticsData = {
-        contribution_history: [],
-        sector_breakdown: [],
+        // contribution_history: [],
+        // sector_breakdown: [],
         ...response,
       }
     } catch (e) {
