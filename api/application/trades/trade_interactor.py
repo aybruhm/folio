@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from datetime import date, datetime
 
 from domain.entities.models import Trade, Asset
-from domain.value_objects.money import Currency, TradeType, AssetMetadata
+from domain.value_objects.money import Currency, TradeType, AssetClass, AssetMetadata
 from domain.ports.inbound.use_cases import ITradeUseCase, CreateTradeRequest
 from domain.ports.outbound.repositories import (
     ITradeRepository, IAssetRepository, IPortfolioRepository
@@ -21,20 +21,26 @@ class TradeInteractor(ITradeUseCase):
         self.portfolio_repo: IPortfolioRepository = PortfolioRepository(session)
         self.yfinance = YFinanceAdapter()
     
-    async def create_trade(self, request: CreateTradeRequest) -> UUID:
-        portfolio = await self.portfolio_repo.get_by_id(request.portfolio_id)
-        if not portfolio:
-            raise ValueError(f"Portfolio {request.portfolio_id} not found")
-        
-        asset = await self.asset_repo.get_by_ticker(request.ticker)
+    async def _resolve_asset(self, ticker: str, currency: Currency, asset_class: AssetClass | None) -> Asset:
+        asset = await self.asset_repo.get_by_ticker(ticker)
         if not asset:
-            metadata = await self.yfinance.get_asset_metadata(request.ticker, request.trade_currency.value)
-            if not metadata:
-                raise ValueError(f"Cannot find asset metadata for {request.ticker}")
-            asset = Asset.from_metadata(request.ticker, metadata)
-            await self.asset_repo.add(asset)
-        else:
-            metadata = await self.yfinance.get_asset_metadata(request.ticker, request.trade_currency.value)
+            if asset_class == AssetClass.CASH:
+                asset = Asset(
+                    id=uuid4(),
+                    ticker=ticker,
+                    name=ticker,
+                    asset_class=AssetClass.CASH,
+                    currency=currency,
+                )
+                await self.asset_repo.add(asset)
+            else:
+                metadata = await self.yfinance.get_asset_metadata(ticker, currency.value)
+                if not metadata:
+                    raise ValueError(f"Cannot find asset metadata for {ticker}")
+                asset = Asset.from_metadata(ticker, metadata)
+                await self.asset_repo.add(asset)
+        elif asset_class != AssetClass.CASH:
+            metadata = await self.yfinance.get_asset_metadata(ticker, currency.value)
             if metadata and (
                 asset.asset_class.value != metadata.asset_class
                 or asset.currency.value != metadata.currency.value
@@ -42,7 +48,15 @@ class TradeInteractor(ITradeUseCase):
                 await self.asset_repo.update_classification(
                     asset.id, metadata.asset_class, metadata.currency.value
                 )
-                asset = await self.asset_repo.get_by_ticker(request.ticker)
+                asset = await self.asset_repo.get_by_ticker(ticker)
+        return asset
+
+    async def create_trade(self, request: CreateTradeRequest) -> UUID:
+        portfolio = await self.portfolio_repo.get_by_id(request.portfolio_id)
+        if not portfolio:
+            raise ValueError(f"Portfolio {request.portfolio_id} not found")
+
+        asset = await self._resolve_asset(request.ticker, request.trade_currency, request.asset_class)
         
         trade = Trade(
             id=uuid4(),
@@ -100,23 +114,7 @@ class TradeInteractor(ITradeUseCase):
         if not trade:
             raise ValueError(f"Trade {trade_id} not found")
 
-        asset = await self.asset_repo.get_by_ticker(request.ticker)
-        if not asset:
-            metadata = await self.yfinance.get_asset_metadata(request.ticker, request.trade_currency.value)
-            if not metadata:
-                raise ValueError(f"Cannot find asset metadata for {request.ticker}")
-            asset = Asset.from_metadata(request.ticker, metadata)
-            await self.asset_repo.add(asset)
-        else:
-            metadata = await self.yfinance.get_asset_metadata(request.ticker, request.trade_currency.value)
-            if metadata and (
-                asset.asset_class.value != metadata.asset_class
-                or asset.currency.value != metadata.currency.value
-            ):
-                await self.asset_repo.update_classification(
-                    asset.id, metadata.asset_class, metadata.currency.value
-                )
-                asset = await self.asset_repo.get_by_ticker(request.ticker)
+        asset = await self._resolve_asset(request.ticker, request.trade_currency, request.asset_class)
 
         trade.asset_id = asset.id
         trade.ticker = request.ticker
