@@ -14,6 +14,7 @@
     price: string
     trade_currency: string
     fees: string
+    asset_class?: string
   } = {
     ticker: '',
     trade_type: 'buy',
@@ -21,7 +22,8 @@
     quantity: '',
     price: '',
     trade_currency: 'USD',
-    fees: '0'
+    fees: '0',
+    asset_class: ''
   }
   export let isLoading = false
 
@@ -30,6 +32,14 @@
     { label: 'Sell', value: 'sell' },
     { label: 'Dividend', value: 'dividend' },
     { label: 'Fee', value: 'fee' }
+  ]
+
+  const assetClasses = [
+    { label: 'Auto-detect', value: '' },
+    { label: 'Stock', value: 'stock' },
+    { label: 'ETF', value: 'etf' },
+    { label: 'Crypto', value: 'crypto' },
+    { label: 'Cash', value: 'cash' },
   ]
 
   const currencies = [
@@ -60,13 +70,21 @@
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="space-y-4">
-  <Input
-    label="Ticker"
-    placeholder="AAPL"
-    bind:value={trade.ticker}
-    required
-    error={errors.ticker}
-  />
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <Input
+      label="Ticker"
+      placeholder="AAPL"
+      bind:value={trade.ticker}
+      required
+      error={errors.ticker}
+    />
+
+    <Select
+      label="Asset Class"
+      bind:value={trade.asset_class}
+      options={assetClasses}
+    />
+  </div>
 
   <Select
     label="Trade Type"

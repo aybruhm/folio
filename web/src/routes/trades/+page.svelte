@@ -60,6 +60,7 @@
         price: parseFloat(trade.price),
         trade_currency: trade.trade_currency,
         fees: parseFloat(trade.fees) || 0,
+        asset_class: trade.asset_class || undefined,
       }
       await tradeController.createTrade(tradeRequest)
       await loadTrades()
@@ -94,6 +95,7 @@
         price: parseFloat(trade.price),
         trade_currency: trade.trade_currency,
         fees: parseFloat(trade.fees) || 0,
+        asset_class: trade.asset_class || undefined,
       }
       await tradeController.updateTrade(editingTrade.id, tradeRequest)
       await loadTrades()
@@ -127,12 +129,21 @@
         <h1 class="text-2xl md:text-3xl font-bold text-foreground">Trades</h1>
         <p class="text-xs md:text-sm text-muted-foreground">Transaction history for {$currentPortfolio?.name}</p>
       </div>
-      <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
-        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        New Trade
-      </Button>
+      <div class="flex gap-2 w-full sm:w-auto">
+        <Button variant="outline" href="/trades/import" class="flex-1 sm:flex-none">
+          <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          Import CSV
+        </Button>
+        <Button variant="default" on:click={() => (showNewModal = true)} class="flex-1 sm:flex-none">
+          <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          New Trade
+        </Button>
+      </div>
     </div>
 
     <!-- Filter -->
