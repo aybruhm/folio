@@ -23,6 +23,8 @@
   let goals: Goal[] = []
   let currentPortfolioValue = 0
   let showNewModal = false
+  let showEditModal = false
+  let editingGoal: (GoalFormData & { id: string }) | null = null
   let portfolioController: PortfolioController
   let goalController: GoalController
 
@@ -67,6 +69,40 @@
       showNewModal = false
     } catch (e) {
       console.error('Failed to create goal:', e)
+    }
+  }
+
+  function handleEditGoal(goal: Goal) {
+    editingGoal = {
+      id: goal.id,
+      name: goal.name,
+      target_amount: String(goal.target_net_worth),
+      target_date: goal.target_date.slice(0, 10),
+      expected_annual_return: String(goal.expected_annual_return),
+      description: ''
+    }
+    showEditModal = true
+  }
+
+  async function handleUpdateGoal(data: GoalFormData) {
+    if (!editingGoal) return
+    try {
+      const goalRequest: CreateGoalRequest = {
+        portfolio_id: $currentPortfolio.id,
+        name: data.name,
+        target_net_worth: data.target_amount,
+        target_net_worth_currency: 'USD',
+        target_date: data.target_date,
+        monthly_savings: 0,
+        monthly_savings_currency: 'USD',
+        expected_annual_return: data.expected_annual_return || '0.07'
+      }
+      await goalController.updateGoal(editingGoal.id, goalRequest)
+      await loadGoals()
+      showEditModal = false
+      editingGoal = null
+    } catch (e) {
+      console.error('Failed to update goal:', e)
     }
   }
 
@@ -172,7 +208,7 @@
               </div>
 
               <div class="flex gap-2 pt-4">
-                <Button variant="outline" size="sm" href="/goals/{goal.id}">
+                <Button variant="outline" size="sm" on:click={() => handleEditGoal(goal)}>
                   Edit
                 </Button>
                 <Button
@@ -191,6 +227,7 @@
   </div>
 </div>
 
+<!-- Create Goal Modal -->
 <Modal
   open={showNewModal}
   title="Create Goal"
@@ -212,3 +249,22 @@
     </Button>
   </svelte:fragment>
 </Modal>
+
+<!-- Edit Goal Modal -->
+{#if editingGoal}
+  <Modal
+    open={showEditModal}
+    title="Edit Goal"
+    onClose={() => { showEditModal = false; editingGoal = null }}
+  >
+    <GoalForm
+      onSubmit={handleUpdateGoal}
+      goal={editingGoal}
+    />
+    <svelte:fragment slot="footer">
+      <Button variant="outline" on:click={() => { showEditModal = false; editingGoal = null }}>
+        Cancel
+      </Button>
+    </svelte:fragment>
+  </Modal>
+{/if}
