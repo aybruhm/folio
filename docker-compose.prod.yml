@@ -1,0 +1,94 @@
+services:
+    db:
+        image: postgres:16-alpine
+        container_name: folio-ghcr-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_DB: ${DB_NAME}
+            PGDATA: /var/lib/postgresql/data/pgdata
+        volumes:
+            - folio_postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        env_file: ./api/.env.prod            
+        networks:
+            - folio-prod-network
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+    api:
+        image: ghcr.io/aybruhm/folio-api:latest
+        container_name: folio-ghcr-api
+        restart: unless-stopped
+        env_file: ./api/.env.prod
+        environment:
+            DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+        ports:
+            - "${API_PORT:-8000}:8000"
+        depends_on:
+            db:
+                condition: service_healthy
+        command: >
+            python -m uvicorn main:app
+            --host ${API_HOST:-0.0.0.0}
+            --port ${API_PORT:-8000}
+            --workers 2
+        networks:
+            - folio-prod-network
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "/opt/python/bin/python",
+                    "-c",
+                    "import urllib.request; r=urllib.request.urlopen('http://localhost:8000/health', timeout=5); exit(0 if r.status==200 else 1)",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+    web:
+        image: ghcr.io/aybruhm/folio-web:latest
+        container_name: folio-ghcr-web
+        restart: unless-stopped
+        env_file: ./web/.env.local
+        ports:
+            - "${WEB_PORT:-3000}:3000"
+        depends_on:
+            api:
+                condition: service_healthy
+        command: node build/index.js
+        networks:
+            - folio-prod-network
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+volumes:
+    folio_postgres_data:
+        driver: local
+
+networks:
+    folio-prod-network:
+        name: folio-prod-network
+        driver: bridge
+        ipam:
+            config:
+                - subnet: 172.24.0.0/16
