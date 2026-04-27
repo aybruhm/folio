@@ -1,4 +1,5 @@
 .PHONY: help setup up down logs clean test lint format
+PROD_COMPOSE = docker compose -f docker-compose.prod.yml
 
 help:
 	@echo "Folio - Investment Tracking Platform"
@@ -32,7 +33,19 @@ help:
 	@echo "  make web-lint       Lint TypeScript/Svelte code"
 	@echo "  make web-test       Run frontend tests"
 	@echo ""
+	@echo "Production Commands:"
+	@echo "  make prod-up        Start all services in production mode"
+	@echo "  make prod-down      Stop all production services"
+	@echo "  make prod-restart   Restart all production services"
+	@echo "  make prod-logs      Stream logs from production services"
+	@echo "  make prod-migrate   Run database migrations in production"
+	@echo "  make prod-health    Check production service health"
+	@echo "  make prod-pull      Pull latest images from GHCR"
+	@echo "  make prod-seed      Seed production database with sample data"
+	@echo ""
 	@echo "Utility Commands:"
+	@echo "  make setup          Setup dev environment (.env files from examples)"
+	@echo "  make prod-setup     Setup prod environment (.env.prod files from examples)"
 	@echo "  make clean          Clean up containers and volumes"
 	@echo "  make clean-hard     Remove all containers, volumes, and images"
 	@echo "  make health         Check service health status"
@@ -42,7 +55,7 @@ help:
 
 # Setup & Environment
 setup:
-	@echo "Setting up environment..."
+	@echo "Setting up dev environment..."
 	@cp -n api/.env.example api/.env && echo "✓ Created api/.env" || echo "ℹ api/.env already exists"
 	@cp -n web/.env.local.example web/.env.local && echo "✓ Created web/.env.local" || echo "ℹ web/.env.local already exists"
 	@echo ""
@@ -50,6 +63,16 @@ setup:
 	@echo "  1. Review and customize api/.env if needed"
 	@echo "  2. Review and customize web/.env.local if needed"
 	@echo "  3. Run 'make up' to start services"
+
+prod-setup:
+	@echo "Setting up production environment..."
+	@cp -n api/.env.prod.example api/.env.prod && echo "✓ Created api/.env.prod" || echo "ℹ api/.env.prod already exists"
+	@cp -n web/.env.local.example web/.env.local && echo "✓ Created web/.env.local" || echo "ℹ web/.env.local already exists"
+	@echo ""
+	@echo "Setup complete! Next steps:"
+	@echo "  1. Review and customize api/.env.prod with production values"
+	@echo "  2. Review and customize web/.env.local if needed"
+	@echo "  3. Run 'make prod-pull' then 'make prod-up' to start services"
 
 env: setup
 
@@ -173,6 +196,55 @@ web-test:
 	@echo "Running frontend tests..."
 	@docker compose exec web npm test
 	@echo "✓ Tests complete"
+
+# Production Operations
+prod-up:
+	@echo "Starting production services..."
+	@$(PROD_COMPOSE) --env-file api/.env.prod up -d
+	@echo ""
+	@echo "Services starting. Wait for health checks..."
+	@sleep 3
+	@make prod-health
+
+prod-down:
+	@echo "Stopping production services..."
+	@$(PROD_COMPOSE) down
+	@echo "✓ Production services stopped"
+
+prod-restart:
+	@echo "Restarting production services..."
+	@$(PROD_COMPOSE) restart
+	@echo "✓ Production services restarted"
+
+prod-logs:
+	@$(PROD_COMPOSE) logs -f
+
+prod-migrate:
+	@echo "Running database migrations in production..."
+	@$(PROD_COMPOSE) exec api python -m alembic upgrade head
+	@echo "✓ Migrations complete"
+
+prod-health:
+	@echo "Checking production service health..."
+	@echo ""
+	@echo "Database:"
+	@$(PROD_COMPOSE) exec -T db pg_isready -U $${DB_USER:-folio} 2>/dev/null && echo "  ✓ PostgreSQL healthy" || echo "  ✗ PostgreSQL unhealthy"
+	@echo ""
+	@echo "API:"
+	@curl -s http://localhost:$${API_PORT:-8000}/health > /dev/null && echo "  ✓ API healthy" || echo "  ✗ API unhealthy"
+	@echo ""
+	@echo "Web:"
+	@curl -s http://localhost:$${WEB_PORT:-3000} > /dev/null && echo "  ✓ Web healthy" || echo "  ✗ Web unhealthy"
+
+prod-pull:
+	@echo "Pulling latest images from GHCR..."
+	@$(PROD_COMPOSE) pull api web
+	@echo "✓ Images updated"
+
+prod-seed:
+	@echo "Seeding production database with sample data..."
+	@$(PROD_COMPOSE) exec api python -m infrastructure.db.seed
+	@echo "✓ Database seeded"
 
 # Cleanup Operations
 clean:
