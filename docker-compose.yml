@@ -74,7 +74,7 @@ services:
     web:
         build:
             context: .
-            dockerfile: web/Dockerfile
+            dockerfile: web/docker/Dockerfile.dev
             cache_from:
                 - folio-web:latest
         image: folio-web:latest
@@ -92,12 +92,6 @@ services:
         command: npm run dev
         networks:
             - folio-network
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:3000"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
-            start_period: 30s
         logging:
             driver: "json-file"
             options:
