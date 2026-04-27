@@ -5,6 +5,7 @@
 
 # API
 api/.env
+api/.env.prod
 api/__pycache__/
 api/*.pyc
 api/.pytest_cache/
@@ -16,6 +17,7 @@ api/env/
 web/.env.local
 web/node_modules/
 web/dist/
+web/build/
 web/.svelte-kit/
 web/*.log
 
