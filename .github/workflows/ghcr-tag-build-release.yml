@@ -20,7 +20,7 @@ jobs:
                     - service: folio-api
                       dockerfile: api/Dockerfile
                     - service: folio-web
-                      dockerfile: web/Dockerfile
+                      dockerfile: web/docker/Dockerfile.prod
 
         steps:
             - name: Checkout
