@@ -44,11 +44,25 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 **Requirements:** Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/yourusername/folio.git
+git clone https://github.com/aybruhm/folio.git
 cd folio
 make setup
-make up
-make db-migrate
+```
+
+### Running in Production
+
+If you just want to run Folio locally for personal use, pull the pre-built images from GHCR and start the stack:
+
+```bash
+make prod-pull
+make prod-up
+make prod-migrate
+```
+
+Optionally seed the database with a demo portfolio (stocks, crypto, and cash positions):
+
+```bash
+make prod-seed
 ```
 
 Once running:
@@ -59,7 +73,16 @@ Once running:
 | API      | http://localhost:8000      |
 | API Docs | http://localhost:8000/docs |
 
-To seed the database with demo data (stocks, crypto, and cash positions):
+### Running for Development
+
+If you want to contribute or run the app with hot reload, use the dev stack instead. This builds images locally from source:
+
+```bash
+make up
+make db-migrate
+```
+
+Optionally seed demo data:
 
 ```bash
 make db-seed
@@ -67,7 +90,20 @@ make db-seed
 
 ## Make Commands
 
-### Infrastructure
+### Production
+
+| Command              | Description                             |
+|----------------------|-----------------------------------------|
+| `make prod-up`       | Start production services               |
+| `make prod-down`     | Stop production services                |
+| `make prod-restart`  | Restart production services             |
+| `make prod-logs`     | Stream production logs                  |
+| `make prod-migrate`  | Run database migrations in production   |
+| `make prod-seed`     | Seed production database with demo data |
+| `make prod-health`   | Check production service health         |
+| `make prod-pull`     | Pull latest images from GHCR            |
+
+### Development Infrastructure
 
 | Command        | Description                        |
 |----------------|------------------------------------|
@@ -99,6 +135,12 @@ make db-seed
 | `make web-shell`  | Shell into the web container       |
 | `make web-lint`   | Lint TypeScript/Svelte code        |
 | `make web-build`  | Build the production frontend      |
+
+## What's Next
+
+- **Authentication**: JWT-based auth with HTTP-only cookies to secure the API and frontend
+- **(Backend) Testing**: It's imperative that we do this before we begin refactoring
+- **Refactor**: improve code patterns, architecture, and design decisions across the stack
 
 ## License
 
