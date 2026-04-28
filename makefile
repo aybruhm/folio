@@ -221,7 +221,7 @@ prod-logs:
 
 prod-migrate:
 	@echo "Running database migrations in production..."
-	@$(PROD_COMPOSE) exec api python -m alembic upgrade head
+	@$(PROD_COMPOSE) --env-file api/.env.prod --env-file web/.env.local exec api python -m alembic upgrade head
 	@echo "✓ Migrations complete"
 
 prod-health:
