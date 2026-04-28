@@ -2,6 +2,7 @@
   import Input from './Input.svelte'
   import Select from './Select.svelte'
   import Button from './Button.svelte'
+  import { CURRENCIES } from '$lib/constants/currencies'
 
   export let portfolio: { name: string; base_currency: string; description: string } = {
     name: '',
@@ -11,12 +12,7 @@
   export let onSubmit: (data: typeof portfolio) => Promise<void> = async () => {}
   export let isLoading = false
 
-  const currencies = [
-    { label: 'USD', value: 'USD' },
-    { label: 'GBP', value: 'GBP' },
-    { label: 'EUR', value: 'EUR' },
-    { label: 'JPY', value: 'JPY' }
-  ]
+  const currencies = CURRENCIES.map((c) => ({ label: c.label, value: c.value }))
 
   let errors: Record<string, string> = {}
 
