@@ -3,6 +3,7 @@
   import Select from './Select.svelte'
   import Button from './Button.svelte'
   import { createEventDispatcher } from 'svelte'
+  import { CURRENCIES } from '$lib/constants/currencies'
 
   const dispatch = createEventDispatcher()
 
@@ -42,12 +43,7 @@
     { label: 'Cash', value: 'cash' },
   ]
 
-  const currencies = [
-    { label: 'USD', value: 'USD' },
-    { label: 'GBP', value: 'GBP' },
-    { label: 'EUR', value: 'EUR' },
-    { label: 'JPY', value: 'JPY' }
-  ]
+  const currencies = CURRENCIES.map((c) => ({ label: c.label, value: c.value }))
 
   let errors: Record<string, string> = {}
 
