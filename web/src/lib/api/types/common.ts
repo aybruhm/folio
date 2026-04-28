@@ -1,4 +1,13 @@
-export type Currency = 'USD' | 'GBP' | 'EUR' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'CNY' | 'INR' | 'SGD';
+export type Currency =
+  // Americas
+  | 'USD' | 'CAD' | 'BRL' | 'MXN' | 'ARS' | 'CLP' | 'COP' | 'PEN'
+  // Europe
+  | 'EUR' | 'GBP' | 'CHF' | 'SEK' | 'NOK' | 'DKK' | 'PLN' | 'CZK' | 'HUF' | 'RON' | 'TRY' | 'RUB'
+  // Middle East & Africa
+  | 'ILS' | 'AED' | 'SAR' | 'QAR' | 'KWD' | 'EGP' | 'NGN' | 'ZAR' | 'KES' | 'GHS' | 'MAD'
+  // Asia Pacific
+  | 'JPY' | 'CNY' | 'HKD' | 'KRW' | 'TWD' | 'SGD' | 'INR' | 'AUD' | 'NZD'
+  | 'MYR' | 'THB' | 'IDR' | 'PHP' | 'VND' | 'PKR' | 'BDT' | 'LKR';
 
 export type TradeType = 'buy' | 'sell' | 'dividend' | 'fee';
 
