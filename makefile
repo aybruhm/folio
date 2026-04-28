@@ -200,7 +200,7 @@ web-test:
 # Production Operations
 prod-up:
 	@echo "Starting production services..."
-	@$(PROD_COMPOSE) --env-file api/.env.prod up -d
+	@$(PROD_COMPOSE) --env-file api/.env.prod --env-file web/.env.local up -d
 	@echo ""
 	@echo "Services starting. Wait for health checks..."
 	@sleep 3
@@ -238,7 +238,7 @@ prod-health:
 
 prod-pull:
 	@echo "Pulling latest images from GHCR..."
-	@$(PROD_COMPOSE) pull api web
+	@$(PROD_COMPOSE) --env-file api/.env.prod --env-file web/.env.local pull api web
 	@echo "✓ Images updated"
 
 prod-seed:
