@@ -202,7 +202,7 @@
 <div class="fixed bottom-6 right-6 z-30 flex flex-col-reverse gap-2">
     {#if fabOpen}
         <a
-            href="/trades/new"
+            href="/trades?new=true"
             class="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors"
             title="New Trade"
         >

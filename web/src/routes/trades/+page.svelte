@@ -10,6 +10,7 @@
   import { TradeController } from '$lib/api/controllers'
   import type { CreateTradeRequest, Trade } from '$lib/api/types'
   import { onMount } from 'svelte'
+  import { page } from '$app/stores'
 
   let loading = true
   let trades: Trade[] = []
@@ -30,6 +31,7 @@
   onMount(async () => {
     tradeController = new TradeController(api.getInstance())
     if ($currentPortfolio) await loadTrades()
+    if ($page.url.searchParams.get('new') === 'true') showNewModal = true
   })
 
   $: if ($currentPortfolio && tradeController) loadTrades()
