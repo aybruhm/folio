@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import axios from "axios";
 import { envUtils } from "@/utils/env";
 
 const API_BASE_URL = envUtils.getBaseUrl();
@@ -20,7 +20,7 @@ export interface ApiError {
 }
 
 // Create axios instance
-const axiosInstance: AxiosInstance = axios.create({
+const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
     headers: {
         "Content-Type": "application/json",
@@ -102,7 +102,7 @@ export const api = {
     /**
      * Get axios instance for advanced usage
      */
-    getInstance(): AxiosInstance {
+    getInstance() {
         return axiosInstance;
     },
 };
