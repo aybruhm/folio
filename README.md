@@ -51,7 +51,15 @@ make setup
 
 ### Running in Production
 
-If you just want to run Folio locally for personal use, pull the pre-built images from GHCR and start the stack:
+If you just want to run Folio locally for personal use, pull the pre-built images from GHCR and start the stack.
+
+**First-time setup** — create your environment files from the provided examples:
+
+```bash
+make prod-setup
+```
+
+Open `api/.env.prod` and `web/.env.local` and fill in your values (database credentials, API URL, etc.), then:
 
 ```bash
 make prod-pull
@@ -94,6 +102,7 @@ make db-seed
 
 | Command              | Description                             |
 |----------------------|-----------------------------------------|
+| `make prod-setup`    | Create production `.env` files from examples |
 | `make prod-up`       | Start production services               |
 | `make prod-down`     | Stop production services                |
 | `make prod-restart`  | Restart production services             |
