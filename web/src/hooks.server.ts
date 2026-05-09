@@ -1,6 +1,8 @@
+import { SECRET_KEY } from "$env/static/private";
 import type { Handle } from "@sveltejs/kit";
 import { redirect } from "@sveltejs/kit";
 import { jwtVerify } from "jose";
+import { envUtils } from "@/utils/env";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
 
@@ -10,9 +12,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     if (token) {
         try {
-            const secret = new TextEncoder().encode(
-                process.env.SECRET_KEY ?? "dev-secret-key-change-in-production",
-            );
+            const secret = new TextEncoder().encode(SECRET_KEY);
             const { payload } = await jwtVerify(token, secret);
             if (payload.sub && payload.email) {
                 event.locals.user = {
