@@ -4,8 +4,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.inbound.http.dependencies import get_current_user
 from application.analytics.analytics_interactor import AnalyticsInteractor
 from application.portfolio.portfolio_interactor import PortfolioInteractor
+from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreatePortfolioRequest
 from domain.value_objects.money import Currency
 from infrastructure.db.session import get_session
@@ -13,29 +15,29 @@ from infrastructure.db.session import get_session
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
-class PortfolioResponse:
-    id: str
-    name: str
-    base_currency: str
-    description: Optional[str]
-    created_at: str
-    updated_at: str
+def _check_ownership(portfolio: dict, current_user: User) -> None:
+    if portfolio.get("user_id") != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
 
 @router.get("/", response_model=List[dict])
-async def list_portfolios(session: AsyncSession = Depends(get_session)):
+async def list_portfolios(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     interactor = PortfolioInteractor(session)
-    portfolios = await interactor.list_portfolios()
-    return portfolios
+    return await interactor.list_portfolios(current_user.id)
 
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
-    request: CreatePortfolioRequest, session: AsyncSession = Depends(get_session)
+    request: CreatePortfolioRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = PortfolioInteractor(session)
-        portfolio_id = await interactor.create_portfolio(request)
+        portfolio_id = await interactor.create_portfolio(request, current_user.id)
         await session.commit()
 
         portfolio = await interactor.get_portfolio(portfolio_id)
@@ -47,12 +49,17 @@ async def create_portfolio(
 
 @router.get("/{portfolio_id}", response_model=dict)
 async def get_portfolio(
-    portfolio_id: UUID, session: AsyncSession = Depends(get_session)
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = PortfolioInteractor(session)
         portfolio = await interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
         return portfolio
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -62,15 +69,21 @@ async def update_portfolio(
     portfolio_id: UUID,
     name: Optional[str] = None,
     description: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = PortfolioInteractor(session)
+        portfolio = await interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
         await interactor.update_portfolio(portfolio_id, name, description)
         await session.commit()
 
-        portfolio = await interactor.get_portfolio(portfolio_id)
-        return portfolio
+        return await interactor.get_portfolio(portfolio_id)
+    except HTTPException:
+        await session.rollback()
+        raise
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
@@ -81,12 +94,20 @@ async def update_portfolio(
 
 @router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_portfolio(
-    portfolio_id: UUID, session: AsyncSession = Depends(get_session)
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = PortfolioInteractor(session)
+        portfolio = await interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
         await interactor.delete_portfolio(portfolio_id)
         await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
@@ -99,10 +120,15 @@ async def delete_portfolio(
 async def get_portfolio_analytics(
     portfolio_id: UUID,
     timeframe: str = "1y",
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
 
     try:
+        portfolio_interactor = PortfolioInteractor(session)
+        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
         interactor = AnalyticsInteractor(session, Currency.USD)
 
         holdings = await interactor.get_holdings(portfolio_id)
@@ -147,10 +173,15 @@ async def get_portfolio_analytics(
 async def get_holdings(
     portfolio_id: UUID,
     in_currency: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
 
     try:
+        portfolio_interactor = PortfolioInteractor(session)
+        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
         base_currency = Currency.USD
         currency = Currency(in_currency) if in_currency else base_currency
 
@@ -186,10 +217,16 @@ async def get_holdings(
 
 @router.get("/{portfolio_id}/performance")
 async def get_performance(
-    portfolio_id: UUID, session: AsyncSession = Depends(get_session)
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
 
     try:
+        portfolio_interactor = PortfolioInteractor(session)
+        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
         interactor = AnalyticsInteractor(session, Currency.USD)
         performance = await interactor.calculate_performance(portfolio_id)
 
@@ -209,10 +246,15 @@ async def get_performance(
 async def get_allocation(
     portfolio_id: UUID,
     group_by: str = "asset_class",
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
 
     try:
+        portfolio_interactor = PortfolioInteractor(session)
+        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
         interactor = AnalyticsInteractor(session, Currency.USD)
         allocation = await interactor.get_allocation(portfolio_id, group_by)
 

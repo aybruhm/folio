@@ -16,6 +16,7 @@ class PortfolioRepository(IPortfolioRepository):
     async def add(self, portfolio: Portfolio) -> None:
         model = PortfolioModel(
             id=portfolio.id,
+            user_id=portfolio.user_id,
             name=portfolio.name,
             base_currency=portfolio.base_currency.value,
             description=portfolio.description,
@@ -34,30 +35,13 @@ class PortfolioRepository(IPortfolioRepository):
         if not model:
             return None
 
-        return Portfolio(
-            id=model.id,
-            name=model.name,
-            base_currency=Currency(model.base_currency),
-            description=model.description,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
+        return self._to_domain(model)
+
+    async def list_by_user(self, user_id: UUID) -> List[Portfolio]:
+        result = await self.session.execute(
+            select(PortfolioModel).where(PortfolioModel.user_id == user_id)
         )
-
-    async def list_all(self) -> List[Portfolio]:
-        result = await self.session.execute(select(PortfolioModel))
-        models = result.scalars().all()
-
-        return [
-            Portfolio(
-                id=m.id,
-                name=m.name,
-                base_currency=Currency(m.base_currency),
-                description=m.description,
-                created_at=m.created_at,
-                updated_at=m.updated_at,
-            )
-            for m in models
-        ]
+        return [self._to_domain(m) for m in result.scalars().all()]
 
     async def update(self, portfolio: Portfolio) -> None:
         model = await self.session.get(PortfolioModel, portfolio.id)
@@ -72,3 +56,14 @@ class PortfolioRepository(IPortfolioRepository):
         if model:
             await self.session.delete(model)
             await self.session.flush()
+
+    def _to_domain(self, model: PortfolioModel) -> Portfolio:
+        return Portfolio(
+            id=model.id,
+            user_id=model.user_id,
+            name=model.name,
+            base_currency=Currency(model.base_currency),
+            description=model.description,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )

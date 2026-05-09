@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from adapters.inbound.http import (
     asset_routes,
+    auth_routes,
     benchmark_fx_routes,
     goal_routes,
     portfolio_routes,
@@ -43,6 +44,7 @@ async def health_check():
 
 v1_router = APIRouter(prefix="/api/v1")
 
+v1_router.include_router(auth_routes.router)
 v1_router.include_router(portfolio_routes.router)
 v1_router.include_router(trade_routes.router)
 v1_router.include_router(goal_routes.router)
