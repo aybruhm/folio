@@ -14,14 +14,15 @@ class PortfolioInteractor(IPortfolioUseCase):
     def __init__(self, session: AsyncSession):
         self.repository: IPortfolioRepository = PortfolioRepository(session)
 
-    async def create_portfolio(self, request: CreatePortfolioRequest) -> UUID:
+    async def create_portfolio(self, request: CreatePortfolioRequest, user_id: UUID) -> UUID:
         portfolio = Portfolio(
             id=uuid4(),
+            user_id=user_id,
             name=request.name,
             base_currency=request.base_currency,
             description=request.description,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
         )
         await self.repository.add(portfolio)
         return portfolio.id
@@ -33,6 +34,7 @@ class PortfolioInteractor(IPortfolioUseCase):
 
         return {
             "id": str(portfolio.id),
+            "user_id": str(portfolio.user_id),
             "name": portfolio.name,
             "base_currency": portfolio.base_currency.value,
             "description": portfolio.description,
@@ -40,11 +42,12 @@ class PortfolioInteractor(IPortfolioUseCase):
             "updated_at": portfolio.updated_at.isoformat(),
         }
 
-    async def list_portfolios(self) -> List[dict]:
-        portfolios = await self.repository.list_all()
+    async def list_portfolios(self, user_id: UUID) -> List[dict]:
+        portfolios = await self.repository.list_by_user(user_id)
         return [
             {
                 "id": str(p.id),
+                "user_id": str(p.user_id),
                 "name": p.name,
                 "base_currency": p.base_currency.value,
                 "description": p.description,
@@ -69,7 +72,7 @@ class PortfolioInteractor(IPortfolioUseCase):
         if description is not None:
             portfolio.description = description
 
-        portfolio.updated_at = datetime.utcnow()
+        portfolio.updated_at = datetime.now()
         await self.repository.update(portfolio)
 
     async def delete_portfolio(self, portfolio_id: UUID) -> None:
