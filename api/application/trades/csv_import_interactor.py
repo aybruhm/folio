@@ -135,7 +135,7 @@ class CsvImportInteractor(ICsvImportUseCase):
                         notes=trade_data.get("notes"),
                         source="csv_import",
                         import_batch_id=import_batch_id,
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(),
                     )
 
                     await self.trade_repo.add(trade)

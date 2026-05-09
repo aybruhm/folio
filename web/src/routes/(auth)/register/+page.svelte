@@ -1,0 +1,169 @@
+<script lang="ts">
+    import { goto } from "$app/navigation";
+    import { api } from "$lib/api/client";
+    import { authUser } from "$lib/stores";
+
+    let email = "";
+    let password = "";
+    let confirmPassword = "";
+    let errorMessage = "";
+    let emailError = "";
+    let passwordError = "";
+    let confirmError = "";
+    let isSubmitting = false;
+
+    function validate(): boolean {
+        passwordError = "";
+        confirmError = "";
+        emailError = "";
+
+        if (password.length < 8) {
+            passwordError = "Password must be at least 8 characters.";
+        }
+        if (password !== confirmPassword) {
+            confirmError = "Passwords do not match.";
+        }
+        return !passwordError && !confirmError;
+    }
+
+    async function handleSubmit(e: SubmitEvent) {
+        e.preventDefault();
+        errorMessage = "";
+
+        if (!validate()) return;
+
+        isSubmitting = true;
+
+        try {
+            const user = await api.post<{ id: string; email: string }>(
+                "/auth/register",
+                { email, password },
+            );
+            authUser.set(user);
+            await goto("/");
+        } catch (err: unknown) {
+            const message = (err as Error).message ?? "";
+            if (message.includes("already registered") || message.includes("409")) {
+                emailError = "An account with this email already exists.";
+            } else if (message.includes("429")) {
+                errorMessage = "Too many attempts. Please wait a moment and try again.";
+            } else {
+                errorMessage = "Something went wrong. Please try again.";
+            }
+        } finally {
+            isSubmitting = false;
+        }
+    }
+</script>
+
+<svelte:head>
+    <title>Create account — folio</title>
+</svelte:head>
+
+<div class="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-white tracking-tight">folio</h1>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-8">
+            <h2 class="text-lg font-semibold text-white mb-6">Create your account</h2>
+
+            {#if errorMessage}
+                <div
+                    class="mb-4 p-3 rounded-lg bg-red-950 border border-red-800 text-red-300 text-sm"
+                    role="alert"
+                    aria-live="assertive"
+                >
+                    {errorMessage}
+                </div>
+            {/if}
+
+            <form on:submit={handleSubmit} novalidate>
+                <div class="mb-4">
+                    <label
+                        for="email"
+                        class="block text-sm font-medium text-gray-300 mb-1.5"
+                    >
+                        Email
+                    </label>
+                    <input
+                        id="email"
+                        type="email"
+                        bind:value={email}
+                        required
+                        autocomplete="email"
+                        aria-describedby={emailError ? "email-error" : undefined}
+                        class="w-full px-3 py-2 rounded-lg bg-gray-800 border {emailError ? 'border-red-600' : 'border-gray-700'} text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="you@example.com"
+                    />
+                    {#if emailError}
+                        <p id="email-error" class="mt-1 text-xs text-red-400">{emailError}</p>
+                    {/if}
+                </div>
+
+                <div class="mb-4">
+                    <label
+                        for="password"
+                        class="block text-sm font-medium text-gray-300 mb-1.5"
+                    >
+                        Password
+                    </label>
+                    <input
+                        id="password"
+                        type="password"
+                        bind:value={password}
+                        required
+                        autocomplete="new-password"
+                        aria-describedby="password-hint {passwordError ? 'password-error' : ''}"
+                        class="w-full px-3 py-2 rounded-lg bg-gray-800 border {passwordError ? 'border-red-600' : 'border-gray-700'} text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="••••••••"
+                    />
+                    {#if passwordError}
+                        <p id="password-error" class="mt-1 text-xs text-red-400">{passwordError}</p>
+                    {:else}
+                        <p id="password-hint" class="mt-1 text-xs text-gray-500">Must be at least 8 characters.</p>
+                    {/if}
+                </div>
+
+                <div class="mb-6">
+                    <label
+                        for="confirm-password"
+                        class="block text-sm font-medium text-gray-300 mb-1.5"
+                    >
+                        Confirm password
+                    </label>
+                    <input
+                        id="confirm-password"
+                        type="password"
+                        bind:value={confirmPassword}
+                        required
+                        autocomplete="new-password"
+                        aria-describedby={confirmError ? "confirm-error" : undefined}
+                        class="w-full px-3 py-2 rounded-lg bg-gray-800 border {confirmError ? 'border-red-600' : 'border-gray-700'} text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="••••••••"
+                    />
+                    {#if confirmError}
+                        <p id="confirm-error" class="mt-1 text-xs text-red-400">{confirmError}</p>
+                    {/if}
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    aria-busy={isSubmitting}
+                    class="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium text-sm transition-colors"
+                >
+                    {isSubmitting ? "Creating account…" : "Create account"}
+                </button>
+            </form>
+
+            <p class="mt-6 text-center text-sm text-gray-500">
+                Already have an account?
+                <a href="/login" class="text-blue-400 hover:text-blue-300 ml-1">
+                    Sign in →
+                </a>
+            </p>
+        </div>
+    </div>
+</div>

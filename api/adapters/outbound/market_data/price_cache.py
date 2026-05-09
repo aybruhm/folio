@@ -12,14 +12,14 @@ class PriceCache:
             return None
 
         price, timestamp = self._cache[ticker]
-        if datetime.utcnow() - timestamp > timedelta(seconds=self.ttl):
+        if datetime.now() - timestamp > timedelta(seconds=self.ttl):
             del self._cache[ticker]
             return None
 
         return price
 
     def set(self, ticker: str, price: int) -> None:
-        self._cache[ticker] = (price, datetime.utcnow())
+        self._cache[ticker] = (price, datetime.now())
 
     def invalidate(self, ticker: str) -> None:
         if ticker in self._cache:

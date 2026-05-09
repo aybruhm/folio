@@ -11,8 +11,15 @@ class EnvironSettings(BaseModel):
     )
 
     # API
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
-    ALLOWED_ORIGINS: str = "http://localhost:3000"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+
+    # Auth
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
+    )
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    SECURE_COOKIES: bool = os.getenv("API_ENV", "development") == "production"
 
     # Market data
     YFINANCE_CACHE_TTL: int = 3600  # 1 hour

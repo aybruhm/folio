@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.inbound.http.dependencies import get_current_user
 from application.goals.goal_interactor import GoalInteractor
+from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateGoalRequest
 from domain.value_objects.money import Currency
 from infrastructure.db.session import get_session
@@ -38,7 +40,11 @@ def _body_to_request(body: GoalBody) -> CreateGoalRequest:
 
 
 @router.get("/")
-async def list_goals(portfolio_id: UUID, session: AsyncSession = Depends(get_session)):
+async def list_goals(
+    portfolio_id: UUID,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = GoalInteractor(session)
         goals = await interactor.list_goals(portfolio_id)
@@ -48,7 +54,11 @@ async def list_goals(portfolio_id: UUID, session: AsyncSession = Depends(get_ses
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_goal(body: GoalBody, session: AsyncSession = Depends(get_session)):
+async def create_goal(
+    body: GoalBody,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = GoalInteractor(session)
         goal_id = await interactor.create_goal(_body_to_request(body))
@@ -62,7 +72,11 @@ async def create_goal(body: GoalBody, session: AsyncSession = Depends(get_sessio
 
 
 @router.get("/{goal_id}")
-async def get_goal(goal_id: UUID, session: AsyncSession = Depends(get_session)):
+async def get_goal(
+    goal_id: UUID,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = GoalInteractor(session)
         goal = await interactor.get_goal(goal_id)
@@ -75,6 +89,7 @@ async def get_goal(goal_id: UUID, session: AsyncSession = Depends(get_session)):
 async def update_goal(
     goal_id: UUID,
     body: GoalBody,
+    _: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
@@ -93,7 +108,11 @@ async def update_goal(
 
 
 @router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_goal(goal_id: UUID, session: AsyncSession = Depends(get_session)):
+async def delete_goal(
+    goal_id: UUID,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = GoalInteractor(session)
         await interactor.delete_goal(goal_id)
@@ -107,7 +126,11 @@ async def delete_goal(goal_id: UUID, session: AsyncSession = Depends(get_session
 
 
 @router.get("/{goal_id}/projection")
-async def get_projection(goal_id: UUID, session: AsyncSession = Depends(get_session)):
+async def get_projection(
+    goal_id: UUID,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = GoalInteractor(session)
         projection = await interactor.get_projection(goal_id)

@@ -1,37 +1,85 @@
+from datetime import datetime
+from uuid import uuid4
+
 from sqlalchemy import (
-    Column,
-    String,
-    DateTime,
+    CHAR,
+    JSON,
     BigInteger,
+    Boolean,
+    Column,
     Date,
+    DateTime,
     ForeignKey,
     Index,
+    String,
     UniqueConstraint,
-    JSON,
-    Enum as SQLEnum,
-    CHAR,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
-from datetime import datetime
-from uuid import uuid4
-import enum
 
 Base = declarative_base()
+
+
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    email = Column(String(255), nullable=False, unique=True)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
+
+    portfolios = relationship(
+        "PortfolioModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    refresh_tokens = relationship(
+        "RefreshTokenModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (Index("ix_users_email", "email"),)
+
+
+class RefreshTokenModel(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    token = Column(String(255), nullable=False, unique=True)
+    family_id = Column(UUID(as_uuid=True), nullable=False)
+    is_revoked = Column(Boolean, nullable=False, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+    user = relationship("UserModel", back_populates="refresh_tokens")
+
+    __table_args__ = (
+        Index("ix_refresh_tokens_token", "token"),
+        Index("ix_refresh_tokens_user_id", "user_id"),
+        Index("ix_refresh_tokens_family_id", "family_id"),
+    )
 
 
 class PortfolioModel(Base):
     __tablename__ = "portfolios"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(String, nullable=True)
     base_currency = Column(CHAR(3), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
     )
 
+    user = relationship("UserModel", back_populates="portfolios")
     trades = relationship(
         "TradeModel", back_populates="portfolio", cascade="all, delete-orphan"
     )
@@ -39,7 +87,10 @@ class PortfolioModel(Base):
         "GoalModel", back_populates="portfolio", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_portfolios_base_currency", "base_currency"),)
+    __table_args__ = (
+        Index("ix_portfolios_base_currency", "base_currency"),
+        Index("ix_portfolios_user_id", "user_id"),
+    )
 
 
 class AssetModel(Base):
@@ -55,7 +106,7 @@ class AssetModel(Base):
     industry = Column(String(100), nullable=True)
     country = Column(String(100), nullable=True)
     isin = Column(String(20), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
 
     trades = relationship("TradeModel", back_populates="asset")
     price_history = relationship(
@@ -87,7 +138,7 @@ class TradeModel(Base):
     notes = Column(String, nullable=True)
     source = Column(String(20), default="manual")
     import_batch_id = Column(UUID(as_uuid=True), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
 
     portfolio = relationship("PortfolioModel", back_populates="trades")
     asset = relationship("AssetModel", back_populates="trades")
@@ -142,7 +193,7 @@ class BenchmarkModel(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     ticker = Column(String(20), nullable=False, unique=True)
     name = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
 
     __table_args__ = (Index("ix_benchmarks_ticker", "ticker"),)
 
@@ -161,9 +212,9 @@ class GoalModel(Base):
     monthly_savings = Column(BigInteger, nullable=False)
     monthly_savings_currency = Column(CHAR(3), nullable=False)
     expected_annual_return = Column(BigInteger, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
     )
 
     portfolio = relationship("PortfolioModel", back_populates="goals")
@@ -182,9 +233,9 @@ class CsvImportProfileModel(Base):
     column_mapping = Column(JSON, nullable=False)
     date_format = Column(String(50), nullable=True)
     delimiter = Column(CHAR(1), default=",")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
     )
 
     __table_args__ = (Index("ix_csv_import_profiles_name", "name"),)

@@ -85,7 +85,7 @@ validate:
 # Docker Compose Operations
 up:
 	@echo "Starting services..."
-	@docker compose up -d
+	@docker compose up -d --build
 	@echo ""
 	@echo "Services starting. Wait for health checks..."
 	@sleep 3
