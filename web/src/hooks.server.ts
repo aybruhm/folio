@@ -1,8 +1,7 @@
-import { SECRET_KEY } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import type { Handle } from "@sveltejs/kit";
 import { redirect } from "@sveltejs/kit";
 import { jwtVerify } from "jose";
-import { envUtils } from "@/utils/env";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
 
@@ -10,9 +9,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     const token = event.cookies.get("access_token");
     event.locals.user = null;
 
-    if (token) {
+    if (token && env.SECRET_KEY) {
         try {
-            const secret = new TextEncoder().encode(SECRET_KEY);
+            const secret = new TextEncoder().encode(env.SECRET_KEY);
             const { payload } = await jwtVerify(token, secret);
             if (payload.sub && payload.email) {
                 event.locals.user = {
