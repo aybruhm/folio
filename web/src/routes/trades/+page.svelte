@@ -1,3 +1,7 @@
+<svelte:head>
+    <title>Trades — Folio</title>
+</svelte:head>
+
 <script lang="ts">
   import Card from '$lib/components/Card.svelte'
   import TradeTable from '$lib/components/TradeTable.svelte'
