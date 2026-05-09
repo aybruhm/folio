@@ -6,3 +6,10 @@ declare module "$env/dynamic/public" {
         [key: string]: string | undefined;
     };
 }
+
+declare module "$env/dynamic/private" {
+    export const env: {
+        SECRET_KEY: string;
+        [key: string]: string | undefined;
+    };
+}
