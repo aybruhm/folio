@@ -1,10 +1,37 @@
 from abc import ABC, abstractmethod
-from datetime import date
-from typing import Optional, List
+from datetime import date, datetime
+from typing import List, Optional
 from uuid import UUID
 
-from domain.entities.models import Portfolio, Trade, Asset, Goal, FxRate, Holding
-from domain.value_objects.money import Currency, AssetMetadata, TradeType
+from domain.entities.models import Asset, Goal, Portfolio, Trade, User
+from domain.value_objects.money import AssetMetadata, Currency
+
+
+class IUserRepository(ABC):
+    @abstractmethod
+    async def create(self, email: str, hashed_password: str) -> User: ...
+
+    @abstractmethod
+    async def get_by_email(self, email: str) -> Optional[User]: ...
+
+    @abstractmethod
+    async def get_by_id(self, user_id: UUID) -> Optional[User]: ...
+
+
+class ITokenRepository(ABC):
+    @abstractmethod
+    async def create(
+        self, user_id: UUID, token: str, family_id: UUID, expires_at: datetime
+    ) -> None: ...
+
+    @abstractmethod
+    async def get_by_token(self, token: str) -> Optional[dict]: ...
+
+    @abstractmethod
+    async def revoke(self, token: str) -> None: ...
+
+    @abstractmethod
+    async def revoke_family(self, family_id: UUID) -> None: ...
 
 
 class IPortfolioRepository(ABC):
@@ -15,7 +42,7 @@ class IPortfolioRepository(ABC):
     async def get_by_id(self, portfolio_id: UUID) -> Optional[Portfolio]: ...
 
     @abstractmethod
-    async def list_all(self) -> List[Portfolio]: ...
+    async def list_by_user(self, user_id: UUID) -> List[Portfolio]: ...
 
     @abstractmethod
     async def update(self, portfolio: Portfolio) -> None: ...
