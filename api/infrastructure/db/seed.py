@@ -3,7 +3,7 @@ import logging
 import math
 import random
 from datetime import date, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
@@ -14,8 +14,12 @@ from infrastructure.db.models import (
     PortfolioModel,
     PriceHistoryModel,
     TradeModel,
+    UserModel,
 )
 from infrastructure.db.session import async_session
+
+_SEED_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+_SEED_USER_EMAIL = "demo@folio.local"
 
 log = logging.getLogger(__name__)
 
@@ -336,11 +340,29 @@ async def seed() -> None:
 
             log.info("Seeding demo data…")
 
+            # Ensure seed user exists
+            existing_user = await session.execute(
+                select(UserModel).where(UserModel.id == _SEED_USER_ID)
+            )
+            if not existing_user.scalar_one_or_none():
+                import bcrypt
+                hashed = bcrypt.hashpw(b"demo1234", bcrypt.gensalt()).decode("utf-8")
+                session.add(
+                    UserModel(
+                        id=_SEED_USER_ID,
+                        email=_SEED_USER_EMAIL,
+                        hashed_password=hashed,
+                        is_active=True,
+                    )
+                )
+                await session.flush()
+
             # Portfolio
             portfolio_id = uuid4()
             session.add(
                 PortfolioModel(
                     id=portfolio_id,
+                    user_id=_SEED_USER_ID,
                     name="Demo Portfolio",
                     description="A sample portfolio — replace with your own trades to get started.",
                     base_currency="USD",
