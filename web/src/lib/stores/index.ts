@@ -1,5 +1,10 @@
 import { writable, derived } from "svelte/store";
 
+export interface AuthUser {
+    id: string;
+    email: string;
+}
+
 export interface Portfolio {
     id: string;
     name: string;
@@ -50,3 +55,6 @@ export const portfolioCount = derived(
     portfolios,
     ($portfolios) => $portfolios.length,
 );
+
+export const authUser = writable<AuthUser | null>(null);
+export const isAuthenticated = derived(authUser, ($user) => $user !== null);
