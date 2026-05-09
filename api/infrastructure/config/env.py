@@ -1,7 +1,7 @@
 import os
-
 from functools import lru_cache
-from pydantic import BaseModel
+
+from pydantic import BaseModel, field_validator
 
 
 class EnvironSettings(BaseModel):
@@ -30,6 +30,15 @@ class EnvironSettings(BaseModel):
     SCHEDULER_TIMEZONE: str = os.getenv("SCHEDULER_TIMEZONE", "UTC")
     PRICE_REFRESH_SCHEDULE: str = "0 18 * * *"  # 18:00 UTC daily
     FX_REFRESH_SCHEDULE: str = "0 18:30 * * *"  # 18:30 UTC daily
+
+    @classmethod
+    @field_validator("DATABASE_URL")
+    def ensure_asyncpg_scheme(cls, v: str) -> str:
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
 
 @lru_cache
