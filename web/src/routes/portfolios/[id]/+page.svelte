@@ -1,3 +1,7 @@
+<svelte:head>
+    <title>{portfolio ? `${portfolio.name} — Folio` : 'Portfolio — Folio'}</title>
+</svelte:head>
+
 <script lang="ts">
   import Card from '$lib/components/Card.svelte'
   import Button from '$lib/components/Button.svelte'

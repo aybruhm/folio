@@ -1,3 +1,7 @@
+<svelte:head>
+    <title>Import Trades — Folio</title>
+</svelte:head>
+
 <script lang="ts">
   import { goto } from '$app/navigation'
   import Card from '$lib/components/Card.svelte'
