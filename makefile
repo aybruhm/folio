@@ -1,5 +1,6 @@
 .PHONY: help setup up down logs clean test lint format
 PROD_COMPOSE = docker compose -f docker-compose.prod.yml
+RAILWAY_COMPOSE = docker compose -f docker-compose.railway.yml
 
 help:
 	@echo "Folio - Investment Tracking Platform"
@@ -42,6 +43,12 @@ help:
 	@echo "  make prod-health    Check production service health"
 	@echo "  make prod-pull      Pull latest images from GHCR"
 	@echo "  make prod-seed      Seed production database with sample data"
+	@echo ""
+	@echo "Railway Test Commands:"
+	@echo "  make railway-up     Build and start services using Railway Dockerfiles"
+	@echo "  make railway-down   Stop Railway test services"
+	@echo "  make railway-logs   Stream Railway test service logs"
+	@echo "  make railway-seed   Seed Railway test database with sample data"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make setup          Setup dev environment (.env files from examples)"
@@ -244,6 +251,31 @@ prod-pull:
 prod-seed:
 	@echo "Seeding production database with sample data..."
 	@$(PROD_COMPOSE) exec api python -m infrastructure.db.seed
+	@echo "✓ Database seeded"
+
+# Railway Test Operations
+railway-up:
+	@echo "Building and starting services using Railway Dockerfiles..."
+	@$(RAILWAY_COMPOSE) --env-file api/.env --env-file web/.env.local up -d --build
+	@echo ""
+	@echo "Services starting on offset ports (api :8001, web :3001)..."
+	@sleep 5
+	@echo "API:"
+	@curl -s http://localhost:8001/health > /dev/null && echo "  ✓ API healthy" || echo "  ✗ API unhealthy (may still be starting)"
+	@echo "Web:"
+	@curl -s http://localhost:3001 > /dev/null && echo "  ✓ Web healthy" || echo "  ✗ Web unhealthy (may still be starting)"
+
+railway-down:
+	@echo "Stopping Railway test services..."
+	@$(RAILWAY_COMPOSE) down
+	@echo "✓ Railway test services stopped"
+
+railway-logs:
+	@$(RAILWAY_COMPOSE) logs -f
+
+railway-seed:
+	@echo "Seeding Railway test database with sample data..."
+	@$(RAILWAY_COMPOSE) exec api python -m infrastructure.db.seed
 	@echo "✓ Database seeded"
 
 # Cleanup Operations
