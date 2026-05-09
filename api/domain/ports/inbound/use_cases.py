@@ -42,7 +42,9 @@ class CreateGoalRequest:
 
 class IPortfolioUseCase(ABC):
     @abstractmethod
-    async def create_portfolio(self, request: CreatePortfolioRequest, user_id: UUID) -> UUID: ...
+    async def create_portfolio(
+        self, request: CreatePortfolioRequest, user_id: UUID
+    ) -> UUID: ...
 
     @abstractmethod
     async def get_portfolio(self, portfolio_id: UUID) -> dict: ...

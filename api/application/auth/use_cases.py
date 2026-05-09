@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import bcrypt
@@ -21,9 +21,7 @@ def _verify_password(plain: str, hashed: str) -> bool:
 
 
 def _refresh_token_expires_at() -> datetime:
-    return datetime.now() + timedelta(
-        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-    )
+    return datetime.now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
 
 class RegisterUser:
