@@ -23,7 +23,9 @@ class LoginBody(BaseModel):
     password: str
 
 
-def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+def _set_auth_cookies(
+    response: Response, access_token: str, refresh_token: str
+) -> None:
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -69,8 +71,12 @@ async def register(
             detail="Password must be at least 8 characters",
         )
     try:
-        use_case = RegisterUser(UserRepository(session), RefreshTokenRepository(session))
-        user, access_token, refresh_token = await use_case.execute(body.email, body.password)
+        use_case = RegisterUser(
+            UserRepository(session), RefreshTokenRepository(session)
+        )
+        user, access_token, refresh_token = await use_case.execute(
+            body.email, body.password
+        )
         await session.commit()
         _set_auth_cookies(response, access_token, refresh_token)
         return _user_response(user)
@@ -90,7 +96,9 @@ async def login(
 ):
     try:
         use_case = LoginUser(UserRepository(session), RefreshTokenRepository(session))
-        user, access_token, refresh_token = await use_case.execute(body.email, body.password)
+        user, access_token, refresh_token = await use_case.execute(
+            body.email, body.password
+        )
         await session.commit()
         _set_auth_cookies(response, access_token, refresh_token)
         return _user_response(user)
@@ -114,7 +122,9 @@ async def refresh(
             detail="Refresh token not found",
         )
     try:
-        use_case = RefreshToken(UserRepository(session), RefreshTokenRepository(session))
+        use_case = RefreshToken(
+            UserRepository(session), RefreshTokenRepository(session)
+        )
         _, new_access_token, new_refresh_token = await use_case.execute(refresh_token)
         await session.commit()
         _set_auth_cookies(response, new_access_token, new_refresh_token)

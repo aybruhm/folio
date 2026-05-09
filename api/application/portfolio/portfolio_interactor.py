@@ -14,7 +14,9 @@ class PortfolioInteractor(IPortfolioUseCase):
     def __init__(self, session: AsyncSession):
         self.repository: IPortfolioRepository = PortfolioRepository(session)
 
-    async def create_portfolio(self, request: CreatePortfolioRequest, user_id: UUID) -> UUID:
+    async def create_portfolio(
+        self, request: CreatePortfolioRequest, user_id: UUID
+    ) -> UUID:
         portfolio = Portfolio(
             id=uuid4(),
             user_id=user_id,

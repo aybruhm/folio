@@ -17,7 +17,9 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 def _check_ownership(portfolio: dict, current_user: User) -> None:
     if portfolio.get("user_id") != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
 
 @router.get("/", response_model=List[dict])

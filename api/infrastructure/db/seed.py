@@ -346,6 +346,7 @@ async def seed() -> None:
             )
             if not existing_user.scalar_one_or_none():
                 import bcrypt
+
                 hashed = bcrypt.hashpw(b"demo1234", bcrypt.gensalt()).decode("utf-8")
                 session.add(
                     UserModel(
