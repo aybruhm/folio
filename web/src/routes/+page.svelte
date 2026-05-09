@@ -1,3 +1,7 @@
+<svelte:head>
+    <title>Dashboard — Folio</title>
+</svelte:head>
+
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
     import LineChart from "$lib/components/LineChart.svelte";
