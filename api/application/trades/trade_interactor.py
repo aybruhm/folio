@@ -78,7 +78,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(),
         )
 
         await self.trade_repo.add(trade)
