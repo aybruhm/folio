@@ -2,13 +2,22 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID, uuid4
+
 from domain.value_objects.money import (
+    AssetClass,
+    AssetMetadata,
     Currency,
     TradeType,
-    AssetClass,
-    DateRange,
-    AssetMetadata,
 )
+
+
+@dataclass(frozen=True)
+class User:
+    id: UUID
+    email: str
+    hashed_password: str
+    is_active: bool
+    created_at: datetime
 
 
 @dataclass(frozen=True)
@@ -88,6 +97,7 @@ class Holding:
 @dataclass
 class Portfolio:
     id: UUID
+    user_id: UUID
     name: str
     base_currency: Currency
     description: Optional[str] = None
