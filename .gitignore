@@ -7,11 +7,15 @@
 api/.env
 api/.env.prod
 api/__pycache__/
+*.pyc
 api/*.pyc
 api/.pytest_cache/
 api/.mypy_cache/
 api/venv/
 api/env/
+
+# Docs
+docs/
 
 # Web
 web/.env.local
