@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.inbound.http.dependencies import get_current_user
 from application.trades.csv_import_interactor import CsvImportInteractor
 from application.trades.trade_interactor import TradeInteractor
+from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
 from domain.value_objects.money import Currency, TradeType, AssetClass
 from infrastructure.db.session import get_session
@@ -53,6 +55,7 @@ async def list_trades(
     end_date: Optional[date] = None,
     skip: int = 0,
     limit: int = 100,
+    _: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
@@ -73,7 +76,11 @@ async def list_trades(
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_trade(body: TradeBody, session: AsyncSession = Depends(get_session)):
+async def create_trade(
+    body: TradeBody,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = TradeInteractor(session)
         trade_id = await interactor.create_trade(_body_to_request(body))
@@ -87,7 +94,11 @@ async def create_trade(body: TradeBody, session: AsyncSession = Depends(get_sess
 
 
 @router.get("/{trade_id}")
-async def get_trade(trade_id: UUID, session: AsyncSession = Depends(get_session)):
+async def get_trade(
+    trade_id: UUID,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = TradeInteractor(session)
         trade = await interactor.get_trade(trade_id)
@@ -100,6 +111,7 @@ async def get_trade(trade_id: UUID, session: AsyncSession = Depends(get_session)
 async def update_trade(
     trade_id: UUID,
     body: TradeBody,
+    _: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
@@ -118,7 +130,11 @@ async def update_trade(
 
 
 @router.delete("/{trade_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_trade(trade_id: UUID, session: AsyncSession = Depends(get_session)):
+async def delete_trade(
+    trade_id: UUID,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         interactor = TradeInteractor(session)
         await interactor.delete_trade(trade_id)
@@ -136,6 +152,7 @@ async def validate_csv(
     file: UploadFile = File(...),
     mapping: str = Form(...),
     date_format: str = Form(...),
+    _: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
@@ -157,6 +174,7 @@ async def confirm_import(
     portfolio_id: UUID = Form(...),
     date_format: str = Form(...),
     profile_name: Optional[str] = Form(None),
+    _: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:

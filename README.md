@@ -6,6 +6,12 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 
 ## Features
 
+**Authentication**
+- Open self-registration
+- JWT access tokens (15 min) + refresh tokens (7 days) delivered via HTTP-only cookies
+- Token rotation with family-based reuse detection
+- All data scoped to the authenticated user
+
 **Portfolio Management**
 - Multi-portfolio support with trade history (buy, sell, dividend, fee)
 - Holdings tracking with live market data via yfinance
@@ -59,7 +65,7 @@ If you just want to run Folio locally for personal use, pull the pre-built image
 make prod-setup
 ```
 
-Open `api/.env.prod` and `web/.env.local` and fill in your values (database credentials, API URL, etc.), then:
+Open `api/.env.prod` and `web/.env.local` and fill in your values (database credentials, API URL, `SECRET_KEY`, etc.), then:
 
 ```bash
 make prod-pull
@@ -145,9 +151,30 @@ make db-seed
 | `make web-lint`   | Lint TypeScript/Svelte code        |
 | `make web-build`  | Build the production frontend      |
 
+## Breaking Changes
+
+### v1.2.0 — Authentication
+
+All API endpoints now require authentication. Existing deployments must run migrations before restarting:
+
+```bash
+# Production
+make prod-migrate
+
+# Development
+make db-migrate
+```
+
+A `SECRET_KEY` environment variable is now required in `api/.env` / `api/.env.prod`. Generate one with:
+
+```bash
+openssl rand -hex 32
+```
+
+The demo seed user (`demo@folio.local` / `demo1234`) owns the seeded portfolio. After seeding, register your own account and create a new portfolio to get started.
+
 ## What's Next
 
-- **Authentication**: JWT-based auth with HTTP-only cookies to secure the API and frontend
 - **(Backend) Testing**: It's imperative that we do this before we begin refactoring
 - **Refactor**: improve code patterns, architecture, and design decisions across the stack
 

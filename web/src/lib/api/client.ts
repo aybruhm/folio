@@ -25,6 +25,7 @@ const axiosInstance = axios.create({
     headers: {
         "Content-Type": "application/json",
     },
+    withCredentials: true,
     validateStatus: () => true, // Don't throw on any status code
 });
 
