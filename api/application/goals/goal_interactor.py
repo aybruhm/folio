@@ -26,8 +26,8 @@ class GoalInteractor(IGoalUseCase):
             monthly_savings=request.monthly_savings,
             monthly_savings_currency=request.monthly_savings_currency,
             expected_annual_return=request.expected_annual_return,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
         )
 
         await self.repository.add(goal)
@@ -56,7 +56,7 @@ class GoalInteractor(IGoalUseCase):
         goal.monthly_savings = request.monthly_savings
         goal.monthly_savings_currency = request.monthly_savings_currency
         goal.expected_annual_return = request.expected_annual_return
-        goal.updated_at = datetime.utcnow()
+        goal.updated_at = datetime.now()
 
         await self.repository.update(goal)
 
