@@ -7,6 +7,7 @@
 
   export let trades: any[] = []
   export let loading = false
+  export let selectedIds: Set<string> = new Set()
 
   const columns = [
     { key: 'ticker', label: 'Ticker', sortable: true },
@@ -20,6 +21,7 @@
 
   let sortKey: string | null = null
   let sortDesc = false
+  let selectAll = false
 
   function handleSort(key: string) {
     if (sortKey === key) {
@@ -33,6 +35,26 @@
       const bVal = b[key]
       return sortDesc ? (aVal > bVal ? -1 : 1) : (aVal > bVal ? 1 : -1)
     })
+  }
+
+  function toggleSelectAll() {
+    if (selectAll) {
+      selectedIds.clear()
+      trades.forEach(t => selectedIds.add(t.id))
+    } else {
+      selectedIds.clear()
+    }
+    selectedIds = selectedIds
+  }
+
+  function toggleSelect(tradeId: string) {
+    if (selectedIds.has(tradeId)) {
+      selectedIds.delete(tradeId)
+    } else {
+      selectedIds.add(tradeId)
+    }
+    selectedIds = selectedIds
+    selectAll = trades.length > 0 && trades.every(t => selectedIds.has(t.id))
   }
 
   function getTradeTypeBadge(type: string): 'success' | 'danger' | 'info' | 'warning' | 'default' {
@@ -54,6 +76,15 @@
       <table class="w-full text-sm">
         <thead class="border-b border-border bg-muted">
           <tr>
+            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-12">
+              <input
+                type="checkbox"
+                bind:checked={selectAll}
+                on:change={toggleSelectAll}
+                class="cursor-pointer"
+                title="Select all trades"
+              />
+            </th>
             {#each columns as col}
               <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                 {#if col.sortable}
@@ -73,6 +104,14 @@
         <tbody class="[&_tr:last-child]:border-0">
           {#each trades as row (row.id)}
             <tr class="border-b border-border hover:bg-muted/50 transition-colors">
+              <td class="p-4 align-middle w-12">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(row.id)}
+                  on:change={() => toggleSelect(row.id)}
+                  class="cursor-pointer"
+                />
+              </td>
               <td class="p-4 align-middle">{row.ticker}</td>
               <td class="p-4 align-middle">{formatDateTime(row.trade_date)}</td>
               <td class="p-4 align-middle">
