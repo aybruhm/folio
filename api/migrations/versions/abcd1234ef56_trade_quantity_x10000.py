@@ -1,7 +1,7 @@
 """trade quantity x10000
 
 Revision ID: abcd1234ef56
-Revises: c4d3e2f1a8b9
+Revises: e2f3a4b5c6d7
 Create Date: 2026-05-11 23:59:00.000000
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "abcd1234ef56"
-down_revision: Union[str, Sequence[str], None] = "c4d3e2f1a8b9"
+down_revision: Union[str, Sequence[str], None] = "e2f3a4b5c6d7"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
