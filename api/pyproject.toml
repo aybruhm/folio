@@ -21,7 +21,20 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=adapters.inbound.http --cov=domain.entities.models --cov=domain.value_objects.money --cov=domain.services.performance --cov=application.auth.use_cases --cov=infrastructure.security.jwt --cov=infrastructure.config.env --cov-report=term-missing --cov-fail-under=75"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "happy_path: expected success cases",
+    "grumpy_path: error handling and invalid input",
+    "edge_case: boundary conditions and empty inputs",
+    "integration: tests that require Docker Compose and Postgres",
+    "smoke: fast readiness checks",
 ]
