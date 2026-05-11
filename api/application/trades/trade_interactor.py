@@ -1,20 +1,22 @@
-from uuid import UUID, uuid4
-from typing import List, Optional, Tuple
+from dataclasses import replace
 from datetime import date, datetime
+from typing import List, Optional, Tuple
+from uuid import UUID, uuid4
 
-from domain.entities.models import Trade, Asset
-from domain.value_objects.money import Currency, TradeType, AssetClass, AssetMetadata
-from domain.ports.inbound.use_cases import ITradeUseCase, CreateTradeRequest
-from domain.ports.outbound.repositories import (
-    ITradeRepository,
-    IAssetRepository,
-    IPortfolioRepository,
-)
-from adapters.outbound.persistence.trade_repository import TradeRepository
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from sqlalchemy.ext.asyncio import AsyncSession
+from adapters.outbound.persistence.trade_repository import TradeRepository
+from domain.entities.models import Asset, Trade
+from domain.ports.inbound.use_cases import CreateTradeRequest, ITradeUseCase
+from domain.ports.outbound.repositories import (
+    IAssetRepository,
+    IPortfolioRepository,
+    ITradeRepository,
+)
+from domain.value_objects.money import AssetClass, Currency, TradeType
 
 
 class TradeInteractor(ITradeUseCase):
@@ -149,16 +151,19 @@ class TradeInteractor(ITradeUseCase):
             request.ticker, request.trade_currency, request.asset_class
         )
 
-        trade.asset_id = asset.id
-        trade.ticker = request.ticker
-        trade.trade_type = request.trade_type
-        trade.trade_date = request.trade_date
-        trade.quantity = request.quantity
-        trade.price = request.price
-        trade.trade_currency = request.trade_currency
-        trade.fees = request.fees
+        updated_trade = replace(
+            trade,
+            asset_id=asset.id,
+            ticker=request.ticker,
+            trade_type=request.trade_type,
+            trade_date=request.trade_date,
+            quantity=request.quantity,
+            price=request.price,
+            trade_currency=request.trade_currency,
+            fees=request.fees,
+        )
 
-        await self.trade_repo.update(trade)
+        await self.trade_repo.update(updated_trade)
 
     async def delete_trade(self, trade_id: UUID) -> None:
         trade = await self.trade_repo.get_by_id(trade_id)
