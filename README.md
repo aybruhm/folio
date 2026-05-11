@@ -175,7 +175,6 @@ The demo seed user (`demo@folio.local` / `demo1234`) owns the seeded portfolio. 
 
 ## What's Next
 
-- **(Backend) Testing**: It's imperative that we do this before we begin refactoring
 - **Refactor**: improve code patterns, architecture, and design decisions across the stack
 
 ## License
