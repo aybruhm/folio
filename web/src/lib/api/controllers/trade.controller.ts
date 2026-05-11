@@ -45,6 +45,10 @@ export class TradeController {
     await this.client.delete(`/trades/${tradeId}`);
   }
 
+  async deleteBulkTrades(tradeIds: string[]): Promise<void> {
+    await this.client.post('/trades/bulk/delete', { trade_ids: tradeIds });
+  }
+
   async validateCsv(
     file: File,
     mapping: Record<string, unknown>,

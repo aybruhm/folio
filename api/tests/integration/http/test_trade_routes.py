@@ -80,6 +80,13 @@ class FakeTradeInteractor:
         if self.mode == "delete-error":
             raise RuntimeError("delete failed")
 
+    async def delete_batch_trades(self, trade_ids):
+        if not trade_ids:
+            raise ValueError("No trade IDs provided")
+        if self.mode == "delete-error":
+            raise RuntimeError("delete failed")
+        return len(trade_ids)
+
 
 class FakeCsvImportInteractor:
     def __init__(self, mode="happy"):
@@ -337,3 +344,47 @@ def test_trade_create_update_delete_generic_exception_paths(authed_client, monke
     _patch_trade_interactor(monkeypatch, FakeTradeInteractor(mode="delete-error"))
     delete = authed_client.delete(f"/api/v1/trades/{uuid4()}")
     assert delete.status_code == 400
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_bulk_delete_trades(authed_client, monkeypatch):
+    interactor = FakeTradeInteractor()
+    _patch_trade_interactor(monkeypatch, interactor)
+    trade_ids = [str(uuid4()), str(uuid4()), str(uuid4())]
+    
+    response = authed_client.post(
+        "/api/v1/trades/bulk/delete",
+        json={"trade_ids": trade_ids},
+    )
+    
+    assert response.status_code == 204
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_bulk_delete_trades_empty_list(authed_client, monkeypatch):
+    interactor = FakeTradeInteractor()
+    _patch_trade_interactor(monkeypatch, interactor)
+    
+    response = authed_client.post(
+        "/api/v1/trades/bulk/delete",
+        json={"trade_ids": []},
+    )
+    
+    assert response.status_code == 400
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+def test_bulk_delete_trades_error(authed_client, monkeypatch):
+    interactor = FakeTradeInteractor(mode="delete-error")
+    _patch_trade_interactor(monkeypatch, interactor)
+    trade_ids = [str(uuid4()), str(uuid4())]
+    
+    response = authed_client.post(
+        "/api/v1/trades/bulk/delete",
+        json={"trade_ids": trade_ids},
+    )
+    
+    assert response.status_code == 400

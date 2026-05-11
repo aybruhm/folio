@@ -20,9 +20,11 @@
   let trades: Trade[] = []
   let showNewModal = false
   let showEditModal = false
+  let showBulkDeleteModal = false
   let editingTrade: any = null
   let tradeTypeFilter = 'all'
   let tradeController: TradeController
+  let selectedTradeIds = new Set<string>()
 
   const tradeTypeOptions = [
     { label: 'All Types', value: 'all' },
@@ -122,6 +124,18 @@
     }
   }
 
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedTradeIds.size} trade(s)? This cannot be undone.`)) return
+    try {
+      await tradeController.deleteBulkTrades(Array.from(selectedTradeIds))
+      selectedTradeIds = new Set()
+      await loadTrades()
+      showBulkDeleteModal = false
+    } catch (e) {
+      console.error('Failed to delete trades:', e)
+    }
+  }
+
   $: filteredTrades = tradeTypeFilter === 'all'
     ? trades
     : trades.filter(t => t.trade_type === tradeTypeFilter)
@@ -181,9 +195,24 @@
       </Card>
     {:else}
       <Card title="Trade History">
+        {#if selectedTradeIds.size > 0}
+          <div class="mb-4 flex items-center justify-between gap-4 bg-blue-50 dark:bg-blue-950 p-3 rounded border border-blue-200 dark:border-blue-800">
+            <span class="text-sm text-blue-900 dark:text-blue-100">
+              {selectedTradeIds.size} trade{selectedTradeIds.size !== 1 ? 's' : ''} selected
+            </span>
+            <Button
+              variant="destructive"
+              on:click={() => (showBulkDeleteModal = true)}
+              class="text-sm"
+            >
+              Delete Selected
+            </Button>
+          </div>
+        {/if}
         <div class="overflow-x-auto -mx-4 md:mx-0">
           <TradeTable
             trades={filteredTrades}
+            bind:selectedIds={selectedTradeIds}
             on:edit={(e) => handleEditTrade(e.detail)}
             on:delete={(e) => handleDeleteTrade(e.detail)}
           />
@@ -236,3 +265,24 @@
     </svelte:fragment>
   </Modal>
 {/if}
+
+<!-- Bulk Delete Modal -->
+<Modal
+  open={showBulkDeleteModal}
+  title="Delete Selected Trades"
+  onClose={() => (showBulkDeleteModal = false)}
+>
+  <div class="space-y-4">
+    <p class="text-muted-foreground">
+      Are you sure you want to delete {selectedTradeIds.size} trade{selectedTradeIds.size !== 1 ? 's' : ''}? This cannot be undone.
+    </p>
+  </div>
+  <svelte:fragment slot="footer">
+    <Button variant="outline" on:click={() => (showBulkDeleteModal = false)}>
+      Cancel
+    </Button>
+    <Button variant="destructive" on:click={handleBulkDelete}>
+      Delete {selectedTradeIds.size} Trade{selectedTradeIds.size !== 1 ? 's' : ''}
+    </Button>
+  </svelte:fragment>
+</Modal>
