@@ -86,6 +86,17 @@ class TradeRepository(ITradeRepository):
             await self.session.delete(model)
             await self.session.flush()
 
+    async def delete_batch(self, trade_ids: List[UUID]) -> int:
+        result = await self.session.execute(
+            select(TradeModel).where(TradeModel.id.in_(trade_ids))
+        )
+        models = result.scalars().all()
+        deleted_count = len(models)
+        for model in models:
+            await self.session.delete(model)
+        await self.session.flush()
+        return deleted_count
+
     @staticmethod
     def _to_domain(model: TradeModel) -> Trade:
         return Trade(

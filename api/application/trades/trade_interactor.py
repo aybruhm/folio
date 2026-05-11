@@ -172,6 +172,11 @@ class TradeInteractor(ITradeUseCase):
 
         await self.trade_repo.delete(trade_id)
 
+    async def delete_batch_trades(self, trade_ids: List[UUID]) -> int:
+        if not trade_ids:
+            raise ValueError("No trade IDs provided")
+        return await self.trade_repo.delete_batch(trade_ids)
+
     @staticmethod
     def _trade_to_dict(trade: Trade) -> dict:
         return {

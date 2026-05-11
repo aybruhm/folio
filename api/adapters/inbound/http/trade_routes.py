@@ -32,6 +32,10 @@ class TradeBody(BaseModel):
     asset_class: Optional[str] = None
 
 
+class BulkDeleteRequest(BaseModel):
+    trade_ids: list[UUID]
+
+
 def _body_to_request(body: TradeBody) -> CreateTradeRequest:
     return CreateTradeRequest(
         portfolio_id=body.portfolio_id,
@@ -143,6 +147,24 @@ async def delete_trade(
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/bulk/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def bulk_delete_trades(
+    request: BulkDeleteRequest,
+    _: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        interactor = TradeInteractor(session)
+        await interactor.delete_batch_trades(request.trade_ids)
+        await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
