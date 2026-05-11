@@ -1,0 +1,66 @@
+services:
+    db:
+        image: postgres:16-alpine
+        container_name: folio-integration-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${DB_USER:-folio_test}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-folio_test_password}
+            POSTGRES_DB: ${DB_NAME:-folio_test}
+            PGDATA: /var/lib/postgresql/data/pgdata
+        ports:
+            - "${DB_PORT:-5434}:5432"
+        volumes:
+            - postgres_integration_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-folio_test}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        networks:
+            - folio-integration-network
+
+    api:
+        build:
+            context: .
+            dockerfile: api/Dockerfile
+        image: folio-api-integration:latest
+        container_name: folio-integration-api
+        restart: unless-stopped
+        environment:
+            DATABASE_URL: postgresql+asyncpg://${DB_USER:-folio_test}:${DB_PASSWORD:-folio_test_password}@db:5432/${DB_NAME:-folio_test}
+            ALLOWED_ORIGINS: http://localhost:3000
+            API_ENV: development
+            SCHEDULER_ENABLED: "false"
+        ports:
+            - "${API_PORT:-8002}:8000"
+        depends_on:
+            db:
+                condition: service_healthy
+        command: >
+            sh -c "python -m alembic upgrade head &&
+                   python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+        networks:
+            - folio-integration-network
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "/opt/python/bin/python",
+                    "-c",
+                    "import urllib.request; r=urllib.request.urlopen('http://localhost:8000/health', timeout=5); exit(0 if r.status==200 else 1)",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+
+volumes:
+    postgres_integration_data:
+        driver: local
+
+networks:
+    folio-integration-network:
+        name: folio-integration-network
+        driver: bridge

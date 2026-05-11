@@ -1,14 +1,15 @@
-from uuid import UUID, uuid4
-from typing import List, Optional
+from dataclasses import replace
 from datetime import date, datetime
+from typing import List
+from uuid import UUID, uuid4
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from adapters.outbound.persistence.goal_repository import GoalRepository
 from domain.entities.models import Goal
-from domain.value_objects.money import Currency
-from domain.ports.inbound.use_cases import IGoalUseCase, CreateGoalRequest
+from domain.ports.inbound.use_cases import CreateGoalRequest, IGoalUseCase
 from domain.ports.outbound.repositories import IGoalRepository
 from domain.services.performance import FIREService
-from adapters.outbound.persistence.goal_repository import GoalRepository
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class GoalInteractor(IGoalUseCase):
@@ -49,16 +50,19 @@ class GoalInteractor(IGoalUseCase):
         if not goal:
             raise ValueError(f"Goal {goal_id} not found")
 
-        goal.name = request.name
-        goal.target_net_worth = request.target_net_worth
-        goal.target_net_worth_currency = request.target_net_worth_currency
-        goal.target_date = request.target_date
-        goal.monthly_savings = request.monthly_savings
-        goal.monthly_savings_currency = request.monthly_savings_currency
-        goal.expected_annual_return = request.expected_annual_return
-        goal.updated_at = datetime.now()
+        updated_goal = replace(
+            goal,
+            name=request.name,
+            target_net_worth=request.target_net_worth,
+            target_net_worth_currency=request.target_net_worth_currency,
+            target_date=request.target_date,
+            monthly_savings=request.monthly_savings,
+            monthly_savings_currency=request.monthly_savings_currency,
+            expected_annual_return=request.expected_annual_return,
+            updated_at=datetime.now(),
+        )
 
-        await self.repository.update(goal)
+        await self.repository.update(updated_goal)
 
     async def delete_goal(self, goal_id: UUID) -> None:
         goal = await self.repository.get_by_id(goal_id)
@@ -92,7 +96,7 @@ class GoalInteractor(IGoalUseCase):
             current_value=monthly_savings,
             target_value=target_value,
             monthly_savings=monthly_savings,
-            months=months_to_target,
+            target_months=months_to_target,
         )
 
         return {
