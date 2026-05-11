@@ -52,15 +52,15 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 holdings_by_asset[trade.ticker] = {
                     "asset_id": trade.asset_id,
                     "ticker": trade.ticker,
-                    "quantity": 0,  # ×100
+                    "quantity": 0,  # ×10000
                     "cost_basis": 0,  # ×100
                     "trades": [],
                 }
 
             holding = holdings_by_asset[trade.ticker]
             holding["quantity"] += trade.quantity
-            # quantity×100 * price×100 → ×10000; ÷100 → ×100
-            holding["cost_basis"] += (trade.quantity * trade.price) // 100
+            # quantity×10000 * price×100 → ÷10000 → ×100
+            holding["cost_basis"] += (trade.quantity * trade.price) // 10000
             holding["trades"].append(trade)
 
         result = []
@@ -76,7 +76,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 # Cash is always worth face value — market value equals cost basis
                 market_value_int = cost_basis_int
                 current_price_int = (
-                    (cost_basis_int * 100) // holding_data["quantity"]
+                    (cost_basis_int * 10000) // holding_data["quantity"]
                     if holding_data["quantity"] > 0
                     else 0
                 )
@@ -90,15 +90,17 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     if latest:
                         current_price_int = latest[1]
 
-                # quantity×100 * price×100 → ÷100 → ×100
-                market_value_int = (holding_data["quantity"] * current_price_int) // 100
+                # quantity×10000 * price×100 → ÷10000 → ×100
+                market_value_int = (
+                    holding_data["quantity"] * current_price_int
+                ) // 10000
                 total_return_int = market_value_int - cost_basis_int
 
             result.append(
                 {
                     "asset_id": str(holding_data["asset_id"]),
                     "ticker": ticker,
-                    "quantity": holding_data["quantity"] / 100,
+                    "quantity": holding_data["quantity"] / 10000,
                     "current_price": current_price_int / 100,
                     "market_value": market_value_int / 100,
                     "cost_basis": cost_basis_int / 100,
@@ -135,8 +137,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     if hasattr(t.trade_date, "date")
                     else t.trade_date
                 )
-                # Divide by 100 to get actual amounts for PerformanceService
-                cost = (t.quantity * t.price) // 100 + t.fees
+                # Divide by 10000 to get actual cents for PerformanceService
+                cost = (t.quantity * t.price) // 10000 + t.fees
                 if t.trade_type.value == "buy":
                     cash_flows.append((trade_date, -(cost / 100)))
                 else:
@@ -276,8 +278,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 if qty_int <= 0:
                     continue
                 price_int = _price_on(ticker, sample_date)
-                # qty×100 * price×100 → ÷10000 → actual dollar value
-                portfolio_value += (qty_int * price_int) / 10000
+                # qty×10000 * price×100 → ÷1000000 → actual dollar value
+                portfolio_value += (qty_int * price_int) / 1000000
 
             result.append(
                 {
@@ -303,7 +305,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
             )
             key = t_date.strftime("%b %Y")
-            amount = (t.quantity * t.price) // 100 / 100
+            amount = (t.quantity * t.price) // 10000 / 100
             if t.trade_type.value == "buy":
                 monthly[key] = monthly.get(key, 0.0) + amount
             else:

@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
@@ -23,10 +24,10 @@ class TradeBody(BaseModel):
     ticker: str
     trade_type: str
     trade_date: datetime
-    quantity: float
-    price: float
+    quantity: Decimal
+    price: Decimal
     trade_currency: str
-    fees: float = 0.0
+    fees: Decimal = Decimal("0")
     notes: Optional[str] = None
     asset_class: Optional[str] = None
 
@@ -37,7 +38,7 @@ def _body_to_request(body: TradeBody) -> CreateTradeRequest:
         ticker=body.ticker,
         trade_type=TradeType(body.trade_type),
         trade_date=body.trade_date,
-        quantity=round(body.quantity * 100),
+        quantity=round(body.quantity * 10000),
         price=round(body.price * 100),
         trade_currency=Currency(body.trade_currency),
         fees=round(body.fees * 100),

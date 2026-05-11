@@ -209,7 +209,7 @@ def _build_trades(
                 ticker=ticker,
                 trade_type=ttype,
                 trade_date=datetime(d.year, d.month, d.day, 9, 30),
-                quantity=round(qty * 100),
+                quantity=round(qty * 10000),
                 price=price,
                 trade_currency="USD",
                 fees=round(fee_dollars * 100),
@@ -236,7 +236,7 @@ def _build_trades(
                 ticker=ticker,
                 trade_type="buy",
                 trade_date=datetime(d.year, d.month, d.day, 9, 30),
-                quantity=round(amount_dollars * 100),
+                quantity=round(amount_dollars * 10000),
                 price=100,  # $1.00 × 100
                 trade_currency="USD",
                 fees=0,
