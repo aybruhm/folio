@@ -1,11 +1,9 @@
-from datetime import datetime
 from uuid import uuid4
 
 import pytest
 
 from adapters.inbound.http import trade_routes
-from domain.entities.models import Trade
-from domain.value_objects.money import AssetClass, Currency, TradeType
+from domain.value_objects.money import Currency, TradeType
 
 
 class FakeTradeInteractor:
@@ -16,7 +14,14 @@ class FakeTradeInteractor:
         self.last_update = None
 
     async def list_trades(
-        self, portfolio_id=None, ticker=None, trade_type=None, start_date=None, end_date=None, skip=0, limit=100
+        self,
+        portfolio_id=None,
+        ticker=None,
+        trade_type=None,
+        start_date=None,
+        end_date=None,
+        skip=0,
+        limit=100,
     ):
         return (
             [
@@ -84,10 +89,24 @@ class FakeCsvImportInteractor:
 
     async def validate_mapping(self, content, filename, mapping, date_format):
         self.validated = (content, filename, mapping, date_format)
-        return {"valid_count": 1, "error_count": 0, "errors": [], "sample_valid_rows": [{"ticker": "AAPL"}]}
+        return {
+            "valid_count": 1,
+            "error_count": 0,
+            "errors": [],
+            "sample_valid_rows": [{"ticker": "AAPL"}],
+        }
 
-    async def confirm_import(self, content, filename, mapping, date_format, portfolio_id, profile_name=None):
-        self.confirmed = (content, filename, mapping, date_format, portfolio_id, profile_name)
+    async def confirm_import(
+        self, content, filename, mapping, date_format, portfolio_id, profile_name=None
+    ):
+        self.confirmed = (
+            content,
+            filename,
+            mapping,
+            date_format,
+            portfolio_id,
+            profile_name,
+        )
         return {
             "import_batch_id": str(uuid4()),
             "imported_count": 1,
@@ -109,14 +128,51 @@ def _patch_csv_interactor(monkeypatch, interactor):
 @pytest.mark.parametrize(
     "method,path,body,params,expected_status",
     [
-        ("get", "/api/v1/trades/", None, {"portfolio_id": str(uuid4()), "ticker": "AAPL", "trade_type": "buy"}, 200),
-        ("post", "/api/v1/trades/", {"portfolio_id": str(uuid4()), "ticker": "AAPL", "trade_type": "buy", "trade_date": "2024-01-01T09:30:00", "quantity": 10, "price": 185.2, "trade_currency": "USD"}, None, 201),
+        (
+            "get",
+            "/api/v1/trades/",
+            None,
+            {"portfolio_id": str(uuid4()), "ticker": "AAPL", "trade_type": "buy"},
+            200,
+        ),
+        (
+            "post",
+            "/api/v1/trades/",
+            {
+                "portfolio_id": str(uuid4()),
+                "ticker": "AAPL",
+                "trade_type": "buy",
+                "trade_date": "2024-01-01T09:30:00",
+                "quantity": 10,
+                "price": 185.2,
+                "trade_currency": "USD",
+            },
+            None,
+            201,
+        ),
         ("get", "/api/v1/trades/{id}", None, None, 200),
-        ("put", "/api/v1/trades/{id}", {"portfolio_id": str(uuid4()), "ticker": "AAPL", "trade_type": "sell", "trade_date": "2024-01-02T09:30:00", "quantity": 7.5, "price": 190.0, "trade_currency": "EUR", "fees": 2.5}, None, 200),
+        (
+            "put",
+            "/api/v1/trades/{id}",
+            {
+                "portfolio_id": str(uuid4()),
+                "ticker": "AAPL",
+                "trade_type": "sell",
+                "trade_date": "2024-01-02T09:30:00",
+                "quantity": 7.5,
+                "price": 190.0,
+                "trade_currency": "EUR",
+                "fees": 2.5,
+            },
+            None,
+            200,
+        ),
         ("delete", "/api/v1/trades/{id}", None, None, 204),
     ],
 )
-def test_trade_crud_routes(authed_client, monkeypatch, method, path, body, params, expected_status):
+def test_trade_crud_routes(
+    authed_client, monkeypatch, method, path, body, params, expected_status
+):
     interactor = FakeTradeInteractor()
     _patch_trade_interactor(monkeypatch, interactor)
     trade_id = interactor.trade_id
@@ -129,9 +185,10 @@ def test_trade_crud_routes(authed_client, monkeypatch, method, path, body, param
 
     assert response.status_code == expected_status
     if method == "post":
-        assert interactor.last_create.quantity == 1000
+        assert interactor.last_create.quantity == 100000
         assert interactor.last_create.trade_currency == Currency.USD
     if method == "put":
+        assert interactor.last_update[1].quantity == 75000
         assert interactor.last_update[1].trade_type == TradeType.SELL
         assert interactor.last_update[1].asset_class is None
     if method == "get" and path.endswith("{id}"):
@@ -150,7 +207,13 @@ def test_trade_crud_routes(authed_client, monkeypatch, method, path, body, param
 def test_trade_import_routes(authed_client, monkeypatch, path, params, expected_key):
     interactor = FakeCsvImportInteractor()
     _patch_csv_interactor(monkeypatch, interactor)
-    files = {"file": ("trades.csv", b"Ticker,Type,Date,Quantity,Price,Currency\nAAPL,buy,2024-01-01,10,185.20,USD\n", "text/csv")}
+    files = {
+        "file": (
+            "trades.csv",
+            b"Ticker,Type,Date,Quantity,Price,Currency\nAAPL,buy,2024-01-01,10,185.20,USD\n",
+            "text/csv",
+        )
+    }
     data = {"mapping": "{}", "date_format": "%Y-%m-%d"}
     if path.endswith("confirm"):
         data["portfolio_id"] = str(uuid4())
@@ -173,7 +236,9 @@ def test_trade_error_paths(authed_client, monkeypatch):
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-@pytest.mark.parametrize("method,path", [("put", "/api/v1/trades/{id}"), ("delete", "/api/v1/trades/{id}")])
+@pytest.mark.parametrize(
+    "method,path", [("put", "/api/v1/trades/{id}"), ("delete", "/api/v1/trades/{id}")]
+)
 def test_trade_update_delete_missing_paths(authed_client, monkeypatch, method, path):
     interactor = FakeTradeInteractor(mode="missing")
     _patch_trade_interactor(monkeypatch, interactor)

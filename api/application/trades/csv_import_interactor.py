@@ -185,7 +185,7 @@ class CsvImportInteractor(ICsvImportUseCase):
 
         try:
             quantity = round(
-                float(row.get(mapping.get("quantity", "Quantity"), "0")) * 100
+                float(row.get(mapping.get("quantity", "Quantity"), "0")) * 10000
             )
             if quantity < 0:
                 raise ValueError("Quantity cannot be negative")

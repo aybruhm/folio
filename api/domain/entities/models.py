@@ -58,7 +58,7 @@ class Trade:
     ticker: str
     trade_type: TradeType
     trade_date: datetime
-    quantity: int  # ×100 scale (e.g. 10 shares → 1000)
+    quantity: int  # ×10000 scale (e.g. 1.0000 BTC → 10000)
     price: int  # ×100 scale (e.g. $185.20 → 18520)
     trade_currency: Currency
     fees: int = 0  # ×100 scale
@@ -68,7 +68,7 @@ class Trade:
     created_at: datetime = field(default_factory=datetime.now)
 
     def total_cost(self) -> int:
-        return (self.quantity * self.price) // 100 + self.fees
+        return (self.quantity * self.price) // 10000 + self.fees
 
 
 @dataclass(frozen=True)

@@ -181,7 +181,7 @@ class TradeInteractor(ITradeUseCase):
             "ticker": trade.ticker,
             "trade_type": trade.trade_type.value,
             "trade_date": trade.trade_date.isoformat(),
-            "quantity": trade.quantity / 100,
+            "quantity": trade.quantity / 10000,
             "price": trade.price / 100,
             "trade_currency": trade.trade_currency.value,
             "fees": trade.fees / 100,

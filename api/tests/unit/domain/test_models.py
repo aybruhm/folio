@@ -35,8 +35,8 @@ def test_asset_from_metadata_maps_domain_fields():
 @pytest.mark.parametrize(
     "quantity,price,fees,expected",
     [
-        (1000, 18520, 495, 185695),
-        (250, 10000, 0, 25000),
+        (100000, 18520, 495, 185695),
+        (25000, 10000, 0, 25000),
     ],
 )
 @pytest.mark.happy_path
@@ -62,7 +62,7 @@ def test_holding_total_return_percent_uses_cost_basis():
     holding = Holding(
         asset_id=uuid4(),
         ticker="AAPL",
-        quantity=1000,
+        quantity=100000,
         current_price=20000,
         cost_basis=150000,
         market_value=200000,
@@ -124,7 +124,7 @@ def test_holding_weight_matches_market_value():
     holding = Holding(
         asset_id=uuid4(),
         ticker="AAPL",
-        quantity=1000,
+        quantity=100000,
         current_price=20000,
         cost_basis=150000,
         market_value=200000,
