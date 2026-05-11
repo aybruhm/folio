@@ -399,7 +399,7 @@
                       <td class="px-3 py-2 font-mono">{row.ticker ?? ''}</td>
                       <td class="px-3 py-2">{row.trade_type ?? ''}</td>
                       <td class="px-3 py-2 whitespace-nowrap">{String(row.trade_date ?? '').slice(0, 10)}</td>
-                      <td class="px-3 py-2">{row.quantity != null ? Number(row.quantity) / 100 : ''}</td>
+                      <td class="px-3 py-2">{row.quantity != null ? Number(row.quantity) / 10000 : ''}</td>
                       <td class="px-3 py-2">{row.price != null ? Number(row.price) / 100 : ''}</td>
                       <td class="px-3 py-2">{row.currency ?? ''}</td>
                     </tr>

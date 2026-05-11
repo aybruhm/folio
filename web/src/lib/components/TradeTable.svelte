@@ -71,7 +71,7 @@
           </tr>
         </thead>
         <tbody class="[&_tr:last-child]:border-0">
-          {#each trades as row}
+          {#each trades as row (row.id)}
             <tr class="border-b border-border hover:bg-muted/50 transition-colors">
               <td class="p-4 align-middle">{row.ticker}</td>
               <td class="p-4 align-middle">{formatDateTime(row.trade_date)}</td>
@@ -80,7 +80,7 @@
                   {row.trade_type.toUpperCase()}
                 </Badge>
               </td>
-              <td class="p-4 align-middle">{formatNumber(row.quantity)}</td>
+              <td class="p-4 align-middle">{formatNumber(row.quantity, 4)}</td>
               <td class="p-4 align-middle">{formatCurrency(row.price, row.trade_currency)}</td>
               <td class="p-4 align-middle">{formatCurrency(row.quantity * row.price, row.trade_currency)}</td>
               <td class="p-4 align-middle">
