@@ -81,6 +81,8 @@ class FakeTradeInteractor:
             raise RuntimeError("delete failed")
 
     async def delete_batch_trades(self, trade_ids):
+        if not trade_ids:
+            raise ValueError("No trade IDs provided")
         if self.mode == "delete-error":
             raise RuntimeError("delete failed")
         return len(trade_ids)
