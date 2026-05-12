@@ -49,15 +49,42 @@ async def _build_portfolio_analytics(
         {"label": a["name"], "value": float(a["value"])} for a in allocation_raw
     ]
 
+    holdings_with_weight = [
+        {
+            **h,
+            "weight_percent": (
+                round((float(h["market_value"]) / current_value) * 100, 2)
+                if current_value > 0
+                else 0.0
+            ),
+        }
+        for h in holdings
+    ]
+
+    top_holdings_by_weight = sorted(
+        holdings_with_weight,
+        key=lambda h: float(h.get("weight_percent", 0)),
+        reverse=True,
+    )[:10]
+
     return {
         "portfolio_id": str(portfolio_id),
         "total_invested": float(total_invested),
         "current_value": float(current_value),
         "total_gain_loss": float(total_gain_loss),
+        "holdings": holdings_with_weight,
         "total_gain_loss_percent": float(round(total_gain_loss_percent, 2)),
         "twr": performance.get("twr", "0"),
         "mwr": performance.get("mwr", "0"),
         "allocation": allocation,
+        "top_holdings": [
+            {
+                "ticker": h.get("ticker"),
+                "value": float(h.get("market_value", 0)),
+                "percent": float(h.get("weight_percent", 0)),
+            }
+            for h in top_holdings_by_weight
+        ],
         "performance_history": performance_history,
         "contribution_history": contribution_history,
         "sector_breakdown": sector_breakdown,
