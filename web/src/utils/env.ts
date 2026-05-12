@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/public';
+import { env } from "$env/dynamic/public";
 
 class EnvUtils {
     private static instance: EnvUtils;
@@ -7,8 +7,12 @@ class EnvUtils {
     };
 
     private constructor() {
+        const rawBaseUrl = env.PUBLIC_API_BASE_URL;
         this.env = {
-            API_BASE_URL: env.PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1/",
+            API_BASE_URL:
+                rawBaseUrl && rawBaseUrl.startsWith("http")
+                    ? "/api/v1/"
+                    : rawBaseUrl || "/api/v1/",
         };
     }
 

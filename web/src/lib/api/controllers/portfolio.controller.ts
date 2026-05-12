@@ -11,6 +11,8 @@ import type {
     GetPerformanceResponse,
     GetAllocationQuery,
     GetAllocationResponse,
+    ListPortfolioAnalyticsQuery,
+    ListPortfolioAnalyticsResponse,
 } from "../types";
 
 export class PortfolioController {
@@ -21,9 +23,7 @@ export class PortfolioController {
         return response.data as Portfolio[];
     }
 
-    async createPortfolio(
-        data: CreatePortfolioRequest,
-    ): Promise<Portfolio> {
+    async createPortfolio(data: CreatePortfolioRequest): Promise<Portfolio> {
         const response = await this.client.post("/portfolios/", data);
         return response.data;
     }
@@ -76,6 +76,17 @@ export class PortfolioController {
                 },
             },
         );
+        return response.data;
+    }
+
+    async listPortfolioAnalytics(
+        params: ListPortfolioAnalyticsQuery = {},
+    ): Promise<ListPortfolioAnalyticsResponse> {
+        const response = await this.client.get(`/portfolios/analytics`, {
+            params: {
+                timeframe: params.timeframe || "1y",
+            },
+        });
         return response.data;
     }
 

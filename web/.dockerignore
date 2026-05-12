@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.svelte-kit/
+*.log
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.db
+*.sqlite
+logs/
+tmp/
+temp/
+*.tmp

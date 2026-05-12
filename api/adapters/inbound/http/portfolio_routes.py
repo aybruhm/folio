@@ -22,6 +22,76 @@ def _check_ownership(portfolio: dict, current_user: User) -> None:
         )
 
 
+async def _build_portfolio_analytics(
+    session: AsyncSession,
+    portfolio_id: UUID,
+    timeframe: str,
+) -> dict:
+    interactor = AnalyticsInteractor(session, Currency.USD)
+
+    holdings = await interactor.get_holdings(portfolio_id)
+    performance = await interactor.calculate_performance(portfolio_id)
+    allocation_raw = await interactor.get_allocation(portfolio_id)
+    performance_history = await interactor.get_performance_history(
+        portfolio_id, timeframe
+    )
+    contribution_history = await interactor.get_contribution_history(portfolio_id)
+    sector_breakdown = await interactor.get_sector_breakdown(portfolio_id)
+
+    current_value = sum(float(h["market_value"]) for h in holdings)
+    total_invested = sum(float(h["cost_basis"]) for h in holdings)
+    total_gain_loss = current_value - total_invested
+    total_gain_loss_percent = (
+        (total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
+    )
+
+    allocation = [
+        {"label": a["name"], "value": float(a["value"])} for a in allocation_raw
+    ]
+
+    holdings_with_weight = [
+        {
+            **h,
+            "weight_percent": (
+                round((float(h["market_value"]) / current_value) * 100, 2)
+                if current_value > 0
+                else 0.0
+            ),
+        }
+        for h in holdings
+    ]
+
+    top_holdings_by_weight = sorted(
+        holdings_with_weight,
+        key=lambda h: float(h.get("weight_percent", 0)),
+        reverse=True,
+    )[:10]
+
+    return {
+        "portfolio_id": str(portfolio_id),
+        "total_invested": float(total_invested),
+        "current_value": float(current_value),
+        "total_gain_loss": float(total_gain_loss),
+        "holdings": holdings_with_weight,
+        "total_gain_loss_percent": float(round(total_gain_loss_percent, 2)),
+        "twr": performance.get("twr", "0"),
+        "mwr": performance.get("mwr", "0"),
+        "allocation": allocation,
+        "top_holdings": [
+            {
+                "ticker": h.get("ticker"),
+                "value": float(h.get("market_value", 0)),
+                "percent": float(h.get("weight_percent", 0)),
+            }
+            for h in top_holdings_by_weight
+        ],
+        "performance_history": performance_history,
+        "contribution_history": contribution_history,
+        "sector_breakdown": sector_breakdown,
+        "timeframe": timeframe,
+    }
+
+
 @router.get("/", response_model=List[dict])
 async def list_portfolios(
     current_user: User = Depends(get_current_user),
@@ -46,6 +116,30 @@ async def create_portfolio(
         return portfolio
     except Exception as e:
         await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/analytics", response_model=List[dict])
+async def list_portfolio_analytics(
+    timeframe: str = "1y",
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        portfolio_interactor = PortfolioInteractor(session)
+        portfolios = await portfolio_interactor.list_portfolios(current_user.id)
+        if not portfolios:
+            return []
+
+        analytics: List[dict] = []
+        for portfolio in portfolios:
+            analytics.append(
+                await _build_portfolio_analytics(
+                    session, UUID(portfolio["id"]), timeframe
+                )
+            )
+        return analytics
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -131,42 +225,7 @@ async def get_portfolio_analytics(
         portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
         _check_ownership(portfolio, current_user)
 
-        interactor = AnalyticsInteractor(session, Currency.USD)
-
-        holdings = await interactor.get_holdings(portfolio_id)
-        performance = await interactor.calculate_performance(portfolio_id)
-        allocation_raw = await interactor.get_allocation(portfolio_id)
-        performance_history = await interactor.get_performance_history(
-            portfolio_id, timeframe
-        )
-        contribution_history = await interactor.get_contribution_history(portfolio_id)
-        sector_breakdown = await interactor.get_sector_breakdown(portfolio_id)
-
-        current_value = sum(float(h["market_value"]) for h in holdings)
-        total_invested = sum(float(h["cost_basis"]) for h in holdings)
-        total_gain_loss = current_value - total_invested
-        total_gain_loss_percent = (
-            (total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
-        )
-
-        allocation = [
-            {"label": a["name"], "value": float(a["value"])} for a in allocation_raw
-        ]
-
-        return {
-            "portfolio_id": str(portfolio_id),
-            "total_invested": float(total_invested),
-            "current_value": float(current_value),
-            "total_gain_loss": float(total_gain_loss),
-            "total_gain_loss_percent": float(round(total_gain_loss_percent, 2)),
-            "twr": performance.get("twr", "0"),
-            "mwr": performance.get("mwr", "0"),
-            "allocation": allocation,
-            "performance_history": performance_history,
-            "contribution_history": contribution_history,
-            "sector_breakdown": sector_breakdown,
-            "timeframe": timeframe,
-        }
+        return await _build_portfolio_analytics(session, portfolio_id, timeframe)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

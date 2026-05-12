@@ -1,75 +1,110 @@
 <script lang="ts">
-  import '../app.css'
-  import Navigation from '$lib/components/Navigation.svelte'
-  import Sidebar from '$lib/components/Sidebar.svelte'
-  import PWAInstall from '$lib/components/PWAInstall.svelte'
-  import OfflineStatus from '$lib/components/OfflineStatus.svelte'
-  import { onMount } from 'svelte'
-  import { portfolios, currentPortfolio } from '$lib/stores'
-  import { initializeAuthStore } from '$lib/stores/offlineAuth'
-  import { syncQueuedData } from '$lib/stores/offline'
-  import { api } from '$lib/api/client'
-  import { PortfolioController } from '$lib/api/controllers'
-  import type { Portfolio } from '$lib/api/types'
+    import "../app.css";
+    import Navigation from "$lib/components/Navigation.svelte";
+    import Sidebar from "$lib/components/Sidebar.svelte";
+    import PWAInstall from "$lib/components/PWAInstall.svelte";
+    import OfflineStatus from "$lib/components/OfflineStatus.svelte";
+    import { onMount } from "svelte";
+    import { page } from "$app/stores";
+    import { portfolios, currentPortfolio } from "$lib/stores";
+    import { initializeAuthStore } from "$lib/stores/offlineAuth";
+    import { syncQueuedData } from "$lib/stores/offline";
+    import { api } from "$lib/api/client";
+    import { PortfolioController } from "$lib/api/controllers";
+    import type { Portfolio } from "$lib/api/types";
 
-  let isDark = true
-  let sidebarOpen = false
-  let portfolioController: PortfolioController
+    let isDark = true;
+    let sidebarOpen = false;
+    let portfolioController: PortfolioController;
 
-  onMount(() => {
-    initializeAuthStore()
-    if (navigator.onLine && 'serviceWorker' in navigator) {
-      syncQueuedData()
+    $: isAuthRoute =
+        $page.url.pathname.startsWith("/login") ||
+        $page.url.pathname.startsWith("/register");
+
+    onMount(async () => {
+        if (!isAuthRoute) {
+            initializeAuthStore();
+            if (navigator.onLine && "serviceWorker" in navigator) {
+                syncQueuedData();
+            }
+        }
+        const prefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+        ).matches;
+        isDark =
+            localStorage.getItem("theme") === "light"
+                ? false
+                : prefersDark || true;
+        applyTheme();
+
+        portfolioController = new PortfolioController(api.getInstance());
+        if (!isAuthRoute) {
+            await refreshSession();
+            await loadPortfolios();
+        }
+    });
+
+    function applyTheme() {
+        if (isDark) {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
     }
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    isDark = localStorage.getItem('theme') === 'light' ? false : prefersDark || true
-    applyTheme()
 
-    portfolioController = new PortfolioController(api.getInstance())
-    loadPortfolios()
-  })
-
-  function applyTheme() {
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
+    function toggleTheme() {
+        isDark = !isDark;
+        localStorage.setItem("theme", isDark ? "dark" : "light");
+        applyTheme();
     }
-  }
 
-  function toggleTheme() {
-    isDark = !isDark
-    localStorage.setItem('theme', isDark ? 'dark' : 'light')
-    applyTheme()
-  }
-
-  async function loadPortfolios() {
-    try {
-      const data = await portfolioController.listPortfolios()
-      portfolios.set(data || [])
-    } catch (e) {
-      console.error('Failed to load portfolios:', e)
+    async function refreshSession() {
+        if (!navigator.onLine) return;
+        try {
+            await api.post("/auth/refresh");
+        } catch (e) {
+            console.warn("Session refresh failed:", e);
+        }
     }
-  }
+
+    async function loadPortfolios() {
+        try {
+            const data = await portfolioController.listPortfolios();
+            portfolios.set(data || []);
+            if (data && data.length > 0) {
+                currentPortfolio.set(data[0]);
+            }
+        } catch (e) {
+            console.error("Failed to load portfolios:", e);
+        }
+    }
 </script>
 
-<div class="flex h-screen flex-col bg-background text-foreground">
-  <Navigation {isDark} on:toggleTheme={toggleTheme} on:toggleSidebar={() => sidebarOpen = !sidebarOpen} />
-  <PWAInstall />
-  <OfflineStatus />
+{#if isAuthRoute}
+    <slot />
+{:else}
+    <div class="flex h-screen flex-col bg-background text-foreground">
+        <Navigation
+            {isDark}
+            on:toggleTheme={toggleTheme}
+            on:toggleSidebar={() => (sidebarOpen = !sidebarOpen)}
+        />
+        <PWAInstall />
+        <OfflineStatus />
 
-  <div class="flex flex-1 overflow-hidden">
-    <Sidebar open={sidebarOpen} onClose={() => sidebarOpen = false} />
-    <main class="flex-1 overflow-auto">
-      <slot />
-    </main>
-  </div>
-</div>
+        <div class="flex flex-1 overflow-hidden">
+            <Sidebar open={sidebarOpen} onClose={() => (sidebarOpen = false)} />
+            <main class="flex-1 overflow-auto">
+                <slot />
+            </main>
+        </div>
+    </div>
+{/if}
 
 <style>
-  :global(body) {
-    margin: 0;
-    padding: 0;
-    font-family: 'Inter', 'Geist', system-ui, sans-serif;
-  }
+    :global(body) {
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", "Geist", system-ui, sans-serif;
+    }
 </style>
