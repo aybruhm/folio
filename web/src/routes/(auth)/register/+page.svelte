@@ -60,18 +60,18 @@
     <title>Create account — folio</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+<div class="min-h-screen bg-background flex items-center justify-center px-4">
     <div class="w-full max-w-sm">
         <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-white tracking-tight">folio</h1>
+            <h1 class="text-2xl font-bold text-foreground tracking-tight">folio</h1>
         </div>
 
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-8">
-            <h2 class="text-lg font-semibold text-white mb-6">Create your account</h2>
+        <div class="bg-card border border-border rounded-xl p-8">
+            <h2 class="text-lg font-semibold text-foreground mb-6">Create your account</h2>
 
             {#if errorMessage}
                 <div
-                    class="mb-4 p-3 rounded-lg bg-red-950 border border-red-800 text-red-300 text-sm"
+                    class="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive text-destructive text-sm"
                     role="alert"
                     aria-live="assertive"
                 >
@@ -83,7 +83,7 @@
                 <div class="mb-4">
                     <label
                         for="email"
-                        class="block text-sm font-medium text-gray-300 mb-1.5"
+                        class="block text-sm font-medium text-foreground/80 mb-1.5"
                     >
                         Email
                     </label>
@@ -94,18 +94,18 @@
                         required
                         autocomplete="email"
                         aria-describedby={emailError ? "email-error" : undefined}
-                        class="w-full px-3 py-2 rounded-lg bg-gray-800 border {emailError ? 'border-red-600' : 'border-gray-700'} text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        class="w-full px-3 py-2 rounded-lg bg-input border {emailError ? 'border-destructive' : 'border-border'} text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
                         placeholder="you@example.com"
                     />
                     {#if emailError}
-                        <p id="email-error" class="mt-1 text-xs text-red-400">{emailError}</p>
+                        <p id="email-error" class="mt-1 text-xs text-destructive">{emailError}</p>
                     {/if}
                 </div>
 
                 <div class="mb-4">
                     <label
                         for="password"
-                        class="block text-sm font-medium text-gray-300 mb-1.5"
+                        class="block text-sm font-medium text-foreground/80 mb-1.5"
                     >
                         Password
                     </label>
@@ -116,20 +116,20 @@
                         required
                         autocomplete="new-password"
                         aria-describedby="password-hint {passwordError ? 'password-error' : ''}"
-                        class="w-full px-3 py-2 rounded-lg bg-gray-800 border {passwordError ? 'border-red-600' : 'border-gray-700'} text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        class="w-full px-3 py-2 rounded-lg bg-input border {passwordError ? 'border-destructive' : 'border-border'} text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
                         placeholder="••••••••"
                     />
                     {#if passwordError}
-                        <p id="password-error" class="mt-1 text-xs text-red-400">{passwordError}</p>
+                        <p id="password-error" class="mt-1 text-xs text-destructive">{passwordError}</p>
                     {:else}
-                        <p id="password-hint" class="mt-1 text-xs text-gray-500">Must be at least 8 characters.</p>
+                        <p id="password-hint" class="mt-1 text-xs text-muted-foreground">Must be at least 8 characters.</p>
                     {/if}
                 </div>
 
                 <div class="mb-6">
                     <label
                         for="confirm-password"
-                        class="block text-sm font-medium text-gray-300 mb-1.5"
+                        class="block text-sm font-medium text-foreground/80 mb-1.5"
                     >
                         Confirm password
                     </label>
@@ -140,11 +140,11 @@
                         required
                         autocomplete="new-password"
                         aria-describedby={confirmError ? "confirm-error" : undefined}
-                        class="w-full px-3 py-2 rounded-lg bg-gray-800 border {confirmError ? 'border-red-600' : 'border-gray-700'} text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        class="w-full px-3 py-2 rounded-lg bg-input border {confirmError ? 'border-destructive' : 'border-border'} text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
                         placeholder="••••••••"
                     />
                     {#if confirmError}
-                        <p id="confirm-error" class="mt-1 text-xs text-red-400">{confirmError}</p>
+                        <p id="confirm-error" class="mt-1 text-xs text-destructive">{confirmError}</p>
                     {/if}
                 </div>
 
@@ -152,15 +152,15 @@
                     type="submit"
                     disabled={isSubmitting}
                     aria-busy={isSubmitting}
-                    class="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium text-sm transition-colors"
+                    class="w-full py-2.5 px-4 rounded-lg bg-accent hover:bg-accent/90 disabled:bg-accent/50 disabled:cursor-not-allowed text-accent-foreground font-medium text-sm transition-colors"
                 >
                     {isSubmitting ? "Creating account…" : "Create account"}
                 </button>
             </form>
 
-            <p class="mt-6 text-center text-sm text-gray-500">
+            <p class="mt-6 text-center text-sm text-muted-foreground">
                 Already have an account?
-                <a href="/login" class="text-blue-400 hover:text-blue-300 ml-1">
+                <a href="/login" class="text-accent hover:text-accent/80 ml-1">
                     Sign in →
                 </a>
             </p>
