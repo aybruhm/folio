@@ -7,12 +7,9 @@ class EnvUtils {
     };
 
     private constructor() {
-        const rawBaseUrl = env.PUBLIC_API_BASE_URL;
+        const rawBaseUrl = env.PUBLIC_API_BASE_URL?.trim();
         this.env = {
-            API_BASE_URL:
-                rawBaseUrl && rawBaseUrl.startsWith("http")
-                    ? "/api/v1/"
-                    : rawBaseUrl || "/api/v1/",
+            API_BASE_URL: rawBaseUrl || "/api/v1/",
         };
     }
 
