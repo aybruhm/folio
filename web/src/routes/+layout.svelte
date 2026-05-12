@@ -70,9 +70,9 @@
     async function loadPortfolios() {
         try {
             const data = await portfolioController.listPortfolios();
-            portfolios.set(data || []);
+            portfolios.set((data || []) as any);
             if (data && data.length > 0) {
-                currentPortfolio.set(data[0]);
+                currentPortfolio.set(data[0] as any);
             }
         } catch (e) {
             console.error("Failed to load portfolios:", e);
