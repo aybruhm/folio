@@ -7,7 +7,7 @@
     import LineChart from "$lib/components/LineChart.svelte";
     import DonutChart from "$lib/components/DonutChart.svelte";
     import { formatCurrency, formatPercent } from "$lib/utils/format";
-    import { currentPortfolio } from "$lib/stores";
+    import { currentPortfolio, portfolios } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
     import type { PortfolioStats } from "$lib/api/types";
@@ -35,53 +35,200 @@
 
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
-        if ($currentPortfolio) await loadDashboardData();
+        // Load portfolios first if not already loaded
+        if ($portfolios.length === 0) {
+            try {
+                const data = await portfolioController.listPortfolios();
+                portfolios.set(data || []);
+            } catch (e) {
+                console.error("Failed to load portfolios:", e);
+            }
+        }
+        await loadDashboardData();
     });
 
-    $: if ($currentPortfolio && portfolioController) loadDashboardData();
+    $: if (portfolioController && ($currentPortfolio?.id || $portfolios.length > 0)) loadDashboardData();
 
     async function loadDashboardData() {
         try {
             loading = true;
-            const [analyticsData, holdingsResponse] = await Promise.all([
-                portfolioController.getPortfolioAnalytics({
-                    portfolio_id: $currentPortfolio?.id,
-                    timeframe: "1y",
-                }),
-                portfolioController.getHoldings({
-                    portfolio_id: $currentPortfolio?.id,
-                }),
-            ]);
+            
+            // Check if currentPortfolio is selected (not empty)
+            if (!$currentPortfolio?.id) {
+                // Load aggregated data from all portfolios
+                const allPortfolios = $portfolios;
+                if (allPortfolios.length === 0) {
+                    stats = {
+                        id: "",
+                        current_value: 0,
+                        cost_basis: 0,
+                        gain_loss: 0,
+                        return_percent: 0,
+                        allocation: [],
+                        performance_history: [],
+                        top_holdings: [],
+                    };
+                    loading = false;
+                    return;
+                }
 
-            const holdings = holdingsResponse.data ?? [];
+                // Fetch holdings and analytics for all portfolios
+                let aggregatedHoldings: any[] = [];
+                let totalCurrentValue = 0;
+                let totalCostBasis = 0;
+                let totalGainLoss = 0;
+                const allocationByAssetClass: Record<string, number> = {};
+                const performanceByMonth: Record<string, number> = {};
 
-            const currentValue = holdings.reduce(
-                (s, h) => s + parseFloat(h.total_value),
-                0,
-            );
-            const costBasis = holdings.reduce(
-                (s, h) => s + parseFloat(h.avg_price) * parseFloat(h.quantity),
-                0,
-            );
-            const gainLoss = holdings.reduce(
-                (s, h) => s + parseFloat(h.gain_loss),
-                0,
-            );
+                for (const p of allPortfolios) {
+                    try {
+                        const [holdingsResponse, analyticsData] = await Promise.all([
+                            portfolioController.getHoldings({
+                                portfolio_id: p.id,
+                            }),
+                            portfolioController.getPortfolioAnalytics({
+                                portfolio_id: p.id,
+                                timeframe: "1y",
+                            }),
+                        ]);
 
-            stats = {
-                id: $currentPortfolio?.id,
-                current_value: currentValue,
-                cost_basis: costBasis,
-                gain_loss: gainLoss,
-                return_percent: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0,
-                allocation: analyticsData.allocation ?? [],
-                performance_history: analyticsData.performance_history ?? [],
-                top_holdings: holdings.slice(0, 5).map((h) => ({
-                    ticker: h.ticker,
-                    value: h.total_value,
-                    percent: h.gain_loss_percent,
-                })),
-            };
+                        const holdings = holdingsResponse.data ?? [];
+                        aggregatedHoldings = [...aggregatedHoldings, ...holdings];
+
+                        totalCurrentValue += holdings.reduce(
+                            (s, h) => s + parseFloat(h.total_value),
+                            0,
+                        );
+                        totalCostBasis += holdings.reduce(
+                            (s, h) => s + parseFloat(h.avg_price) * parseFloat(h.quantity),
+                            0,
+                        );
+                        totalGainLoss += holdings.reduce(
+                            (s, h) => s + parseFloat(h.gain_loss),
+                            0,
+                        );
+
+                        // Aggregate allocation data
+                        if (analyticsData.allocation) {
+                            for (const item of analyticsData.allocation) {
+                                const label = item.label;
+                                allocationByAssetClass[label] = 
+                                    (allocationByAssetClass[label] || 0) + parseFloat(item.value);
+                            }
+                        }
+
+                        // Aggregate performance history
+                        if (analyticsData.performance_history) {
+                            for (const item of analyticsData.performance_history) {
+                                const name = item.name;
+                                performanceByMonth[name] = 
+                                    (performanceByMonth[name] || 0) + parseFloat(item.value);
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Failed to load data for portfolio ${p.id}:`, e);
+                    }
+                }
+
+                // Group holdings by ticker and sum them up for aggregated top holdings
+                const holdingsByTicker: Record<string, any> = {};
+                for (const holding of aggregatedHoldings) {
+                    const ticker = holding.ticker;
+                    if (!holdingsByTicker[ticker]) {
+                        holdingsByTicker[ticker] = {
+                            ticker,
+                            total_value: 0,
+                            gain_loss: 0,
+                            quantity: 0,
+                        };
+                    }
+                    holdingsByTicker[ticker].total_value += parseFloat(holding.total_value);
+                    holdingsByTicker[ticker].gain_loss += parseFloat(holding.gain_loss);
+                    holdingsByTicker[ticker].quantity += parseFloat(holding.quantity);
+                }
+
+                // Get top 10 holdings
+                const topHoldings = Object.values(holdingsByTicker)
+                    .sort((a: any, b: any) => parseFloat(b.total_value) - parseFloat(a.total_value))
+                    .slice(0, 10)
+                    .map((h: any) => ({
+                        ticker: h.ticker,
+                        value: h.total_value.toString(),
+                        percent: totalCurrentValue > 0 
+                            ? ((parseFloat(h.total_value) / totalCurrentValue) * 100).toString()
+                            : "0",
+                    }));
+
+                // Convert allocation object to array format
+                const allocationArray = Object.entries(allocationByAssetClass).map(([label, value]) => ({
+                    label,
+                    value,
+                }));
+
+                // Convert performance history to sorted array format
+                const performanceArray = Object.entries(performanceByMonth)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => {
+                        const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        const getMonthNum = (nameStr: string) => {
+                            const parts = nameStr.split(" ");
+                            return (parseInt(parts[1]) - 2024) * 12 + monthOrder.indexOf(parts[0]);
+                        };
+                        return getMonthNum(a.name) - getMonthNum(b.name);
+                    });
+
+                stats = {
+                    id: "aggregated",
+                    current_value: totalCurrentValue,
+                    cost_basis: totalCostBasis,
+                    gain_loss: totalGainLoss,
+                    return_percent: totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0,
+                    allocation: allocationArray,
+                    performance_history: performanceArray,
+                    top_holdings: topHoldings,
+                };
+            } else {
+                // Load single portfolio data
+                const [analyticsData, holdingsResponse] = await Promise.all([
+                    portfolioController.getPortfolioAnalytics({
+                        portfolio_id: $currentPortfolio?.id,
+                        timeframe: "1y",
+                    }),
+                    portfolioController.getHoldings({
+                        portfolio_id: $currentPortfolio?.id,
+                    }),
+                ]);
+
+                const holdings = holdingsResponse.data ?? [];
+
+                const currentValue = holdings.reduce(
+                    (s, h) => s + parseFloat(h.total_value),
+                    0,
+                );
+                const costBasis = holdings.reduce(
+                    (s, h) => s + parseFloat(h.avg_price) * parseFloat(h.quantity),
+                    0,
+                );
+                const gainLoss = holdings.reduce(
+                    (s, h) => s + parseFloat(h.gain_loss),
+                    0,
+                );
+
+                stats = {
+                    id: $currentPortfolio?.id,
+                    current_value: currentValue,
+                    cost_basis: costBasis,
+                    gain_loss: gainLoss,
+                    return_percent: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0,
+                    allocation: analyticsData.allocation ?? [],
+                    performance_history: analyticsData.performance_history ?? [],
+                    top_holdings: holdings.slice(0, 10).map((h) => ({
+                        ticker: h.ticker,
+                        value: h.total_value,
+                        percent: h.gain_loss_percent,
+                    })),
+                };
+            }
         } catch (e) {
             console.error("Failed to load dashboard data:", e);
         } finally {
@@ -100,13 +247,15 @@
                 Dashboard
             </h1>
             <p class="text-xs md:text-sm text-muted-foreground">
-                {#if $currentPortfolio}
+                {#if $currentPortfolio?.id}
                     <span>{$currentPortfolio.name}</span>
                     {#if $currentPortfolio.description}
                         <span class="text-xs"
                             >· {$currentPortfolio.description}</span
                         >
                     {/if}
+                {:else}
+                    <span>All Portfolios (Aggregated)</span>
                 {/if}
             </p>
         </div>
@@ -170,14 +319,14 @@
 
                 <Card
                     title="Top Holdings"
-                    subtitle="5 largest positions by weight"
+                    subtitle="10 largest positions by weight"
                 >
                     <DonutChart data={topHoldingsChart} title="" />
                 </Card>
             </div>
 
             <!-- Top Holdings List -->
-            <Card title="Top Holdings" subtitle="5 largest positions">
+            <Card title="Top Holdings" subtitle="10 largest positions">
                 <div class="space-y-2">
                     {#each stats.top_holdings ?? [] as holding}
                         <div class="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 md:px-4 md:py-3">
