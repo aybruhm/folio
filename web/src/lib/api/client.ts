@@ -1,5 +1,8 @@
 import axios from "axios";
+import type { AxiosRequestConfig } from "axios";
 import { envUtils } from "@/utils/env";
+import { queueRequest } from "$lib/stores/offline";
+import type { SyncQueueItem } from "$lib/stores/offline";
 
 const API_BASE_URL = envUtils.getBaseUrl();
 
@@ -27,6 +30,66 @@ const axiosInstance = axios.create({
     },
     withCredentials: true,
     validateStatus: () => true, // Don't throw on any status code
+});
+
+function normalizeHeaders(
+    headers: AxiosRequestConfig["headers"],
+): Record<string, string> {
+    if (!headers) return {};
+    const resolved =
+        typeof (headers as { toJSON?: () => Record<string, unknown> }).toJSON ===
+        "function"
+            ? (headers as { toJSON: () => Record<string, unknown> }).toJSON()
+            : (headers as Record<string, unknown>);
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(resolved)) {
+        if (typeof value === "string") {
+            normalized[key] = value;
+        } else if (Array.isArray(value)) {
+            normalized[key] = value.join(",");
+        }
+    }
+    return normalized;
+}
+
+axiosInstance.interceptors.request.use(async (config) => {
+    if (typeof window === "undefined") return config;
+
+    const method = (config.method ?? "get").toUpperCase();
+    if (method === "GET") return config;
+    if (navigator.onLine) return config;
+
+    const url = config.url ?? "";
+    if (url.startsWith("/auth/")) return config;
+
+    const data = config.data;
+    if (typeof FormData !== "undefined" && data instanceof FormData) {
+        throw new Error("Offline uploads require an active connection.");
+    }
+
+    const baseURL = config.baseURL ?? API_BASE_URL ?? window.location.origin;
+    const fullUrl = url.startsWith("http")
+        ? url
+        : new URL(url, baseURL).toString();
+    const headers = normalizeHeaders(config.headers);
+
+    await queueRequest(
+        fullUrl,
+        method as SyncQueueItem["method"],
+        data,
+        headers,
+    );
+
+    return {
+        ...config,
+        adapter: async () => ({
+            data: { queued: true },
+            status: 202,
+            statusText: "Accepted",
+            headers: {},
+            config,
+        }),
+    };
 });
 
 // Response interceptor for error handling

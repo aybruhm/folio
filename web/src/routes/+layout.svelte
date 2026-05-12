@@ -2,8 +2,12 @@
   import '../app.css'
   import Navigation from '$lib/components/Navigation.svelte'
   import Sidebar from '$lib/components/Sidebar.svelte'
+  import PWAInstall from '$lib/components/PWAInstall.svelte'
+  import OfflineStatus from '$lib/components/OfflineStatus.svelte'
   import { onMount } from 'svelte'
   import { portfolios, currentPortfolio } from '$lib/stores'
+  import { initializeAuthStore } from '$lib/stores/offlineAuth'
+  import { syncQueuedData } from '$lib/stores/offline'
   import { api } from '$lib/api/client'
   import { PortfolioController } from '$lib/api/controllers'
   import type { Portfolio } from '$lib/api/types'
@@ -13,6 +17,10 @@
   let portfolioController: PortfolioController
 
   onMount(() => {
+    initializeAuthStore()
+    if (navigator.onLine && 'serviceWorker' in navigator) {
+      syncQueuedData()
+    }
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     isDark = localStorage.getItem('theme') === 'light' ? false : prefersDark || true
     applyTheme()
@@ -50,6 +58,8 @@
 
 <div class="flex h-screen flex-col bg-background text-foreground">
   <Navigation {isDark} on:toggleTheme={toggleTheme} on:toggleSidebar={() => sidebarOpen = !sidebarOpen} />
+  <PWAInstall />
+  <OfflineStatus />
 
   <div class="flex flex-1 overflow-hidden">
     <Sidebar open={sidebarOpen} onClose={() => sidebarOpen = false} />
