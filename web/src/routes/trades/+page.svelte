@@ -9,9 +9,9 @@
   import Modal from '$lib/components/Modal.svelte'
   import TradeForm from '$lib/components/TradeForm.svelte'
   import Select from '$lib/components/Select.svelte'
-  import { currentPortfolio } from '$lib/stores'
+  import { currentPortfolio, portfolios } from '$lib/stores'
   import { api } from '$lib/api/client'
-  import { TradeController } from '$lib/api/controllers'
+  import { TradeController, PortfolioController } from '$lib/api/controllers'
   import type { CreateTradeRequest, Trade } from '$lib/api/types'
   import { onMount } from 'svelte'
   import { page } from '$app/stores'
@@ -24,6 +24,7 @@
   let editingTrade: any = null
   let tradeTypeFilter = 'all'
   let tradeController: TradeController
+  let portfolioController: PortfolioController
   let selectedTradeIds = new Set<string>()
 
   const tradeTypeOptions = [
@@ -36,20 +37,50 @@
 
   onMount(async () => {
     tradeController = new TradeController(api.getInstance())
-    if ($currentPortfolio) await loadTrades()
+    portfolioController = new PortfolioController(api.getInstance())
+    // Load portfolios if not already loaded
+    if ($portfolios.length === 0) {
+      try {
+        const data = await portfolioController.listPortfolios()
+        portfolios.set(data || [])
+      } catch (e) {
+        console.error('Failed to load portfolios:', e)
+      }
+    }
+    await loadTrades()
     if ($page.url.searchParams.get('new') === 'true') showNewModal = true
   })
 
-  $: if ($currentPortfolio && tradeController) loadTrades()
+  $: if (tradeController && ($currentPortfolio?.id || $portfolios.length > 0)) loadTrades()
 
   async function loadTrades() {
     try {
       loading = true
-      const response = await tradeController.listTrades({
-        portfolio_id: $currentPortfolio.id,
-        limit: 500
-      })
-      trades = (response.data as Trade[]) || []
+      let allTrades: Trade[] = []
+
+      if (!$currentPortfolio?.id) {
+        // Load trades from all portfolios
+        for (const p of $portfolios) {
+          try {
+            const response = await tradeController.listTrades({
+              portfolio_id: p.id,
+              limit: 500
+            })
+            allTrades = [...allTrades, ...(response.data as Trade[]) || []]
+          } catch (e) {
+            console.error(`Failed to load trades for portfolio ${p.id}:`, e)
+          }
+        }
+      } else {
+        // Load trades for current portfolio
+        const response = await tradeController.listTrades({
+          portfolio_id: $currentPortfolio.id,
+          limit: 500
+        })
+        allTrades = (response.data as Trade[]) || []
+      }
+
+      trades = allTrades
     } catch (e) {
       console.error('Failed to load trades:', e)
     } finally {
@@ -147,17 +178,23 @@
     <div class="flex flex-col gap-4 sm:gap-6 sm:items-start sm:justify-between md:flex-row md:items-center">
       <div class="space-y-2">
         <h1 class="text-2xl md:text-3xl font-bold text-foreground">Trades</h1>
-        <p class="text-xs md:text-sm text-muted-foreground">Transaction history for {$currentPortfolio?.name}</p>
+        <p class="text-xs md:text-sm text-muted-foreground">
+          {#if $currentPortfolio?.id}
+            Transaction history for {$currentPortfolio?.name}
+          {:else}
+            All trades (Aggregated)
+          {/if}
+        </p>
       </div>
       <div class="flex gap-2 w-full sm:w-auto">
-        <Button variant="outline" href="/trades/import" class="flex-1 sm:flex-none">
+        <Button variant="outline" href="/trades/import" class="flex-1 sm:flex-none {!$currentPortfolio?.id ? 'opacity-50 cursor-not-allowed' : ''}" disabled={!$currentPortfolio?.id}>
           <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
           Import CSV
         </Button>
-        <Button variant="default" on:click={() => (showNewModal = true)} class="flex-1 sm:flex-none">
+        <Button variant="default" on:click={() => (showNewModal = true)} class="flex-1 sm:flex-none {!$currentPortfolio?.id ? 'opacity-50 cursor-not-allowed' : ''}" disabled={!$currentPortfolio?.id}>
           <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
