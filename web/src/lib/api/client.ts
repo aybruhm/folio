@@ -3,6 +3,8 @@ import type { AxiosRequestConfig } from "axios";
 import { envUtils } from "@/utils/env";
 import { queueRequest } from "$lib/stores/offline";
 import type { SyncQueueItem } from "$lib/stores/offline";
+import { clearAuthToken, getAuthToken, storeAuthToken } from "$lib/stores/offlineAuth";
+import { goto } from "$app/navigation";
 
 const API_BASE_URL = envUtils.getBaseUrl();
 
@@ -21,6 +23,16 @@ export interface ApiError {
     field?: string;
     details?: Record<string, unknown>;
 }
+
+// Create axios instance for token refresh (without response interceptor to avoid recursion)
+const refreshAxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+  validateStatus: () => true,
+});
 
 // Create axios instance
 const axiosInstance = axios.create({
@@ -93,20 +105,100 @@ axiosInstance.interceptors.request.use(async (config) => {
 });
 
 // Response interceptor for error handling
-axiosInstance.interceptors.response.use((response) => {
+axiosInstance.interceptors.response.use(
+  (response) => {
     // Handle error responses from API
     if (response.status >= 400) {
-        const errorData = response.data?.error || response.data;
-        const error = new Error(
-            errorData?.message ||
-                `API error: ${response.status} ${response.statusText}`,
-        ) as Error & { code?: string; details?: Record<string, unknown> };
-        error.code = errorData?.code;
-        error.details = errorData?.details;
-        throw error;
+      // Handle 401 Unauthorized - attempt token refresh
+      if (response.status === 401) {
+        const currentToken = getAuthToken();
+        if (currentToken?.refreshToken) {
+          // Try to refresh the token with retry logic
+          return attemptTokenRefresh(currentToken.refreshToken, 3)
+            .then((newToken) => {
+              storeAuthToken(newToken);
+              // Retry the original request with the new token
+              const retryConfig = {
+                ...response.config,
+              };
+              return axiosInstance(retryConfig);
+            })
+            .catch(() => {
+              // If all refresh attempts fail, clear auth and redirect to login
+              clearAuthToken();
+              if (typeof window !== 'undefined') {
+                goto('/login');
+              }
+              const errorData = response.data?.error || response.data;
+              const error = new Error(
+                errorData?.message || `API error: ${response.status} ${response.statusText}`,
+              ) as Error & { code?: string; details?: Record<string, unknown> };
+              error.code = errorData?.code;
+              error.details = errorData?.details;
+              throw error;
+            });
+        } else {
+          // No refresh token available, clear auth and redirect to login
+          clearAuthToken();
+          if (typeof window !== 'undefined') {
+            goto('/login');
+          }
+        }
+      }
+
+      const errorData = response.data?.error || response.data;
+      const error = new Error(
+        errorData?.message ||
+          `API error: ${response.status} ${response.statusText}`,
+      ) as Error & { code?: string; details?: Record<string, unknown> };
+      error.code = errorData?.code;
+      error.details = errorData?.details;
+      throw error;
     }
     return response;
-});
+  }
+);
+
+/**
+ * Attempt to refresh access token with retry logic
+ */
+async function attemptTokenRefresh(
+  refreshToken: string,
+  retriesLeft: number = 3,
+): Promise<any> {
+  try {
+    return await refreshAccessToken(refreshToken);
+  } catch (error) {
+    if (retriesLeft > 1) {
+      // Wait a bit before retrying (exponential backoff)
+      const delay = 100 * (4 - retriesLeft);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return attemptTokenRefresh(refreshToken, retriesLeft - 1);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Refresh access token using refresh token
+ */
+async function refreshAccessToken(
+  refreshToken: string,
+): Promise<any> {
+  try {
+    const response = await refreshAxiosInstance.post('/auth/refresh', {
+      refresh_token: refreshToken,
+    });
+
+    if (response.status >= 400) {
+      throw new Error('Token refresh failed');
+    }
+
+    return response.data;
+  } catch (error) {
+    throw new Error('Failed to refresh access token');
+  }
+}
 
 export const api = {
     /**
