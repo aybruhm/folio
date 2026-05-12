@@ -47,9 +47,6 @@
     try {
       const data = await portfolioController.listPortfolios()
       portfolios.set(data || [])
-      if (data && data.length > 0) {
-        currentPortfolio.set(data[0])
-      }
     } catch (e) {
       console.error('Failed to load portfolios:', e)
     }

@@ -31,9 +31,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 
 ## Preview
 
-![Dashboard](static/images/01-dashboard.png)
-
-![Dashboard](static/images/02-dashboard.png)
+[folio-demo.webm](https://github.com/user-attachments/assets/bb43d330-5571-4a6c-aeb7-e9ac58a1e26a)
 
 ## Stack
 

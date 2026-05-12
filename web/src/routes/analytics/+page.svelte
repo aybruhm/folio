@@ -9,7 +9,7 @@
   import DonutChart from '$lib/components/DonutChart.svelte'
   import Select from '$lib/components/Select.svelte'
   import Badge from '$lib/components/Badge.svelte'
-  import { currentPortfolio } from '$lib/stores'
+  import { currentPortfolio, portfolios } from '$lib/stores'
   import { api } from '$lib/api/client'
   import { PortfolioController } from '$lib/api/controllers'
   import { formatPercent, formatCurrency } from '$lib/utils/format'
@@ -38,21 +38,137 @@
 
   onMount(async () => {
     portfolioController = new PortfolioController(api.getInstance())
-    if ($currentPortfolio) await loadAnalytics()
+    // Load portfolios if not already loaded
+    if ($portfolios.length === 0) {
+      try {
+        const data = await portfolioController.listPortfolios()
+        portfolios.set(data || [])
+      } catch (e) {
+        console.error('Failed to load portfolios:', e)
+      }
+    }
+    await loadAnalytics()
   })
 
   async function loadAnalytics() {
-    if (!$currentPortfolio) return
+    if (!$currentPortfolio?.id && $portfolios.length === 0) return
     try {
       loading = true
-      const response = await portfolioController.getPortfolioAnalytics({
-        portfolio_id: $currentPortfolio.id,
-        timeframe
-      })
-      analyticsData = {
-        // contribution_history: [],
-        // sector_breakdown: [],
-        ...response,
+
+      if (!$currentPortfolio?.id) {
+        // Load aggregated analytics from all portfolios
+        let totalTwr = 0
+        let totalMwr = 0
+        let portfolioCount = 0
+        const allocationByAssetClass: Record<string, number> = {}
+        const performanceByMonth: Record<string, number> = {}
+        const contributionByMonth: Record<string, number> = {}
+        const sectorByName: Record<string, number> = {}
+
+        for (const p of $portfolios) {
+          try {
+            const response = await portfolioController.getPortfolioAnalytics({
+              portfolio_id: p.id,
+              timeframe
+            })
+
+            totalTwr += parseFloat(response.twr || '0')
+            totalMwr += parseFloat(response.mwr || '0')
+            portfolioCount++
+
+            // Aggregate allocation
+            if (response.allocation) {
+              for (const item of response.allocation) {
+                const label = item.label
+                allocationByAssetClass[label] = 
+                  (allocationByAssetClass[label] || 0) + parseFloat(item.value)
+              }
+            }
+
+            // Aggregate performance history
+            if (response.performance_history) {
+              for (const item of response.performance_history) {
+                const name = item.name
+                performanceByMonth[name] = 
+                  (performanceByMonth[name] || 0) + parseFloat(item.value)
+              }
+            }
+
+            // Aggregate contribution history
+            if (response.contribution_history) {
+              for (const item of response.contribution_history) {
+                const name = item.name
+                contributionByMonth[name] = 
+                  (contributionByMonth[name] || 0) + parseFloat(item.value)
+              }
+            }
+
+            // Aggregate sector breakdown
+            if (response.sector_breakdown) {
+              for (const item of response.sector_breakdown) {
+                const label = item.label
+                sectorByName[label] = 
+                  (sectorByName[label] || 0) + parseFloat(item.value)
+              }
+            }
+          } catch (e) {
+            console.error(`Failed to load analytics for portfolio ${p.id}:`, e)
+          }
+        }
+
+        // Convert allocation to array format
+        const allocationArray = Object.entries(allocationByAssetClass).map(([label, value]) => ({
+          label,
+          value,
+        }))
+
+        // Convert performance history to sorted array format
+        const performanceArray = Object.entries(performanceByMonth)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => {
+            const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            const getMonthNum = (nameStr: string) => {
+              const parts = nameStr.split(" ")
+              return (parseInt(parts[1]) - 2024) * 12 + monthOrder.indexOf(parts[0])
+            }
+            return getMonthNum(a.name) - getMonthNum(b.name)
+          })
+
+        // Convert contribution history to array format
+        const contributionArray = Object.entries(contributionByMonth)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => {
+            const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            const getMonthNum = (nameStr: string) => {
+              const parts = nameStr.split(" ")
+              return (parseInt(parts[1]) - 2024) * 12 + monthOrder.indexOf(parts[0])
+            }
+            return getMonthNum(a.name) - getMonthNum(b.name)
+          })
+
+        // Convert sector breakdown to array format
+        const sectorArray = Object.entries(sectorByName).map(([label, value]) => ({
+          label,
+          value,
+        }))
+
+        analyticsData = {
+          twr: portfolioCount > 0 ? (totalTwr / portfolioCount).toString() : '0',
+          mwr: portfolioCount > 0 ? (totalMwr / portfolioCount).toString() : '0',
+          allocation: allocationArray,
+          performance_history: performanceArray,
+          contribution_history: contributionArray,
+          sector_breakdown: sectorArray
+        }
+      } else {
+        // Load single portfolio analytics
+        const response = await portfolioController.getPortfolioAnalytics({
+          portfolio_id: $currentPortfolio.id,
+          timeframe
+        })
+        analyticsData = {
+          ...response,
+        }
       }
     } catch (e) {
       console.error('Failed to load analytics:', e)
@@ -61,7 +177,7 @@
     }
   }
 
-  $: if ($currentPortfolio && timeframe && portfolioController) loadAnalytics()
+  $: if (portfolioController && timeframe && ($currentPortfolio?.id || $portfolios.length > 0)) loadAnalytics()
 
   $: contribChart = (analyticsData.contribution_history || []).map((d: any) => ({
     label: d.name,
@@ -75,7 +191,13 @@
     <div class="flex flex-col gap-4 sm:gap-6 sm:items-center sm:justify-between">
       <div class="space-y-2">
         <h1 class="text-2xl md:text-3xl font-bold text-foreground">Analytics</h1>
-        <p class="text-xs md:text-sm text-muted-foreground">Performance analysis for {$currentPortfolio?.name}</p>
+        <p class="text-xs md:text-sm text-muted-foreground">
+          {#if $currentPortfolio?.id}
+            Performance analysis for {$currentPortfolio?.name}
+          {:else}
+            Performance analysis (Aggregated)
+          {/if}
+        </p>
       </div>
     </div>
 

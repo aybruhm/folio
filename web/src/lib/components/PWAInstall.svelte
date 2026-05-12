@@ -111,7 +111,6 @@
 
   {#if isIOS && isMobile && !$offlineStore.isOnline}
     <div class="offline-badge">
-      <span class="badge-icon">📡</span>
       <span>You're offline</span>
     </div>
   {/if}
