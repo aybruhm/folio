@@ -1,8 +1,13 @@
 <script lang="ts">
   import { page } from '$app/stores'
+  import { goto } from '$app/navigation'
+  import { portfolios, currentPortfolio } from '$lib/stores'
+  import { clearAuthToken } from '$lib/stores/offlineAuth'
 
   export let open = false
   export let onClose: () => void = () => {}
+
+  let showPortfolioMenu = false
 
   const navLinks = [
     {
@@ -38,6 +43,12 @@
   ]
 
   $: currentPath = $page.url.pathname
+
+  async function handleLogout() {
+    clearAuthToken()
+    onClose()
+    await goto('/login')
+  }
 </script>
 
 <!-- Desktop sidebar -->
@@ -79,6 +90,41 @@
     </div>
 
     <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <div class="mb-4 pb-4 border-b border-border">
+        <button
+          on:click={() => (showPortfolioMenu = !showPortfolioMenu)}
+          class="w-full flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors bg-muted hover:bg-muted/80 text-foreground"
+        >
+          <span class="truncate">{$currentPortfolio?.id ? $currentPortfolio.name : 'Aggregated'}</span>
+          <svg class="h-4 w-4 flex-shrink-0 {showPortfolioMenu ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {#if showPortfolioMenu}
+          <div class="mt-2 space-y-1">
+            <button
+              on:click={() => { currentPortfolio.set({ id: "", name: "", base_currency: "USD", created_at: "", updated_at: "" }); showPortfolioMenu = false }}
+              class="block w-full px-3 py-2 text-left text-sm rounded-md transition-colors {!$currentPortfolio?.id
+                ? 'bg-accent text-accent-foreground'
+                : 'text-foreground hover:bg-muted'}"
+            >
+              Aggregated
+            </button>
+            {#each $portfolios as p}
+              <button
+                on:click={() => { currentPortfolio.set(p); showPortfolioMenu = false }}
+                class="block w-full px-3 py-2 text-left text-sm rounded-md transition-colors {$currentPortfolio.id === p.id
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground hover:bg-muted'}"
+              >
+                {p.name}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
       {#each navLinks as link}
         <a
           href={link.href}
@@ -93,6 +139,18 @@
           {link.label}
         </a>
       {/each}
+
+      <div class="mt-4 pt-4 border-t border-border">
+        <button
+          on:click={handleLogout}
+          class="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors w-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Logout
+        </button>
+      </div>
     </nav>
   </aside>
 {/if}
