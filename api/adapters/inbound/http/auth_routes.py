@@ -41,14 +41,14 @@ def _set_auth_cookies(
         httponly=True,
         samesite="lax",
         secure=settings.SECURE_COOKIES,
-        path="/api/v1/auth/refresh",
+        path="/",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
     )
 
 
 def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(key="access_token", path="/")
-    response.delete_cookie(key="refresh_token", path="/api/v1/auth/refresh")
+    response.delete_cookie(key="refresh_token", path="/")
 
 
 def _user_response(user: User) -> dict:
