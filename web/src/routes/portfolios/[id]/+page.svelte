@@ -8,6 +8,7 @@
   import HoldingsTable from '$lib/components/HoldingsTable.svelte'
   import { api } from '$lib/api/client'
   import { PortfolioController } from '$lib/api/controllers'
+  import { currentPortfolio } from '$lib/stores'
   import { page } from '$app/stores'
   import { onMount } from 'svelte'
   import { formatCurrency, formatPercent } from '$lib/utils/format'
@@ -35,6 +36,7 @@
       ])
 
       portfolio = portfolioData
+      currentPortfolio.set(portfolioData)
       holdings = (holdingsData.data || []).map((h: any) => ({
         ...h,
         average_cost: h.avg_price,
