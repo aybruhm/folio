@@ -236,9 +236,6 @@
     margin-top: 8px;
   }
 
-  .firefox-install-hint {
-    margin-top: 8px;
-  }
 
   .btn-link {
     background: none;
