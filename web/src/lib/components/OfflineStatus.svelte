@@ -4,7 +4,6 @@
 
 {#if !$offlineStore.isOnline}
     <div class="offline-banner">
-        <span class="icon">📡</span>
         <span class="text">You're offline</span>
         {#if $offlineStore.syncInProgress}
             <span class="spinner" />
