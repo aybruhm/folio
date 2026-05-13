@@ -38,6 +38,7 @@ export interface PortfolioStats {
   return_percent: number | string;
   allocation?: { label: string; value: number }[];
   performance_history?: { name: string; value: number }[];
+  contribution_history?: { name: string; value: number }[];
   top_holdings?: { ticker: string; value: number | string; percent: number | string }[];
 }
 
