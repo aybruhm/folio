@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
-from dataclasses import dataclass, field
 
-from domain.value_objects.money import Currency, TradeType, AssetClass
+from domain.value_objects.money import AssetClass, Currency, TradeType
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ class CreateTradeRequest:
 
 @dataclass(frozen=True)
 class CreateGoalRequest:
-    portfolio_id: UUID
+    user_id: UUID
     name: str
     target_net_worth: int  # ×100
     target_net_worth_currency: Currency
@@ -128,7 +128,7 @@ class IGoalUseCase(ABC):
     async def get_goal(self, goal_id: UUID) -> dict: ...
 
     @abstractmethod
-    async def list_goals(self, portfolio_id: UUID) -> List[dict]: ...
+    async def list_goals(self, user_id: UUID) -> List[dict]: ...
 
     @abstractmethod
     async def update_goal(self, goal_id: UUID, request: CreateGoalRequest) -> None: ...

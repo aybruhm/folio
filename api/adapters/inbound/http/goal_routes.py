@@ -16,7 +16,6 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 
 
 class GoalBody(BaseModel):
-    portfolio_id: UUID
     name: str
     target_net_worth: float
     target_net_worth_currency: str
@@ -26,9 +25,9 @@ class GoalBody(BaseModel):
     expected_annual_return: float
 
 
-def _body_to_request(body: GoalBody) -> CreateGoalRequest:
+def _body_to_request(body: GoalBody, user_id: UUID) -> CreateGoalRequest:
     return CreateGoalRequest(
-        portfolio_id=body.portfolio_id,
+        user_id=user_id,
         name=body.name,
         target_net_worth=round(body.target_net_worth * 100),
         target_net_worth_currency=Currency(body.target_net_worth_currency),
@@ -41,13 +40,12 @@ def _body_to_request(body: GoalBody) -> CreateGoalRequest:
 
 @router.get("/")
 async def list_goals(
-    portfolio_id: UUID,
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = GoalInteractor(session)
-        goals = await interactor.list_goals(portfolio_id)
+        goals = await interactor.list_goals(current_user.id)
         return goals
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -56,12 +54,12 @@ async def list_goals(
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_goal(
     body: GoalBody,
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = GoalInteractor(session)
-        goal_id = await interactor.create_goal(_body_to_request(body))
+        goal_id = await interactor.create_goal(_body_to_request(body, current_user.id))
         await session.commit()
 
         goal = await interactor.get_goal(goal_id)
@@ -89,12 +87,12 @@ async def get_goal(
 async def update_goal(
     goal_id: UUID,
     body: GoalBody,
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         interactor = GoalInteractor(session)
-        await interactor.update_goal(goal_id, _body_to_request(body))
+        await interactor.update_goal(goal_id, _body_to_request(body, current_user.id))
         await session.commit()
 
         goal = await interactor.get_goal(goal_id)
