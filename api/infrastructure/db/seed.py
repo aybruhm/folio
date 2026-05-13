@@ -437,7 +437,7 @@ async def seed() -> None:
             session.add(
                 GoalModel(
                     id=uuid4(),
-                    portfolio_id=portfolio_id,
+                    user_id=_SEED_USER_ID,
                     name="FIRE by 2040",
                     target_net_worth=200000000,  # $2,000,000 × 100
                     target_net_worth_currency="USD",

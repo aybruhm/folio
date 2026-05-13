@@ -19,7 +19,7 @@ class GoalInteractor(IGoalUseCase):
     async def create_goal(self, request: CreateGoalRequest) -> UUID:
         goal = Goal(
             id=uuid4(),
-            portfolio_id=request.portfolio_id,
+            user_id=request.user_id,
             name=request.name,
             target_net_worth=request.target_net_worth,
             target_net_worth_currency=request.target_net_worth_currency,
@@ -41,8 +41,8 @@ class GoalInteractor(IGoalUseCase):
 
         return self._goal_to_dict(goal)
 
-    async def list_goals(self, portfolio_id: UUID) -> List[dict]:
-        goals = await self.repository.list_by_portfolio(portfolio_id)
+    async def list_goals(self, user_id: UUID) -> List[dict]:
+        goals = await self.repository.list_by_user(user_id)
         return [self._goal_to_dict(g) for g in goals]
 
     async def update_goal(self, goal_id: UUID, request: CreateGoalRequest) -> None:
@@ -120,7 +120,7 @@ class GoalInteractor(IGoalUseCase):
     def _goal_to_dict(goal: Goal) -> dict:
         return {
             "id": str(goal.id),
-            "portfolio_id": str(goal.portfolio_id),
+            "user_id": str(goal.user_id),
             "name": goal.name,
             "target_net_worth": goal.target_net_worth / 100,
             "target_net_worth_currency": goal.target_net_worth_currency.value,

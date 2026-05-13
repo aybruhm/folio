@@ -83,9 +83,6 @@ class PortfolioModel(Base):
     trades = relationship(
         "TradeModel", back_populates="portfolio", cascade="all, delete-orphan"
     )
-    goals = relationship(
-        "GoalModel", back_populates="portfolio", cascade="all, delete-orphan"
-    )
 
     __table_args__ = (
         Index("ix_portfolios_base_currency", "base_currency"),
@@ -202,9 +199,7 @@ class GoalModel(Base):
     __tablename__ = "goals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    portfolio_id = Column(
-        UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=False
-    )
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     name = Column(String(255), nullable=False)
     target_net_worth = Column(BigInteger, nullable=False)
     target_net_worth_currency = Column(CHAR(3), nullable=False)
@@ -217,10 +212,8 @@ class GoalModel(Base):
         DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
     )
 
-    portfolio = relationship("PortfolioModel", back_populates="goals")
-
     __table_args__ = (
-        Index("ix_goals_portfolio_id", "portfolio_id"),
+        Index("ix_goals_user_id", "user_id"),
         Index("ix_goals_target_date", "target_date"),
     )
 

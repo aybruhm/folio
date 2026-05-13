@@ -1,11 +1,12 @@
+from typing import List, Optional
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from uuid import UUID
-from typing import List, Optional
 
 from domain.entities.models import Goal
-from domain.value_objects.money import Currency
 from domain.ports.outbound.repositories import IGoalRepository
+from domain.value_objects.money import Currency
 from infrastructure.db.models import GoalModel
 
 
@@ -16,7 +17,7 @@ class GoalRepository(IGoalRepository):
     async def add(self, goal: Goal) -> None:
         model = GoalModel(
             id=goal.id,
-            portfolio_id=goal.portfolio_id,
+            user_id=goal.user_id,
             name=goal.name,
             target_net_worth=goal.target_net_worth,
             target_net_worth_currency=goal.target_net_worth_currency.value,
@@ -34,10 +35,10 @@ class GoalRepository(IGoalRepository):
         model = await self.session.get(GoalModel, goal_id)
         return self._to_domain(model) if model else None
 
-    async def list_by_portfolio(self, portfolio_id: UUID) -> List[Goal]:
+    async def list_by_user(self, user_id: UUID) -> List[Goal]:
         result = await self.session.execute(
             select(GoalModel)
-            .where(GoalModel.portfolio_id == portfolio_id)
+            .where(GoalModel.user_id == user_id)
             .order_by(GoalModel.target_date.asc())
         )
         models = result.scalars().all()
@@ -66,7 +67,7 @@ class GoalRepository(IGoalRepository):
     def _to_domain(model: GoalModel) -> Goal:
         return Goal(
             id=model.id,
-            portfolio_id=model.portfolio_id,
+            user_id=model.user_id,
             name=model.name,
             target_net_worth=int(model.target_net_worth),
             target_net_worth_currency=Currency(model.target_net_worth_currency),

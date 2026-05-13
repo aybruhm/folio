@@ -38,10 +38,8 @@
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
         goalController = new GoalController(api.getInstance());
-        if ($currentPortfolio?.id) {
-            lastPortfolioId = $currentPortfolio.id;
-            await loadGoals();
-        }
+        lastPortfolioId = $currentPortfolio?.id || "";
+        await loadGoals();
     });
 
     $: if (
@@ -54,19 +52,26 @@
     }
 
     async function loadGoals() {
-        if (loadInProgress) return;
+        if (loadInProgress || !goalController || !portfolioController) return;
         loadInProgress = true;
         try {
             loading = true;
+
+            const goalsPromise = goalController.listGoals();
+            const analyticsPromise = $currentPortfolio?.id
+                ? portfolioController.getPortfolioAnalytics({
+                      portfolio_id: $currentPortfolio.id,
+                      timeframe: "1y",
+                  })
+                : Promise.resolve({ current_value: 0 });
+
             const [goalsResponse, analyticsData] = await Promise.all([
-                goalController.listGoals($currentPortfolio.id),
-                portfolioController.getPortfolioAnalytics({
-                    portfolio_id: $currentPortfolio.id,
-                    timeframe: "1y",
-                }),
+                goalsPromise,
+                analyticsPromise,
             ]);
+
             goals = goalsResponse;
-            currentPortfolioValue = analyticsData.current_value ?? 0;
+            currentPortfolioValue = Number(analyticsData.current_value ?? 0);
         } catch (e) {
             console.error("Failed to load goals:", e);
         } finally {
@@ -78,7 +83,6 @@
     async function handleCreateGoal(goal: GoalFormData) {
         try {
             const goalRequest: CreateGoalRequest = {
-                portfolio_id: $currentPortfolio.id,
                 name: goal.name,
                 target_net_worth: goal.target_amount,
                 target_net_worth_currency: "USD",
@@ -111,7 +115,6 @@
         if (!editingGoal) return;
         try {
             const goalRequest: CreateGoalRequest = {
-                portfolio_id: $currentPortfolio.id,
                 name: data.name,
                 target_net_worth: data.target_amount,
                 target_net_worth_currency: "USD",

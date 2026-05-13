@@ -1,8 +1,9 @@
-from dataclasses import replace
 from datetime import date, datetime, timedelta
+from typing import cast
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from application.goals import goal_interactor as goal_module
 from domain.entities.models import Goal
@@ -24,8 +25,8 @@ class FakeGoalRepository:
     async def get_by_id(self, goal_id):
         return self.goals.get(goal_id)
 
-    async def list_by_portfolio(self, portfolio_id):
-        return [g for g in self.goals.values() if g.portfolio_id == portfolio_id]
+    async def list_by_user(self, user_id):
+        return [g for g in self.goals.values() if g.user_id == user_id]
 
     async def update(self, goal: Goal) -> None:
         self.goals[goal.id] = goal
@@ -46,10 +47,10 @@ def _goal_repo(monkeypatch):
 @pytest.mark.happy_path
 async def test_create_goal_adds_goal_and_returns_id(monkeypatch):
     repo = _goal_repo(monkeypatch)
-    interactor = goal_module.GoalInteractor(session=object())
-    portfolio_id = uuid4()
+    interactor = goal_module.GoalInteractor(session=cast(AsyncSession, object()))
+    user_id = uuid4()
     request = CreateGoalRequest(
-        portfolio_id=portfolio_id,
+        user_id=user_id,
         name="Fire",
         target_net_worth=1000000,
         target_net_worth_currency=Currency.USD,
@@ -62,7 +63,7 @@ async def test_create_goal_adds_goal_and_returns_id(monkeypatch):
     goal_id = await interactor.create_goal(request)
 
     assert goal_id == repo.added[0].id
-    assert repo.added[0].portfolio_id == portfolio_id
+    assert repo.added[0].user_id == user_id
     assert repo.added[0].name == "Fire"
 
 
@@ -70,10 +71,10 @@ async def test_create_goal_adds_goal_and_returns_id(monkeypatch):
 @pytest.mark.happy_path
 async def test_get_goal_returns_serialized_data(monkeypatch):
     repo = _goal_repo(monkeypatch)
-    interactor = goal_module.GoalInteractor(session=object())
+    interactor = goal_module.GoalInteractor(session=cast(AsyncSession, object()))
     goal = Goal(
         id=uuid4(),
-        portfolio_id=uuid4(),
+        user_id=uuid4(),
         name="House",
         target_net_worth=2500000,
         target_net_worth_currency=Currency.USD,
@@ -96,14 +97,14 @@ async def test_get_goal_returns_serialized_data(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.happy_path
-async def test_list_goals_returns_portfolio_goals(monkeypatch):
+async def test_list_goals_returns_user_goals(monkeypatch):
     repo = _goal_repo(monkeypatch)
-    interactor = goal_module.GoalInteractor(session=object())
-    portfolio_id = uuid4()
+    interactor = goal_module.GoalInteractor(session=cast(AsyncSession, object()))
+    user_id = uuid4()
     repo.goals = {
         uuid4(): Goal(
             id=uuid4(),
-            portfolio_id=portfolio_id,
+            user_id=user_id,
             name="Goal A",
             target_net_worth=1000,
             target_net_worth_currency=Currency.USD,
@@ -116,7 +117,7 @@ async def test_list_goals_returns_portfolio_goals(monkeypatch):
         ),
         uuid4(): Goal(
             id=uuid4(),
-            portfolio_id=uuid4(),
+            user_id=uuid4(),
             name="Goal B",
             target_net_worth=2000,
             target_net_worth_currency=Currency.USD,
@@ -129,7 +130,7 @@ async def test_list_goals_returns_portfolio_goals(monkeypatch):
         ),
     }
 
-    result = await interactor.list_goals(portfolio_id)
+    result = await interactor.list_goals(user_id)
 
     assert len(result) == 1
     assert result[0]["name"] == "Goal A"
@@ -139,10 +140,10 @@ async def test_list_goals_returns_portfolio_goals(monkeypatch):
 @pytest.mark.happy_path
 async def test_update_goal_replaces_frozen_goal(monkeypatch):
     repo = _goal_repo(monkeypatch)
-    interactor = goal_module.GoalInteractor(session=object())
+    interactor = goal_module.GoalInteractor(session=cast(AsyncSession, object()))
     goal = Goal(
         id=uuid4(),
-        portfolio_id=uuid4(),
+        user_id=uuid4(),
         name="Old",
         target_net_worth=1000,
         target_net_worth_currency=Currency.USD,
@@ -155,7 +156,7 @@ async def test_update_goal_replaces_frozen_goal(monkeypatch):
     )
     repo.goals[goal.id] = goal
     request = CreateGoalRequest(
-        portfolio_id=goal.portfolio_id,
+        user_id=goal.user_id,
         name="New",
         target_net_worth=2000,
         target_net_worth_currency=Currency.EUR,
@@ -178,10 +179,10 @@ async def test_update_goal_replaces_frozen_goal(monkeypatch):
 @pytest.mark.happy_path
 async def test_get_projection_uses_fire_services(monkeypatch):
     repo = _goal_repo(monkeypatch)
-    interactor = goal_module.GoalInteractor(session=object())
+    interactor = goal_module.GoalInteractor(session=cast(AsyncSession, object()))
     goal = Goal(
         id=uuid4(),
-        portfolio_id=uuid4(),
+        user_id=uuid4(),
         name="Fire",
         target_net_worth=1000000,
         target_net_worth_currency=Currency.USD,
