@@ -117,7 +117,7 @@ class Portfolio:
 @dataclass(frozen=True)
 class Goal:
     id: UUID
-    portfolio_id: UUID
+    user_id: UUID
     name: str
     target_net_worth: int  # ×100
     target_net_worth_currency: Currency
