@@ -35,7 +35,6 @@ export interface ListTradesQuery {
 }
 
 export interface CreateGoalRequest {
-    portfolio_id: string;
     name: string;
     target_net_worth: number | string;
     target_net_worth_currency: Currency;
