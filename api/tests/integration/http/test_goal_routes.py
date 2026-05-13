@@ -1,4 +1,3 @@
-from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -14,10 +13,10 @@ class FakeGoalInteractor:
         self.last_create = None
         self.last_update = None
 
-    async def list_goals(self, portfolio_id):
+    async def list_goals(self, user_id):
         if self.mode == "list-error":
             raise RuntimeError("list failed")
-        return [{"id": str(self.goal_id), "portfolio_id": str(portfolio_id), "name": "Fire"}]
+        return [{"id": str(self.goal_id), "user_id": str(user_id), "name": "Fire"}]
 
     async def create_goal(self, request):
         self.last_create = request
@@ -28,7 +27,7 @@ class FakeGoalInteractor:
             raise ValueError(f"Goal {goal_id} not found")
         return {
             "id": str(goal_id),
-            "portfolio_id": str(uuid4()),
+            "user_id": str(uuid4()),
             "name": "Fire",
             "target_net_worth": 10000.0,
             "target_net_worth_currency": "USD",
@@ -83,12 +82,11 @@ def _patch_goal_interactor(monkeypatch, interactor):
 @pytest.mark.parametrize(
     "method,path,body,params,expected_status",
     [
-        ("get", "/api/v1/goals/", None, {"portfolio_id": str(uuid4())}, 200),
+        ("get", "/api/v1/goals/", None, None, 200),
         (
             "post",
             "/api/v1/goals/",
             {
-                "portfolio_id": str(uuid4()),
                 "name": "Fire",
                 "target_net_worth": 10000.0,
                 "target_net_worth_currency": "USD",
@@ -105,7 +103,6 @@ def _patch_goal_interactor(monkeypatch, interactor):
             "put",
             "/api/v1/goals/{id}",
             {
-                "portfolio_id": str(uuid4()),
                 "name": "Updated",
                 "target_net_worth": 20000.0,
                 "target_net_worth_currency": "EUR",
@@ -121,7 +118,9 @@ def _patch_goal_interactor(monkeypatch, interactor):
         ("get", "/api/v1/goals/{id}/projection", None, None, 200),
     ],
 )
-def test_goal_routes(authed_client, monkeypatch, method, path, body, params, expected_status):
+def test_goal_routes(
+    authed_client, monkeypatch, method, path, body, params, expected_status
+):
     interactor = FakeGoalInteractor()
     _patch_goal_interactor(monkeypatch, interactor)
     goal_id = interactor.goal_id
@@ -134,9 +133,11 @@ def test_goal_routes(authed_client, monkeypatch, method, path, body, params, exp
 
     assert response.status_code == expected_status
     if method == "post":
+        assert interactor.last_create is not None
         assert interactor.last_create.target_net_worth == 1000000
         assert interactor.last_create.monthly_savings == 10000
     if method == "put":
+        assert interactor.last_update is not None
         assert interactor.last_update[1].target_net_worth_currency == Currency.EUR
     if method == "get" and path.endswith("{id}"):
         assert response.json()["name"] == "Fire"
@@ -155,12 +156,13 @@ def test_goal_error_paths(authed_client, monkeypatch):
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-@pytest.mark.parametrize("method,path", [("put", "/api/v1/goals/{id}"), ("delete", "/api/v1/goals/{id}")])
+@pytest.mark.parametrize(
+    "method,path", [("put", "/api/v1/goals/{id}"), ("delete", "/api/v1/goals/{id}")]
+)
 def test_goal_update_delete_missing_paths(authed_client, monkeypatch, method, path):
     interactor = FakeGoalInteractor(mode="missing")
     _patch_goal_interactor(monkeypatch, interactor)
     body = {
-        "portfolio_id": str(uuid4()),
         "name": "Updated",
         "target_net_worth": 20000.0,
         "target_net_worth_currency": "EUR",
@@ -170,7 +172,9 @@ def test_goal_update_delete_missing_paths(authed_client, monkeypatch, method, pa
         "expected_annual_return": 8.0,
     }
     response = authed_client.request(
-        method, path.replace("{id}", str(uuid4())), json=(body if method == "put" else None)
+        method,
+        path.replace("{id}", str(uuid4())),
+        json=(body if method == "put" else None),
     )
     assert response.status_code == 404
 
@@ -183,7 +187,6 @@ def test_goal_create_rejects_invalid_currency(authed_client, monkeypatch):
     response = authed_client.post(
         "/api/v1/goals/",
         json={
-            "portfolio_id": str(uuid4()),
             "name": "Fire",
             "target_net_worth": 10000.0,
             "target_net_worth_currency": "XXX",
@@ -201,15 +204,16 @@ def test_goal_create_rejects_invalid_currency(authed_client, monkeypatch):
 def test_goal_list_generic_exception_returns_400(authed_client, monkeypatch):
     interactor = FakeGoalInteractor(mode="list-error")
     _patch_goal_interactor(monkeypatch, interactor)
-    response = authed_client.get("/api/v1/goals/", params={"portfolio_id": str(uuid4())})
+    response = authed_client.get("/api/v1/goals/")
     assert response.status_code == 400
 
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-def test_goal_update_delete_projection_generic_exceptions_return_400(authed_client, monkeypatch):
+def test_goal_update_delete_projection_generic_exceptions_return_400(
+    authed_client, monkeypatch
+):
     body = {
-        "portfolio_id": str(uuid4()),
         "name": "Updated",
         "target_net_worth": 20000.0,
         "target_net_worth_currency": "EUR",
