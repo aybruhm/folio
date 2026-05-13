@@ -19,6 +19,7 @@
         return_percent: 0,
         allocation: [],
         performance_history: [],
+        contribution_history: [],
         top_holdings: [],
     };
 
@@ -50,6 +51,9 @@
                     acc.performance_history.push(
                         ...(item.performance_history || []),
                     );
+                    acc.contribution_history.push(
+                        ...(item.contribution_history || []),
+                    );
                     acc.top_holdings.push(...(item.top_holdings || []));
                     return acc;
                 },
@@ -59,6 +63,10 @@
                     total_gain_loss: 0,
                     allocation: [] as { label: string; value: number }[],
                     performance_history: [] as {
+                        name: string;
+                        value: number;
+                    }[],
+                    contribution_history: [] as {
                         name: string;
                         value: number;
                     }[],
@@ -90,9 +98,21 @@
                         Number(point.value || 0),
                 );
             }
-            const performance_history = Array.from(performanceMap.entries())
-                .map(([name, value]) => ({ name, value }))
-                .sort((a, b) => a.name.localeCompare(b.name));
+            const performance_history = Array.from(
+                performanceMap.entries(),
+            ).map(([name, value]) => ({ name, value }));
+
+            const contributionMap = new Map<string, number>();
+            for (const point of analyticsData.contribution_history) {
+                contributionMap.set(
+                    point.name,
+                    (contributionMap.get(point.name) || 0) +
+                        Number(point.value || 0),
+                );
+            }
+            const contribution_history = Array.from(
+                contributionMap.entries(),
+            ).map(([name, value]) => ({ name, value }));
 
             const topHoldingsByWeightMap = new Map<string, number>();
             for (const item of analyticsData.top_holdings) {
@@ -127,6 +147,7 @@
                     costBasis > 0 ? (gainLoss / costBasis) * 100 : 0,
                 allocation,
                 performance_history,
+                contribution_history,
                 top_holdings: topHoldingsByWeight,
             };
         } catch (e) {
@@ -205,6 +226,18 @@
             <Card title="Performance" subtitle="Portfolio value over time">
                 <LineChart
                     data={stats.performance_history}
+                    title=""
+                    height="h-72 md:h-96"
+                />
+            </Card>
+
+            <!-- Contribution History Chart -->
+            <Card
+                title="Contribution History"
+                subtitle="Net contributions over time"
+            >
+                <LineChart
+                    data={stats.contribution_history}
                     title=""
                     height="h-72 md:h-96"
                 />
