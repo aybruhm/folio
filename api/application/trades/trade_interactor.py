@@ -160,42 +160,18 @@ class TradeInteractor(ITradeUseCase):
     ) -> Tuple[List[dict], int]:
         if portfolio_id:
             trades, total = await self.trade_repo.list_by_portfolio(
-                portfolio_id, skip, limit
+                portfolio_id,
+                ticker,
+                trade_type,
+                start_date,
+                end_date,
+                skip,
+                limit,
             )
         else:
             raise ValueError("portfolio_id required for listing trades")
 
-        filtered_trades = trades
-        if ticker:
-            filtered_trades = [
-                t for t in filtered_trades if t.ticker.upper() == ticker.upper()
-            ]
-        if trade_type:
-            filtered_trades = [t for t in filtered_trades if t.trade_type == trade_type]
-        if start_date:
-            filtered_trades = [
-                t
-                for t in filtered_trades
-                if (
-                    t.trade_date.date()
-                    if hasattr(t.trade_date, "date")
-                    else t.trade_date
-                )
-                >= start_date
-            ]
-        if end_date:
-            filtered_trades = [
-                t
-                for t in filtered_trades
-                if (
-                    t.trade_date.date()
-                    if hasattr(t.trade_date, "date")
-                    else t.trade_date
-                )
-                <= end_date
-            ]
-
-        return [self._trade_to_dict(t) for t in filtered_trades], len(filtered_trades)
+        return [self._trade_to_dict(t) for t in trades], total
 
     async def update_trade(self, trade_id: UUID, request: CreateTradeRequest) -> None:
         trade = await self.trade_repo.get_by_id(trade_id)
