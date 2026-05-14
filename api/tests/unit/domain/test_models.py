@@ -32,6 +32,35 @@ def test_asset_from_metadata_maps_domain_fields():
     assert isinstance(asset.id, UUID)
 
 
+@pytest.mark.edge_case
+def test_asset_from_metadata_uses_ticker_when_name_missing_or_blank():
+    missing_name = AssetMetadata(
+        ticker="MPW",
+        name="",
+        asset_class="stock",
+        currency=Currency.USD,
+    )
+
+    asset = Asset.from_metadata("MPW", missing_name)
+
+    assert asset.name == "MPW"
+    assert asset.market_data_provider == "yfinance"
+
+
+@pytest.mark.edge_case
+def test_asset_from_metadata_stores_explicit_market_data_provider():
+    metadata = AssetMetadata(
+        ticker="BRK.B",
+        name="Berkshire Hathaway B",
+        asset_class="stock",
+        currency=Currency.USD,
+    )
+
+    asset = Asset.from_metadata("BRK.B", metadata, market_data_provider="tiingo")
+
+    assert asset.market_data_provider == "tiingo"
+
+
 @pytest.mark.parametrize(
     "quantity,price,fees,expected",
     [
@@ -133,3 +162,23 @@ def test_holding_weight_matches_market_value():
     )
 
     assert holding.weight == 200000
+
+
+@pytest.mark.edge_case
+def test_portfolio_update_no_values_keeps_description_and_only_updates_timestamp():
+    initial_time = datetime(2024, 1, 1, 10, 0)
+    portfolio = Portfolio(
+        id=uuid4(),
+        user_id=uuid4(),
+        name="Growth",
+        base_currency=Currency.USD,
+        description="Keep me",
+        created_at=initial_time,
+        updated_at=initial_time,
+    )
+
+    portfolio.update(name="", description=None)
+
+    assert portfolio.name == "Growth"
+    assert portfolio.description == "Keep me"
+    assert portfolio.updated_at > initial_time

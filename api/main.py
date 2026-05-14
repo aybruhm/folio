@@ -17,8 +17,13 @@ from infrastructure.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting Folio API...")
-    yield
-    print("Shutting down Folio API...")
+    try:
+        yield
+    finally:
+        from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+
+        await NgnMarketAdapter.close_shared_session()
+        print("Shutting down Folio API...")
 
 
 app = FastAPI(

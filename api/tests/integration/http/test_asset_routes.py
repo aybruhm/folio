@@ -17,13 +17,33 @@ class FakeAssetRepository:
 
 
 class FakeYFinanceAdapter:
-    def __init__(self, history=None):
+    def __init__(self, history=None, metadata=None):
         self.history = history or []
+        self.metadata = metadata
         self.calls = []
 
     async def get_price_history(self, ticker, start, end):
         self.calls.append((ticker, start, end))
         return self.history
+
+    async def get_asset_metadata(self, ticker, currency):
+        return self.metadata
+
+
+class FakeTiingoAdapter:
+    def __init__(self, metadata=None):
+        self.metadata = metadata
+
+    async def get_asset_metadata(self, ticker, currency):
+        return self.metadata
+
+
+class FakeNgnMarketAdapter:
+    def __init__(self, metadata=None):
+        self.metadata = metadata
+
+    async def get_asset_metadata(self, ticker, currency):
+        return self.metadata
 
 
 @pytest.mark.integration
@@ -60,7 +80,9 @@ def test_asset_search_and_history_routes(client, monkeypatch):
 @pytest.mark.integration
 @pytest.mark.grumpy_path
 def test_asset_routes_reject_bad_search_and_history_errors(client, monkeypatch):
-    monkeypatch.setattr(asset_routes, "AssetRepository", lambda session: FakeAssetRepository([]))
+    monkeypatch.setattr(
+        asset_routes, "AssetRepository", lambda session: FakeAssetRepository([])
+    )
 
     bad_search = client.get("/api/v1/assets/search", params={"q": ""})
     assert bad_search.status_code == 400
@@ -91,7 +113,51 @@ def test_asset_history_defaults_date_range_when_not_provided(client, monkeypatch
 @pytest.mark.integration
 @pytest.mark.happy_path
 def test_asset_search_accepts_single_character_query(client, monkeypatch):
-    monkeypatch.setattr(asset_routes, "AssetRepository", lambda session: FakeAssetRepository([]))
+    monkeypatch.setattr(
+        asset_routes, "AssetRepository", lambda session: FakeAssetRepository([])
+    )
     response = client.get("/api/v1/assets/search", params={"q": "A"})
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_validate_ticker_route_supports_all_providers(client, monkeypatch):
+    monkeypatch.setattr(
+        asset_routes,
+        "YFinanceAdapter",
+        lambda: FakeYFinanceAdapter(metadata={"ticker": "AAPL"}),
+    )
+    monkeypatch.setattr(
+        asset_routes,
+        "TiingoAdapter",
+        lambda: FakeTiingoAdapter(metadata={"ticker": "AAPL"}),
+    )
+    monkeypatch.setattr(
+        asset_routes,
+        "NgnMarketAdapter",
+        lambda: FakeNgnMarketAdapter(metadata={"ticker": "NGX30"}),
+    )
+
+    yfinance_response = client.get(
+        "/api/v1/assets/validate",
+        params={"ticker": "AAPL", "provider": "yfinance", "currency": "USD"},
+    )
+    assert yfinance_response.status_code == 200
+    assert yfinance_response.json()["supported"] is True
+
+    tiingo_response = client.get(
+        "/api/v1/assets/validate",
+        params={"ticker": "AAPL", "provider": "tiingo", "currency": "USD"},
+    )
+    assert tiingo_response.status_code == 200
+    assert tiingo_response.json()["supported"] is True
+
+    ngn_response = client.get(
+        "/api/v1/assets/validate",
+        params={"ticker": "NGX:NGX30", "provider": "ngnmarket", "currency": "NGN"},
+    )
+    assert ngn_response.status_code == 200
+    assert ngn_response.json()["supported"] is True
+    assert ngn_response.json()["provider"] == "ngnmarket"

@@ -58,6 +58,28 @@ class FakeYFinanceAdapter:
         return []
 
 
+class FakeTiingoAdapter:
+    def __init__(self):
+        self.current_price_calls = []
+
+    async def get_current_price(self, symbol):
+        self.current_price_calls.append(symbol)
+        return date(2024, 1, 1), 12345
+
+
+class FakeNgnMarketAdapter:
+    def __init__(self):
+        self.chart_calls = []
+
+    async def get_index_chart(self, symbol):
+        self.chart_calls.append(symbol)
+        return {
+            "data": [
+                {"date": "2026-04-17", "index_value": 2841.45},
+            ]
+        }
+
+
 def _patch_analytics_deps(
     monkeypatch, *, trades=None, assets=None, latest=None, history=None
 ):
@@ -65,6 +87,8 @@ def _patch_analytics_deps(
     asset_repo = FakeAssetRepository(assets)
     price_repo = FakePriceRepository(latest=latest, history=history)
     yfinance = FakeYFinanceAdapter()
+    tiingo = FakeTiingoAdapter()
+    ngnmarket = FakeNgnMarketAdapter()
 
     monkeypatch.setattr(analytics_module, "TradeRepository", lambda session: trade_repo)
     monkeypatch.setattr(analytics_module, "AssetRepository", lambda session: asset_repo)
@@ -73,6 +97,8 @@ def _patch_analytics_deps(
     )
     monkeypatch.setattr(analytics_module, "FxRateRepository", lambda session: object())
     monkeypatch.setattr(analytics_module, "YFinanceAdapter", lambda: yfinance)
+    monkeypatch.setattr(analytics_module, "TiingoAdapter", lambda: tiingo)
+    monkeypatch.setattr(analytics_module, "NgnMarketAdapter", lambda: ngnmarket)
 
     interactor = analytics_module.AnalyticsInteractor(
         session=object(), portfolio_base_currency=Currency.USD
@@ -81,7 +107,9 @@ def _patch_analytics_deps(
     interactor.asset_repo = asset_repo
     interactor.price_repo = price_repo
     interactor.yfinance = yfinance
-    return interactor, trade_repo, asset_repo, price_repo, yfinance
+    interactor.tiingo = tiingo
+    interactor.ngnmarket = ngnmarket
+    return interactor, trade_repo, asset_repo, price_repo, yfinance, tiingo, ngnmarket
 
 
 @pytest.mark.asyncio
@@ -318,7 +346,7 @@ async def test_get_performance_history_uses_trade_price_fallback_when_history_mi
     )
 
     # Ensure last fallback doesn't interfere with this check
-    async def _resolve_price_zero(_asset_id, _ticker):
+    async def _resolve_price_zero(_asset_id, _ticker, provider_hint=None):
         return 0
 
     interactor._resolve_price = _resolve_price_zero
@@ -440,7 +468,7 @@ async def test_get_holdings_uses_fifo_cost_basis_for_remaining_position(monkeypa
         latest={btc_asset.id: (date(2025, 1, 4), 8000000)},
     )
 
-    async def _resolve_price_zero(_asset_id, _ticker):
+    async def _resolve_price_zero(_asset_id, _ticker, provider_hint=None):
         return 0
 
     interactor._resolve_price = _resolve_price_zero
@@ -453,3 +481,49 @@ async def test_get_holdings_uses_fifo_cost_basis_for_remaining_position(monkeypa
     # remaining FIFO lot cost basis = 0.1 * 90,000 = 9,000
     assert Decimal(str(holding["cost_basis"])) == Decimal("9000")
     # avg price from holdings route math would be 9000 / 0.1 = 90,000
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_get_holdings_uses_trade_market_data_provider_for_price_source(
+    monkeypatch,
+):
+    portfolio = Portfolio(
+        id=uuid4(), user_id=uuid4(), name="Core", base_currency=Currency.USD
+    )
+    asset = Asset(
+        id=uuid4(),
+        ticker="BRK.B",
+        name="Berkshire Hathaway B",
+        asset_class=AssetClass.STOCK,
+        currency=Currency.USD,
+        market_data_provider="yfinance",
+    )
+    trades = [
+        Trade(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            asset_id=asset.id,
+            ticker="BRK.B",
+            trade_type=TradeType.BUY,
+            trade_date=datetime(2025, 1, 1, 9, 30),
+            quantity=10000,
+            price=50000,
+            trade_currency=Currency.USD,
+            market_data_provider="tiingo",
+        )
+    ]
+
+    interactor, _trade_repo, _asset_repo, _price_repo, yfinance, tiingo, _ngn = (
+        _patch_analytics_deps(
+            monkeypatch,
+            trades=trades,
+            assets={asset.id: asset},
+            history={asset.id: []},
+        )
+    )
+
+    holdings = await interactor.get_holdings(portfolio.id)
+
+    assert len(holdings) == 1
+    assert tiingo.current_price_calls == ["BRK-B"]

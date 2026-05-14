@@ -4,6 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from adapters.outbound.persistence.price_repository import (
@@ -29,14 +31,56 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         self.price_repo: IPriceHistoryRepository = PriceHistoryRepository(session)
         self.fx_repo: IFxRateRepository = FxRateRepository(session)
         self.yfinance = YFinanceAdapter()
+        self.tiingo = TiingoAdapter()
+        self.ngnmarket = NgnMarketAdapter()
         self.base_currency = portfolio_base_currency
 
-    async def _resolve_price(self, asset_id: UUID, ticker: str) -> int:
+    @staticmethod
+    def _normalize_provider(provider: str | None) -> str:
+        normalized = (provider or "yfinance").strip().lower()
+        return (
+            normalized
+            if normalized in {"yfinance", "tiingo", "ngnmarket"}
+            else "yfinance"
+        )
+
+    async def _get_price_from_provider(self, symbol: str, provider: str):
+        selected = self._normalize_provider(provider)
+
+        if selected == "tiingo":
+            return await self.tiingo.get_current_price(symbol)
+
+        if selected == "ngnmarket":
+            chart = await self.ngnmarket.get_index_chart(symbol)
+            if chart and chart.get("data"):
+                last = chart["data"][-1]
+                price = last.get("index_value")
+                if price is not None:
+                    return (date.today(), round(float(price) * 100))
+            return (date.today(), 0)
+
+        return await self.yfinance.get_current_price(symbol)
+
+    async def _resolve_price(
+        self, asset_id: UUID, ticker: str, provider_hint: Optional[str] = None
+    ) -> int:
         asset = await self.asset_repo.get_by_id(asset_id)
         symbol = ticker.upper()
         if asset and asset.asset_class.value == "crypto" and "-" not in symbol:
             symbol = f"{symbol}-{asset.currency.value}"
-        _, price = await self.yfinance.get_current_price(symbol)
+
+        provider = self._normalize_provider(
+            provider_hint or (asset.market_data_provider if asset else "yfinance")
+        )
+
+        if provider == "tiingo" and "." in symbol:
+            symbol = symbol.replace(".", "-")
+
+        _, price = await self._get_price_from_provider(symbol, provider)
+
+        if price == 0 and provider != "yfinance":
+            _, price = await self.yfinance.get_current_price(symbol)
+
         return price
 
     async def get_holdings(
@@ -69,6 +113,14 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         for ticker, holding_data in holdings_by_asset.items():
             asset = await self.asset_repo.get_by_id(holding_data["asset_id"])
             is_cash = bool(asset and asset.asset_class.value == "cash")
+            provider_hint = None
+            if holding_data["trades"]:
+                provider_hint = getattr(
+                    holding_data["trades"][-1], "market_data_provider", None
+                )
+
+            if not provider_hint and asset:
+                provider_hint = getattr(asset, "market_data_provider", None)
 
             if is_cash:
                 # For cash instruments, quantity is often encoded as 1.0 per flow and
@@ -119,7 +171,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
                 cost_basis_int = sum(lot["cost"] for lot in lots)
                 current_price_int = await self._resolve_price(
-                    holding_data["asset_id"], ticker
+                    holding_data["asset_id"], ticker, provider_hint=provider_hint
                 )
                 if current_price_int == 0:
                     latest = await self.price_repo.get_latest(holding_data["asset_id"])
@@ -304,6 +356,11 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         price_map: dict = {}  # ticker -> {date -> price_int (×100)}
         ticker_is_cash: dict = {}
         fallback_current_price: dict = {}
+        latest_provider_for_ticker = {}
+        for t in trades_sorted:
+            latest_provider_for_ticker[t.ticker] = getattr(
+                t, "market_data_provider", None
+            )
 
         for asset_id, ticker in asset_ids.items():
             history = await self.price_repo.get_history(asset_id, first_date, end_date)
@@ -313,12 +370,15 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             is_cash = bool(asset and asset.asset_class.value == "cash")
             ticker_is_cash[ticker] = is_cash
 
+            provider_hint = latest_provider_for_ticker.get(ticker)
+            if not provider_hint and asset:
+                provider_hint = getattr(asset, "market_data_provider", None)
             # Last-resort fallback if there is no historical price at all.
             if is_cash:
                 fallback_current_price[ticker] = 100  # $1.00 for cash instruments
             else:
                 fallback_current_price[ticker] = await self._resolve_price(
-                    asset_id, ticker
+                    asset_id, ticker, provider_hint=provider_hint
                 )
 
         def _price_on(ticker: str, target: date) -> int:

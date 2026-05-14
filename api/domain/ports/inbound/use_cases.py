@@ -26,6 +26,7 @@ class CreateTradeRequest:
     fees: int = 0  # ×100
     notes: Optional[str] = None
     asset_class: Optional[AssetClass] = None
+    market_data_provider: str = "yfinance"
 
 
 @dataclass(frozen=True)
@@ -158,4 +159,5 @@ class ICsvImportUseCase(ABC):
         date_format: str,
         portfolio_id: UUID,
         profile_name: Optional[str] = None,
+        market_data_provider: str = "yfinance",
     ) -> dict: ...

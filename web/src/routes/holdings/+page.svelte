@@ -160,6 +160,7 @@
                 trade_currency: trade.trade_currency,
                 fees: parseFloat(trade.fees) || 0,
                 asset_class: trade.asset_class || undefined,
+                market_data_provider: trade.market_data_provider || "yfinance",
             };
             await tradeController.createTrade(tradeRequest);
             await loadHoldings();
@@ -305,6 +306,7 @@
             price: "",
             trade_currency: "USD",
             fees: "0",
+            market_data_provider: "yfinance",
         }}
     />
     <svelte:fragment slot="footer">

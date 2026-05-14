@@ -1,12 +1,13 @@
+from typing import List, Optional, Tuple
+from uuid import UUID
+
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
-from uuid import UUID
-from typing import List, Optional, Tuple
 
 from domain.entities.models import Trade
-from domain.value_objects.money import Currency, TradeType
 from domain.ports.outbound.repositories import ITradeRepository
+from domain.value_objects.money import Currency, TradeType
 from infrastructure.db.models import TradeModel
 
 
@@ -29,6 +30,7 @@ class TradeRepository(ITradeRepository):
             notes=trade.notes,
             source=trade.source,
             import_batch_id=trade.import_batch_id,
+            market_data_provider=trade.market_data_provider,
             created_at=trade.created_at,
         )
         self.session.add(model)
@@ -113,5 +115,6 @@ class TradeRepository(ITradeRepository):
             notes=model.notes,
             source=model.source,
             import_batch_id=model.import_batch_id,
+            market_data_provider=model.market_data_provider,
             created_at=model.created_at,
         )
