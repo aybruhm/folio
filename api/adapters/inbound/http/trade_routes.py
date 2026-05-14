@@ -185,7 +185,7 @@ async def validate_csv(
         mapping_dict = json.loads(mapping)
         interactor = CsvImportInteractor(session)
         validation = await interactor.validate_mapping(
-            content, file.filename, mapping_dict, date_format
+            content, file.filename or "upload.csv", mapping_dict, date_format
         )
         return validation
     except Exception as e:
@@ -199,6 +199,7 @@ async def confirm_import(
     portfolio_id: UUID = Form(...),
     date_format: str = Form(...),
     profile_name: Optional[str] = Form(None),
+    market_data_provider: str = Form("yfinance"),
     _: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -208,11 +209,12 @@ async def confirm_import(
         interactor = CsvImportInteractor(session)
         result = await interactor.confirm_import(
             content,
-            file.filename,
+            file.filename or "upload.csv",
             mapping_dict,
             date_format,
             portfolio_id,
             profile_name,
+            market_data_provider,
         )
         await session.commit()
         return result

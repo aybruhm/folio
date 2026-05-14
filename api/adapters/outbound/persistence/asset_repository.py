@@ -1,12 +1,13 @@
+from typing import List, Optional
+from uuid import UUID
+
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
-from uuid import UUID
-from typing import List, Optional
 
 from domain.entities.models import Asset
-from domain.value_objects.money import Currency, AssetClass
 from domain.ports.outbound.repositories import IAssetRepository
+from domain.value_objects.money import AssetClass, Currency
 from infrastructure.db.models import AssetModel
 
 
@@ -26,6 +27,7 @@ class AssetRepository(IAssetRepository):
             industry=asset.industry,
             country=asset.country,
             isin=asset.isin,
+            market_data_provider=asset.market_data_provider,
             created_at=asset.created_at,
         )
         self.session.add(model)
@@ -49,12 +51,17 @@ class AssetRepository(IAssetRepository):
         return self._to_domain(model) if model else None
 
     async def update_classification(
-        self, asset_id: UUID, asset_class: str, currency: str
+        self,
+        asset_id: UUID,
+        asset_class: str,
+        currency: str,
+        market_data_provider: str = "yfinance",
     ) -> None:
         model = await self.session.get(AssetModel, asset_id)
         if model:
             model.asset_class = asset_class
             model.currency = currency
+            model.market_data_provider = market_data_provider
             await self.session.flush()
 
     async def search_by_ticker(self, query: str, limit: int = 10) -> List[Asset]:
@@ -83,5 +90,6 @@ class AssetRepository(IAssetRepository):
             industry=model.industry,
             country=model.country,
             isin=model.isin,
+            market_data_provider=model.market_data_provider,
             created_at=model.created_at,
         )
