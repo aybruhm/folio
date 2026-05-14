@@ -35,12 +35,15 @@ class FakeAssetRepository:
     async def get_by_ticker(self, ticker: str):
         return self.assets.get(ticker)
 
-    async def update_classification(self, asset_id, asset_class, currency):
+    async def update_classification(
+        self, asset_id, asset_class, currency, market_data_provider="yfinance"
+    ):
         asset = next(item for item in self.assets.values() if item.id == asset_id)
         updated = replace(
             asset,
             asset_class=AssetClass(asset_class),
             currency=Currency(currency),
+            market_data_provider=market_data_provider,
         )
         self.assets[updated.ticker] = updated
         self.updated.append(updated)
@@ -174,6 +177,7 @@ async def test_create_trade_creates_cash_asset_without_yfinance(monkeypatch):
     assert yfinance.calls == []
     assert asset_repo.added[0].asset_class == AssetClass.CASH
     assert trade_repo.added[0].id == trade_id
+    assert trade_repo.added[0].market_data_provider == "yfinance"
     assert trade_repo.added[0].asset_id == asset_repo.added[0].id
 
 
@@ -217,6 +221,7 @@ async def test_create_trade_fetches_metadata_and_adds_asset_when_missing(monkeyp
     assert yfinance.calls == [("AAPL", "USD")]
     assert asset_repo.added[0].name == "Apple Inc."
     assert trade_repo.added[0].id == trade_id
+    assert trade_repo.added[0].market_data_provider == "yfinance"
 
 
 @pytest.mark.asyncio
@@ -299,6 +304,7 @@ async def test_create_trade_updates_existing_asset_classification_when_metadata_
     assert yfinance.calls == [("AAPL", "EUR")]
     assert asset_repo.updated[0].asset_class == AssetClass.ETF
     assert asset_repo.updated[0].currency == Currency.EUR
+    assert asset_repo.updated[0].market_data_provider == "yfinance"
     assert trade_repo.added[0].id == trade_id
 
 
@@ -556,3 +562,4 @@ async def test_create_trade_uses_ngnmarket_provider_when_selected(monkeypatch):
     assert yfinance.calls == []
     assert asset_repo.added[0].exchange == "NGX"
     assert trade_repo.added[0].id == trade_id
+    assert trade_repo.added[0].market_data_provider == "ngnmarket"

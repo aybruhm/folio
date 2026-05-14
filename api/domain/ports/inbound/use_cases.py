@@ -159,4 +159,5 @@ class ICsvImportUseCase(ABC):
         date_format: str,
         portfolio_id: UUID,
         profile_name: Optional[str] = None,
+        market_data_provider: str = "yfinance",
     ) -> dict: ...

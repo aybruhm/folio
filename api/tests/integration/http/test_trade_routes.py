@@ -3,7 +3,8 @@ from uuid import uuid4
 import pytest
 
 from adapters.inbound.http import trade_routes
-from domain.value_objects.money import Currency, TradeType
+from domain.entities.models import Asset
+from domain.value_objects.money import AssetMetadata, Currency, TradeType
 
 
 class FakeTradeInteractor:
@@ -104,7 +105,14 @@ class FakeCsvImportInteractor:
         }
 
     async def confirm_import(
-        self, content, filename, mapping, date_format, portfolio_id, profile_name=None
+        self,
+        content,
+        filename,
+        mapping,
+        date_format,
+        portfolio_id,
+        profile_name=None,
+        market_data_provider="yfinance",
     ):
         self.confirmed = (
             content,
@@ -113,6 +121,7 @@ class FakeCsvImportInteractor:
             date_format,
             portfolio_id,
             profile_name,
+            market_data_provider,
         )
         return {
             "import_batch_id": str(uuid4()),
@@ -128,6 +137,39 @@ def _patch_trade_interactor(monkeypatch, interactor):
 
 def _patch_csv_interactor(monkeypatch, interactor):
     monkeypatch.setattr(trade_routes, "CsvImportInteractor", lambda session: interactor)
+
+
+class FakeCsvImportInteractorWithMissingName(FakeCsvImportInteractor):
+    def __init__(self):
+        super().__init__()
+        self.created_asset_name = None
+
+    async def confirm_import(
+        self,
+        content,
+        filename,
+        mapping,
+        date_format,
+        portfolio_id,
+        profile_name=None,
+        market_data_provider="yfinance",
+    ):
+        metadata = AssetMetadata(
+            ticker="MPW",
+            name="",
+            asset_class="stock",
+            currency=Currency.USD,
+            exchange="NYSE",
+        )
+        asset = Asset.from_metadata("MPW", metadata)
+        self.created_asset_name = asset.name
+
+        return {
+            "import_batch_id": str(uuid4()),
+            "imported_count": 1,
+            "rejected_count": 0,
+            "rejection_details": [],
+        }
 
 
 @pytest.mark.integration
@@ -308,6 +350,36 @@ def test_trade_import_routes_reject_invalid_mapping_json(authed_client, monkeypa
 
 
 @pytest.mark.integration
+@pytest.mark.edge_case
+def test_trade_import_confirm_handles_missing_metadata_name_without_db_error(
+    authed_client, monkeypatch
+):
+    interactor = FakeCsvImportInteractorWithMissingName()
+    _patch_csv_interactor(monkeypatch, interactor)
+
+    files = {
+        "file": (
+            "trades.csv",
+            b"Ticker,Type,Date,Quantity,Price,Currency\nMPW,buy,2024-01-01,10,5.00,USD\n",
+            "text/csv",
+        )
+    }
+    response = authed_client.post(
+        "/api/v1/trades/import/confirm",
+        files=files,
+        data={
+            "mapping": "{}",
+            "date_format": "%Y-%m-%d",
+            "portfolio_id": str(uuid4()),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["imported_count"] == 1
+    assert interactor.created_asset_name == "MPW"
+
+
+@pytest.mark.integration
 @pytest.mark.grumpy_path
 def test_trade_create_update_delete_generic_exception_paths(authed_client, monkeypatch):
     _patch_trade_interactor(monkeypatch, FakeTradeInteractor(mode="create-error"))
@@ -352,12 +424,12 @@ def test_bulk_delete_trades(authed_client, monkeypatch):
     interactor = FakeTradeInteractor()
     _patch_trade_interactor(monkeypatch, interactor)
     trade_ids = [str(uuid4()), str(uuid4()), str(uuid4())]
-    
+
     response = authed_client.post(
         "/api/v1/trades/bulk/delete",
         json={"trade_ids": trade_ids},
     )
-    
+
     assert response.status_code == 204
 
 
@@ -366,12 +438,12 @@ def test_bulk_delete_trades(authed_client, monkeypatch):
 def test_bulk_delete_trades_empty_list(authed_client, monkeypatch):
     interactor = FakeTradeInteractor()
     _patch_trade_interactor(monkeypatch, interactor)
-    
+
     response = authed_client.post(
         "/api/v1/trades/bulk/delete",
         json={"trade_ids": []},
     )
-    
+
     assert response.status_code == 400
 
 
@@ -381,10 +453,10 @@ def test_bulk_delete_trades_error(authed_client, monkeypatch):
     interactor = FakeTradeInteractor(mode="delete-error")
     _patch_trade_interactor(monkeypatch, interactor)
     trade_ids = [str(uuid4()), str(uuid4())]
-    
+
     response = authed_client.post(
         "/api/v1/trades/bulk/delete",
         json={"trade_ids": trade_ids},
     )
-    
+
     assert response.status_code == 400

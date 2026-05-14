@@ -78,6 +78,7 @@ class TradeInteractor(ITradeUseCase):
                     name=ticker,
                     asset_class=AssetClass.CASH,
                     currency=currency,
+                    market_data_provider=self._normalize_provider(market_data_provider),
                 )
                 await self.asset_repo.add(asset)
             else:
@@ -86,18 +87,26 @@ class TradeInteractor(ITradeUseCase):
                 )
                 if not metadata:
                     raise ValueError(f"Cannot find asset metadata for {ticker}")
-                asset = Asset.from_metadata(ticker, metadata)
+                selected_provider = self._normalize_provider(market_data_provider)
+                asset = Asset.from_metadata(
+                    ticker, metadata, market_data_provider=selected_provider
+                )
                 await self.asset_repo.add(asset)
         elif asset_class != AssetClass.CASH:
             metadata = await self._get_asset_metadata(
                 ticker, currency, market_data_provider
             )
+            selected_provider = self._normalize_provider(market_data_provider)
             if metadata and (
                 asset.asset_class.value != metadata.asset_class
                 or asset.currency.value != metadata.currency.value
+                or asset.market_data_provider != selected_provider
             ):
                 await self.asset_repo.update_classification(
-                    asset.id, metadata.asset_class, metadata.currency.value
+                    asset.id,
+                    metadata.asset_class,
+                    metadata.currency.value,
+                    selected_provider,
                 )
                 asset = await self.asset_repo.get_by_ticker(ticker)
         return asset
@@ -125,6 +134,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
+            market_data_provider=self._normalize_provider(request.market_data_provider),
             created_at=datetime.now(),
         )
 
@@ -209,6 +219,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
+            market_data_provider=self._normalize_provider(request.market_data_provider),
         )
 
         await self.trade_repo.update(updated_trade)
