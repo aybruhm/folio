@@ -37,7 +37,7 @@ class NgnMarketAdapter:
             resolved_currency = self._safe_currency(currency)
             return AssetMetadata(
                 ticker=ticker,
-                name=detail.get("name", symbol),
+                name=detail.get("name") or symbol,
                 asset_class="etf",
                 currency=resolved_currency,
                 exchange="NGX",

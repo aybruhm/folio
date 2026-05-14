@@ -76,7 +76,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
                 asset_class = self._determine_asset_class(symbol, info)
                 return AssetMetadata(
                     ticker=ticker,
-                    name=info.get("longName", info.get("shortName", ticker)),
+                    name=info.get("longName") or info.get("shortName") or ticker,
                     asset_class=asset_class,
                     currency=Currency(info.get("currency", currency)),
                     exchange=info.get("exchange"),

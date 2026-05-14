@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Optional
 
 from tiingo import TiingoClient
@@ -71,6 +71,46 @@ class TiingoAdapter:
 
         return self._client
 
+    async def get_current_price(self, ticker: str) -> tuple[date, int]:
+        client = self._get_client()
+        if client is None:
+            return (date.today(), 0)
+
+        candidates = self._build_symbol_candidates(ticker, "USD")
+
+        for symbol in candidates:
+            if not self._can_make_request():
+                return (date.today(), 0)
+
+            try:
+                payload = client.get_ticker_price(symbol)
+                self._register_usage_bytes(self._estimate_bytes(payload))
+
+                rows = payload if isinstance(payload, list) else []
+                if not rows:
+                    continue
+
+                row = rows[-1]
+                close = row.get("close") or row.get("adjClose")
+                if close is None:
+                    continue
+
+                date_str = str(row.get("date") or "")
+                parsed_date = date.today()
+                if date_str:
+                    try:
+                        parsed_date = datetime.fromisoformat(
+                            date_str.replace("Z", "+00:00")
+                        ).date()
+                    except Exception:
+                        parsed_date = date.today()
+
+                return (parsed_date, round(float(close) * 100))
+            except Exception:
+                continue
+
+        return (date.today(), 0)
+
     async def get_asset_metadata(
         self, ticker: str, currency: str = "USD"
     ) -> Optional[AssetMetadata]:
@@ -81,11 +121,7 @@ class TiingoAdapter:
 
         exchange_hint, base_ticker = self._parse_exchange_qualified_ticker(ticker)
 
-        candidates = [
-            ticker.upper(),
-            base_ticker.upper(),
-            f"{base_ticker.upper()}-{currency.upper()}",
-        ]
+        candidates = self._build_symbol_candidates(base_ticker, currency)
 
         if exchange_hint:
             resolved = self._resolve_ticker_for_exchange(
@@ -104,7 +140,7 @@ class TiingoAdapter:
 
         return AssetMetadata(
             ticker=ticker,
-            name=info.get("name", base_ticker),
+            name=info.get("name") or base_ticker,
             asset_class=self._determine_asset_class(info),
             currency=currency_value,
             exchange=info.get("exchangeCode") or info.get("exchange"),
@@ -243,6 +279,26 @@ class TiingoAdapter:
                 if left and right:
                     return left, right
         return None, normalized
+
+    @staticmethod
+    def _build_symbol_candidates(base_ticker: str, currency: str) -> list[str]:
+        raw = base_ticker.upper().strip()
+
+        variants = [raw]
+        if "." in raw:
+            variants.append(raw.replace(".", "-"))
+        if "-" in raw:
+            variants.append(raw.replace("-", "."))
+
+        candidates: list[str] = []
+        seen = set()
+        for variant in variants:
+            for symbol in (variant, f"{variant}-{currency.upper()}"):
+                if symbol not in seen:
+                    seen.add(symbol)
+                    candidates.append(symbol)
+
+        return candidates
 
     @staticmethod
     def _safe_currency(value: str, fallback: str) -> Currency:
