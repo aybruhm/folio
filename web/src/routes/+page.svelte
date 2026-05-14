@@ -29,6 +29,38 @@
             value: Number(h.percent),
         })) ?? [];
 
+    const monthOrder = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    ];
+
+    const getTimeFromLabel = (label: string) => {
+        const trimmed = label.trim();
+        const isoTime = Date.parse(trimmed);
+        if (!Number.isNaN(isoTime)) return isoTime;
+
+        const parts = trimmed.split(" ");
+        if (parts.length >= 2) {
+            const monthIndex = monthOrder.indexOf(parts[0]);
+            const year = Number(parts[1]);
+            if (monthIndex >= 0 && !Number.isNaN(year)) {
+                return new Date(year, monthIndex, 1).getTime();
+            }
+        }
+
+        return 0;
+    };
+
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
         await loadDashboardData();
@@ -98,9 +130,12 @@
                         Number(point.value || 0),
                 );
             }
-            const performance_history = Array.from(
-                performanceMap.entries(),
-            ).map(([name, value]) => ({ name, value }));
+            const performance_history = Array.from(performanceMap.entries())
+                .map(([name, value]) => ({ name, value }))
+                .sort(
+                    (a, b) =>
+                        getTimeFromLabel(a.name) - getTimeFromLabel(b.name),
+                );
 
             const contributionMap = new Map<string, number>();
             for (const point of analyticsData.contribution_history) {
@@ -110,9 +145,12 @@
                         Number(point.value || 0),
                 );
             }
-            const contribution_history = Array.from(
-                contributionMap.entries(),
-            ).map(([name, value]) => ({ name, value }));
+            const contribution_history = Array.from(contributionMap.entries())
+                .map(([name, value]) => ({ name, value }))
+                .sort(
+                    (a, b) =>
+                        getTimeFromLabel(a.name) - getTimeFromLabel(b.name),
+                );
 
             const topHoldingsByWeightMap = new Map<string, number>();
             for (const item of analyticsData.top_holdings) {
