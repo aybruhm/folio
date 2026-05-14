@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-07T09:47:10.864786605Z"
+exclude-newer = "2026-05-07T22:11:38.680566966Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -618,7 +618,7 @@ wheels = [
 
 [[package]]
 name = "folio-api"
-version = "1.10.0"
+version = "1.11.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -647,7 +647,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.13.5" },
+    { name = "aiohttp", specifier = ">=3.12.15" },
     { name = "alembic", specifier = ">=1.18.4" },
     { name = "apscheduler", specifier = ">=3.11.2" },
     { name = "asyncpg", specifier = ">=0.31.0" },

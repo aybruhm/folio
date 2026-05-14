@@ -1,3 +1,4 @@
+from datetime import date
 from typing import List, Optional, Tuple
 from uuid import UUID
 
@@ -41,14 +42,33 @@ class TradeRepository(ITradeRepository):
         return self._to_domain(model) if model else None
 
     async def list_by_portfolio(
-        self, portfolio_id: UUID, skip: int = 0, limit: int = 100
+        self,
+        portfolio_id: UUID,
+        ticker: Optional[str] = None,
+        trade_type: Optional[TradeType] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 100,
     ) -> Tuple[List[Trade], int]:
         query = select(TradeModel).where(TradeModel.portfolio_id == portfolio_id)
+
+        if ticker:
+            normalized = f"%{ticker.lower()}%"
+            query = query.where(func.lower(TradeModel.ticker).like(normalized))
+        if trade_type:
+            query = query.where(TradeModel.trade_type == trade_type.value)
+        if start_date:
+            query = query.where(func.date(TradeModel.trade_date) >= start_date)
+        if end_date:
+            query = query.where(func.date(TradeModel.trade_date) <= end_date)
 
         count_result = await self.session.execute(
             select(func.count(TradeModel.id)).where(
                 TradeModel.portfolio_id == portfolio_id
             )
+            if not any([ticker, trade_type, start_date, end_date])
+            else select(func.count(TradeModel.id)).select_from(query.subquery())
         )
         total = count_result.scalar()
 

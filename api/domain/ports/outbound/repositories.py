@@ -4,7 +4,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from domain.entities.models import Asset, Goal, Portfolio, Trade, User
-from domain.value_objects.money import AssetMetadata, Currency
+from domain.value_objects.money import AssetMetadata, Currency, TradeType
 
 
 class IUserRepository(ABC):
@@ -60,7 +60,14 @@ class ITradeRepository(ABC):
 
     @abstractmethod
     async def list_by_portfolio(
-        self, portfolio_id: UUID, skip: int = 0, limit: int = 100
+        self,
+        portfolio_id: UUID,
+        ticker: Optional[str] = None,
+        trade_type: Optional[TradeType] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 100,
     ) -> tuple[List[Trade], int]: ...
 
     @abstractmethod
