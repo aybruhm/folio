@@ -5,6 +5,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import TradeForm from "$lib/components/TradeForm.svelte";
     import Select from "$lib/components/Select.svelte";
+    import SearchPagination from "$lib/components/SearchPagination.svelte";
     import { currentPortfolio, portfolios } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { TradeController, PortfolioController } from "$lib/api/controllers";
@@ -19,6 +20,11 @@
     let showBulkDeleteModal = false;
     let editingTrade: any = null;
     let tradeTypeFilter = "all";
+    let searchTerm = "";
+    let currentPage = 1;
+    let pageSize = 25;
+    let totalTrades = 0;
+    let serverTotalTrades = 0;
     let tradeController: TradeController;
     let portfolioController: PortfolioController;
     let selectedTradeIds = new Set<string>();
@@ -33,6 +39,11 @@
 
     let lastLoadKey = "";
     let loadInProgress = false;
+    let lastSearchTerm = "";
+    let lastTradeTypeFilter = tradeTypeFilter;
+    let lastPageSize = pageSize;
+    let lastPage = currentPage;
+    let lastPortfolioKey = "";
 
     onMount(async () => {
         tradeController = new TradeController(api.getInstance());
@@ -49,8 +60,38 @@
         if ($page.url.searchParams.get("new") === "true") showNewModal = true;
     });
 
+    $: isAggregated = !$currentPortfolio?.id;
+
+    $: if (
+        searchTerm !== lastSearchTerm ||
+        tradeTypeFilter !== lastTradeTypeFilter
+    ) {
+        lastSearchTerm = searchTerm;
+        lastTradeTypeFilter = tradeTypeFilter;
+        currentPage = 1;
+    }
+
+    $: if (pageSize !== lastPageSize) {
+        lastPageSize = pageSize;
+        currentPage = 1;
+    }
+
+    $: if (currentPage !== lastPage) {
+        lastPage = currentPage;
+        selectedTradeIds = new Set();
+    }
+
+    $: {
+        const portfolioKey = $currentPortfolio?.id || "all";
+        if (portfolioKey !== lastPortfolioKey) {
+            lastPortfolioKey = portfolioKey;
+            currentPage = 1;
+            selectedTradeIds = new Set();
+        }
+    }
+
     $: loadKey = tradeController
-        ? `${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}`
+        ? `${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}:${tradeTypeFilter}:${searchTerm}:${currentPage}:${pageSize}`
         : "";
 
     $: if (loadKey && loadKey !== lastLoadKey) {
@@ -65,13 +106,19 @@
             loading = true;
             let allTrades: Trade[] = [];
 
-            if (!$currentPortfolio?.id) {
+            if (isAggregated) {
                 // Load trades from all portfolios
                 for (const p of $portfolios) {
                     try {
                         const response = await tradeController.listTrades({
                             portfolio_id: p.id,
                             limit: 500,
+                            skip: 0,
+                            ticker: searchTerm ? searchTerm : undefined,
+                            trade_type:
+                                tradeTypeFilter === "all"
+                                    ? undefined
+                                    : tradeTypeFilter,
                         });
                         allTrades = [
                             ...allTrades,
@@ -84,16 +131,26 @@
                         );
                     }
                 }
+                allTrades.sort((a, b) => {
+                    const aTime = new Date(a.trade_date).getTime();
+                    const bTime = new Date(b.trade_date).getTime();
+                    return bTime - aTime;
+                });
+                trades = allTrades;
+                serverTotalTrades = allTrades.length;
             } else {
-                // Load trades for current portfolio
+                // Load trades for current portfolio (server-side paging)
                 const response = await tradeController.listTrades({
                     portfolio_id: $currentPortfolio.id,
-                    limit: 500,
+                    limit: pageSize,
+                    skip: (currentPage - 1) * pageSize,
+                    ticker: searchTerm ? searchTerm : undefined,
+                    trade_type:
+                        tradeTypeFilter === "all" ? undefined : tradeTypeFilter,
                 });
-                allTrades = (response.data as Trade[]) || [];
+                trades = (response.data as Trade[]) || [];
+                serverTotalTrades = response.total || 0;
             }
-
-            trades = allTrades;
         } catch (e) {
             console.error("Failed to load trades:", e);
         } finally {
@@ -191,10 +248,26 @@
         }
     }
 
-    $: filteredTrades =
-        tradeTypeFilter === "all"
-            ? trades
-            : trades.filter((t) => t.trade_type === tradeTypeFilter);
+    $: filteredTrades = isAggregated
+        ? trades.filter((t) => {
+              const matchesType =
+                  tradeTypeFilter === "all" || t.trade_type === tradeTypeFilter;
+              const normalizedSearch = searchTerm.trim().toLowerCase();
+              const matchesSearch =
+                  !normalizedSearch ||
+                  String(t.ticker).toLowerCase().includes(normalizedSearch);
+              return matchesType && matchesSearch;
+          })
+        : trades;
+
+    $: totalTrades = isAggregated ? filteredTrades.length : serverTotalTrades;
+
+    $: pagedTrades = isAggregated
+        ? filteredTrades.slice(
+              (currentPage - 1) * pageSize,
+              currentPage * pageSize,
+          )
+        : trades;
 </script>
 
 <svelte:head>
@@ -269,13 +342,26 @@
             </div>
         </div>
 
-        <!-- Filter -->
+        <!-- Search + Filters -->
         <Card>
-            <Select
-                label="Filter by type"
-                bind:value={tradeTypeFilter}
-                options={tradeTypeOptions}
-            />
+            <SearchPagination
+                bind:search={searchTerm}
+                searchLabel="Search by ticker"
+                searchPlaceholder="e.g. AAPL"
+                bind:page={currentPage}
+                bind:pageSize
+                total={totalTrades}
+            >
+                <svelte:fragment slot="filters">
+                    <div class="min-w-[180px]">
+                        <Select
+                            label="Filter by type"
+                            bind:value={tradeTypeFilter}
+                            options={tradeTypeOptions}
+                        />
+                    </div>
+                </svelte:fragment>
+            </SearchPagination>
         </Card>
 
         <!-- Trades Table -->
@@ -283,7 +369,7 @@
             <div class="flex justify-center py-12">
                 <div class="text-muted-foreground">Loading trades...</div>
             </div>
-        {:else if filteredTrades.length === 0}
+        {:else if totalTrades === 0}
             <Card
                 title="No trades"
                 subtitle="Create your first trade to track investments"
@@ -325,7 +411,7 @@
                 {/if}
                 <div class="overflow-x-auto -mx-4 md:mx-0">
                     <TradeTable
-                        trades={filteredTrades}
+                        trades={pagedTrades}
                         bind:selectedIds={selectedTradeIds}
                         on:edit={(e) => handleEditTrade(e.detail)}
                         on:delete={(e) => handleDeleteTrade(e.detail)}
