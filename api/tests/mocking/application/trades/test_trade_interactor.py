@@ -63,9 +63,46 @@ class FakeTradeRepository:
     async def get_by_id(self, trade_id):
         return self.trades.get(trade_id)
 
-    async def list_by_portfolio(self, portfolio_id, skip=0, limit=100):
+    async def list_by_portfolio(
+        self,
+        portfolio_id,
+        ticker=None,
+        trade_type=None,
+        start_date=None,
+        end_date=None,
+        skip=0,
+        limit=100,
+    ):
         trades = [t for t in self.trades.values() if t.portfolio_id == portfolio_id]
-        return trades[skip : skip + limit], len(trades)
+        if ticker:
+            normalized = ticker.lower()
+            trades = [t for t in trades if normalized in t.ticker.lower()]
+        if trade_type:
+            trades = [t for t in trades if t.trade_type == trade_type]
+        if start_date:
+            trades = [
+                t
+                for t in trades
+                if (
+                    t.trade_date.date()
+                    if hasattr(t.trade_date, "date")
+                    else t.trade_date
+                )
+                >= start_date
+            ]
+        if end_date:
+            trades = [
+                t
+                for t in trades
+                if (
+                    t.trade_date.date()
+                    if hasattr(t.trade_date, "date")
+                    else t.trade_date
+                )
+                <= end_date
+            ]
+        total = len(trades)
+        return trades[skip : skip + limit], total
 
     async def update(self, trade: Trade) -> None:
         self.trades[trade.id] = trade
