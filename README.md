@@ -149,32 +149,6 @@ make db-seed
 | `make web-lint`   | Lint TypeScript/Svelte code        |
 | `make web-build`  | Build the production frontend      |
 
-## Breaking Changes
-
-### v1.2.0 — Authentication
-
-All API endpoints now require authentication. Existing deployments must run migrations before restarting:
-
-```bash
-# Production
-make prod-migrate
-
-# Development
-make db-migrate
-```
-
-A `SECRET_KEY` environment variable is now required in `api/.env` / `api/.env.prod`. Generate one with:
-
-```bash
-openssl rand -hex 32
-```
-
-The demo seed user (`demo@folio.local` / `demo1234`) owns the seeded portfolio. After seeding, register your own account and create a new portfolio to get started.
-
-## What's Next
-
-- **Refactor**: improve code patterns, architecture, and design decisions across the stack
-
 ## License
 
 [GNU GPL v2](LICENSE)
