@@ -86,6 +86,12 @@ export interface GetPriceHistoryResponse {
     }>;
 }
 
+export interface ValidateTickerResponse {
+    ticker: string;
+    provider: "yfinance" | "tiingo" | "ngnmarket";
+    supported: boolean;
+}
+
 export interface ListBenchmarksResponse {
     data: Benchmark[];
 }

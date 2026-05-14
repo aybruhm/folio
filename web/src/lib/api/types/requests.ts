@@ -11,6 +11,8 @@ export interface UpdatePortfolioRequest {
     description?: string | null;
 }
 
+export type MarketDataProvider = "yfinance" | "tiingo" | "ngnmarket";
+
 export interface CreateTradeRequest {
     portfolio_id: string;
     ticker: string;
@@ -22,6 +24,7 @@ export interface CreateTradeRequest {
     fees?: number | string;
     notes?: string | null;
     asset_class?: string;
+    market_data_provider?: MarketDataProvider;
 }
 
 export interface ListTradesQuery {

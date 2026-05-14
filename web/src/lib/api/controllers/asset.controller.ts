@@ -7,6 +7,7 @@ import type {
     ListBenchmarksResponse,
     AddBenchmarkResponse,
     GetFxRatesResponse,
+    ValidateTickerResponse,
 } from "../types";
 
 export class AssetController {
@@ -16,6 +17,21 @@ export class AssetController {
         const response = await this.client.get("/assets/search", {
             params: {
                 q: query,
+            },
+        });
+        return response.data;
+    }
+
+    async validateTicker(
+        ticker: string,
+        provider: "yfinance" | "tiingo" | "ngnmarket" = "yfinance",
+        currency: string = "USD",
+    ): Promise<ValidateTickerResponse> {
+        const response = await this.client.get("/assets/validate", {
+            params: {
+                ticker,
+                provider,
+                currency,
             },
         });
         return response.data;

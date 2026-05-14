@@ -114,6 +114,7 @@
                 trade_currency: trade.trade_currency,
                 fees: parseFloat(trade.fees) || 0,
                 asset_class: trade.asset_class || undefined,
+                market_data_provider: trade.market_data_provider || "yfinance",
             };
             await tradeController.createTrade(tradeRequest);
             await loadTrades();
@@ -133,6 +134,7 @@
             price: String(row.price),
             trade_currency: row.trade_currency,
             fees: String(row.fees ?? 0),
+            market_data_provider: "yfinance",
         };
         showEditModal = true;
     }
@@ -149,6 +151,7 @@
                 trade_currency: trade.trade_currency,
                 fees: parseFloat(trade.fees) || 0,
                 asset_class: trade.asset_class || undefined,
+                market_data_provider: trade.market_data_provider || "yfinance",
             };
             await tradeController.updateTrade(editingTrade.id, tradeRequest);
             await loadTrades();
@@ -349,6 +352,7 @@
             price: "",
             trade_currency: "USD",
             fees: "0",
+            market_data_provider: "yfinance",
         }}
     />
     <svelte:fragment slot="footer">
