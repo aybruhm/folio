@@ -102,6 +102,36 @@ async def test_get_asset_metadata_resolves_exchange_qualified_ticker(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_get_asset_metadata_handles_dot_ticker_with_dash_variant(monkeypatch):
+    monkeypatch.setattr(
+        tiingo_module.settings, "TIINGO_API_KEY", "test-tiingo-key", raising=False
+    )
+
+    fake_client = FakeTiingoClient(
+        metadata_by_symbol={
+            "BRK-B": {
+                "ticker": "BRK-B",
+                "name": "Berkshire Hathaway Inc. Class B",
+                "assetType": "Stock",
+                "currency": "USD",
+                "exchange": "NYSE",
+            }
+        }
+    )
+
+    monkeypatch.setattr(tiingo_module, "TiingoClient", lambda config: fake_client)
+
+    adapter = tiingo_module.TiingoAdapter()
+    result = await adapter.get_asset_metadata("BRK.B", "USD")
+
+    assert result is not None
+    assert result.name == "Berkshire Hathaway Inc. Class B"
+    assert result.exchange == "NYSE"
+    assert "BRK.B" in fake_client.metadata_calls
+    assert "BRK-B" in fake_client.metadata_calls
+
+
+@pytest.mark.asyncio
 async def test_get_asset_metadata_stops_when_hourly_limit_reached(monkeypatch):
     monkeypatch.setattr(
         tiingo_module.settings, "TIINGO_API_KEY", "test-tiingo-key", raising=False

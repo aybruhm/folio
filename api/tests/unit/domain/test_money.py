@@ -35,3 +35,8 @@ def test_date_range_allows_same_start_and_end_date():
 def test_date_range_rejects_inverted_bounds():
     with pytest.raises(ValueError, match="start date must be <= end date"):
         DateRange(start=date(2024, 2, 1), end=date(2024, 1, 1))
+
+
+@pytest.mark.happy_path
+def test_currency_validate_accepts_nigerian_naira_code():
+    assert Currency.validate("NGN") is True
