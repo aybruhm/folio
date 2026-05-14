@@ -26,6 +26,7 @@ class CreateTradeRequest:
     fees: int = 0  # ×100
     notes: Optional[str] = None
     asset_class: Optional[AssetClass] = None
+    market_data_provider: str = "yfinance"
 
 
 @dataclass(frozen=True)
