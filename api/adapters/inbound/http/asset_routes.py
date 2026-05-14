@@ -4,11 +4,20 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/assets", tags=["assets"])
+
+
+def _normalize_provider(provider: str) -> str:
+    normalized = (provider or "yfinance").strip().lower()
+    return (
+        normalized if normalized in {"yfinance", "tiingo", "ngnmarket"} else "yfinance"
+    )
 
 
 @router.get("/search")
@@ -30,6 +39,36 @@ async def search_assets(q: str, session: AsyncSession = Depends(get_session)):
             }
             for a in assets
         ]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/validate")
+async def validate_ticker(
+    ticker: str,
+    provider: str = "yfinance",
+    currency: str = "USD",
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        _ = session
+        selected = _normalize_provider(provider)
+
+        if selected == "tiingo":
+            adapter = TiingoAdapter()
+            metadata = await adapter.get_asset_metadata(ticker, currency)
+        elif selected == "ngnmarket":
+            adapter = NgnMarketAdapter()
+            metadata = await adapter.get_asset_metadata(ticker, currency)
+        else:
+            adapter = YFinanceAdapter()
+            metadata = await adapter.get_asset_metadata(ticker, currency)
+
+        return {
+            "ticker": ticker,
+            "provider": selected,
+            "supported": metadata is not None,
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -1,9 +1,9 @@
+import json
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-import json
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,7 @@ from application.trades.csv_import_interactor import CsvImportInteractor
 from application.trades.trade_interactor import TradeInteractor
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
-from domain.value_objects.money import Currency, TradeType, AssetClass
+from domain.value_objects.money import AssetClass, Currency, TradeType
 from infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -30,6 +30,7 @@ class TradeBody(BaseModel):
     fees: Decimal = Decimal("0")
     notes: Optional[str] = None
     asset_class: Optional[str] = None
+    market_data_provider: str = "yfinance"
 
 
 class BulkDeleteRequest(BaseModel):
@@ -48,6 +49,7 @@ def _body_to_request(body: TradeBody) -> CreateTradeRequest:
         fees=round(body.fees * 100),
         notes=body.notes,
         asset_class=AssetClass(body.asset_class) if body.asset_class else None,
+        market_data_provider=body.market_data_provider,
     )
 
 
