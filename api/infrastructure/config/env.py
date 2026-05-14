@@ -15,7 +15,10 @@ def _asyncpg_url(url: str) -> str:
 class EnvironSettings(BaseModel):
     # Database
     DATABASE_URL: str = _asyncpg_url(
-        os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres")
+        os.getenv(
+            "DATABASE_URL",
+            "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres",
+        )
     )
 
     # API
@@ -30,8 +33,15 @@ class EnvironSettings(BaseModel):
     SECURE_COOKIES: bool = os.getenv("API_ENV", "development") == "production"
 
     # Market data
-    YFINANCE_CACHE_TTL: int = 3600  # 1 hour
-    YFINANCE_PRICE_HISTORY_CACHE_TTL: int = 86400  # 1 day
+    YFINANCE_CACHE_TTL: int = int(os.getenv("YFINANCE_CACHE_TTL", "3600"))  # 1 hour
+    YFINANCE_PRICE_HISTORY_CACHE_TTL: int = int(
+        os.getenv("YFINANCE_PRICE_HISTORY_CACHE_TTL", "86400")
+    )  # 1 day
+    TIINGO_API_KEY: str = os.getenv("TIINGO_API_KEY", "")
+    NGNMARKET_API_BASE_URL: str = os.getenv(
+        "NGNMARKET_API_BASE_URL", "https://api.ngnmarket.com/v1"
+    )
+    NGNMARKET_API_KEY: str = os.getenv("NGNMARKET_API_KEY", "")
 
     # Scheduler
     SCHEDULER_ENABLED: bool = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
