@@ -72,6 +72,9 @@ class ITradeRepository(ABC):
     @abstractmethod
     async def delete(self, trade_id: UUID) -> None: ...
 
+    @abstractmethod
+    async def delete_batch(self, trade_ids: List[UUID]) -> int: ...
+
 
 class IAssetRepository(ABC):
     @abstractmethod
@@ -82,6 +85,15 @@ class IAssetRepository(ABC):
 
     @abstractmethod
     async def get_by_id(self, asset_id: UUID) -> Optional[Asset]: ...
+
+    @abstractmethod
+    async def update_classification(
+        self,
+        asset_id: UUID,
+        asset_class: str,
+        currency: str,
+        market_data_provider: str = "yfinance",
+    ) -> None: ...
 
     @abstractmethod
     async def search_by_ticker(self, query: str, limit: int = 10) -> List[Asset]: ...

@@ -103,6 +103,7 @@ class AssetModel(Base):
     industry = Column(String(100), nullable=True)
     country = Column(String(100), nullable=True)
     isin = Column(String(20), nullable=True)
+    market_data_provider = Column(String(20), nullable=False, default="yfinance")
     created_at = Column(DateTime, nullable=False, default=datetime.now)
 
     trades = relationship("TradeModel", back_populates="asset")
@@ -135,6 +136,7 @@ class TradeModel(Base):
     notes = Column(String, nullable=True)
     source = Column(String(20), default="manual")
     import_batch_id = Column(UUID(as_uuid=True), nullable=True)
+    market_data_provider = Column(String(20), nullable=False, default="yfinance")
     created_at = Column(DateTime, nullable=False, default=datetime.now)
 
     portfolio = relationship("PortfolioModel", back_populates="trades")

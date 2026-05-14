@@ -32,14 +32,21 @@ class Asset:
     industry: Optional[str] = None
     country: Optional[str] = None
     isin: Optional[str] = None
+    market_data_provider: str = "yfinance"
     created_at: datetime = field(default_factory=datetime.now)
 
     @classmethod
-    def from_metadata(cls, ticker: str, metadata: AssetMetadata) -> "Asset":
+    def from_metadata(
+        cls,
+        ticker: str,
+        metadata: AssetMetadata,
+        market_data_provider: str = "yfinance",
+    ) -> "Asset":
+        resolved_name = (metadata.name or "").strip() or ticker
         return cls(
             id=uuid4(),
             ticker=ticker,
-            name=metadata.name,
+            name=resolved_name,
             asset_class=AssetClass(metadata.asset_class),
             currency=metadata.currency,
             exchange=metadata.exchange,
@@ -47,6 +54,7 @@ class Asset:
             industry=metadata.industry,
             country=metadata.country,
             isin=metadata.isin,
+            market_data_provider=market_data_provider,
         )
 
 
@@ -65,6 +73,7 @@ class Trade:
     notes: Optional[str] = None
     source: str = "manual"
     import_batch_id: Optional[UUID] = None
+    market_data_provider: str = "yfinance"
     created_at: datetime = field(default_factory=datetime.now)
 
     def total_cost(self) -> int:
