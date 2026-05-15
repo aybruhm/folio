@@ -143,6 +143,16 @@ class FakeNgnMarketAdapter:
         return self.metadata
 
 
+class FakeTradingviewAdapter:
+    def __init__(self, metadata=None):
+        self.metadata = metadata
+        self.calls = []
+
+    async def get_asset_metadata(self, ticker, currency):
+        self.calls.append((ticker, currency))
+        return self.metadata
+
+
 def _patch_trade_deps(
     monkeypatch,
     *,
@@ -151,6 +161,7 @@ def _patch_trade_deps(
     yfinance_metadata=None,
     tiingo_metadata=None,
     ngnmarket_metadata=None,
+    tradingview_metadata=None,
 ):
     portfolio_repo = FakePortfolioRepository(portfolio)
     asset_repo = FakeAssetRepository(asset)
@@ -158,6 +169,7 @@ def _patch_trade_deps(
     yfinance = FakeYFinanceAdapter(yfinance_metadata)
     tiingo = FakeTiingoAdapter(tiingo_metadata)
     ngnmarket = FakeNgnMarketAdapter(ngnmarket_metadata)
+    tradingview = FakeTradingviewAdapter(tradingview_metadata)
 
     monkeypatch.setattr(
         trade_module, "PortfolioRepository", lambda session: portfolio_repo
@@ -167,6 +179,7 @@ def _patch_trade_deps(
     monkeypatch.setattr(trade_module, "YFinanceAdapter", lambda: yfinance)
     monkeypatch.setattr(trade_module, "TiingoAdapter", lambda: tiingo)
     monkeypatch.setattr(trade_module, "NgnMarketAdapter", lambda: ngnmarket)
+    monkeypatch.setattr(trade_module, "TradingviewAdapter", lambda: tradingview)
 
     interactor = trade_module.TradeInteractor(session=object())
     return (
@@ -177,6 +190,7 @@ def _patch_trade_deps(
         yfinance,
         tiingo,
         ngnmarket,
+        tradingview,
     )
 
 
@@ -197,6 +211,7 @@ async def test_create_trade_creates_cash_asset_without_yfinance(monkeypatch):
         yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(monkeypatch, portfolio=portfolio)
     request = CreateTradeRequest(
         portfolio_id=portfolio.id,
@@ -242,6 +257,7 @@ async def test_create_trade_fetches_metadata_and_adds_asset_when_missing(monkeyp
         yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(monkeypatch, portfolio=portfolio, yfinance_metadata=metadata)
     request = CreateTradeRequest(
         portfolio_id=portfolio.id,
@@ -272,6 +288,7 @@ async def test_create_trade_raises_when_portfolio_missing(monkeypatch):
         _yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(monkeypatch)
     request = CreateTradeRequest(
         portfolio_id=uuid4(),
@@ -320,6 +337,7 @@ async def test_create_trade_updates_existing_asset_classification_when_metadata_
         yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(
         monkeypatch,
         portfolio=portfolio,
@@ -375,6 +393,7 @@ async def test_get_trade_serializes_model(monkeypatch):
         _yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(monkeypatch, portfolio=portfolio)
     trade_repo.trades[trade.id] = trade
 
@@ -404,6 +423,7 @@ async def test_list_trades_filters_by_ticker_type_and_dates(monkeypatch):
         _yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(monkeypatch, portfolio=portfolio)
     common_asset_id = uuid4()
     trade_repo.trades = {
@@ -485,6 +505,7 @@ async def test_update_trade_updates_fields(monkeypatch):
         _yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(
         monkeypatch,
         portfolio=portfolio,
@@ -531,6 +552,7 @@ async def test_delete_trade_removes_trade(monkeypatch):
         _yfinance,
         _tiingo,
         _ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(monkeypatch, portfolio=portfolio)
     trade = Trade(
         id=uuid4(),
@@ -575,6 +597,7 @@ async def test_create_trade_uses_ngnmarket_provider_when_selected(monkeypatch):
         yfinance,
         tiingo,
         ngnmarket,
+        _tradingview,
     ) = _patch_trade_deps(
         monkeypatch,
         portfolio=portfolio,
@@ -600,3 +623,57 @@ async def test_create_trade_uses_ngnmarket_provider_when_selected(monkeypatch):
     assert asset_repo.added[0].exchange == "NGX"
     assert trade_repo.added[0].id == trade_id
     assert trade_repo.added[0].market_data_provider == "ngnmarket"
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_create_trade_uses_tradingview_provider_when_selected(monkeypatch):
+    portfolio = Portfolio(
+        id=uuid4(),
+        user_id=uuid4(),
+        name="Tech",
+        base_currency=Currency.USD,
+    )
+    metadata = AssetMetadata(
+        ticker="NASDAQ:AAPL",
+        name="Apple Inc.",
+        asset_class="stock",
+        currency=Currency.USD,
+        exchange="NASDAQ",
+    )
+    (
+        interactor,
+        _portfolio_repo,
+        asset_repo,
+        trade_repo,
+        yfinance,
+        tiingo,
+        ngnmarket,
+        tradingview,
+    ) = _patch_trade_deps(
+        monkeypatch,
+        portfolio=portfolio,
+        tradingview_metadata=metadata,
+    )
+
+    request = CreateTradeRequest(
+        portfolio_id=portfolio.id,
+        ticker="NASDAQ:AAPL",
+        trade_type=TradeType.BUY,
+        trade_date=datetime(2024, 1, 8, 9, 30),
+        quantity=100000,
+        price=18520,
+        trade_currency=Currency.USD,
+        market_data_provider="tradingview",
+    )
+
+    trade_id = await interactor.create_trade(request)
+
+    assert tradingview.calls == [("NASDAQ:AAPL", "USD")]
+    assert tiingo.calls == []
+    assert yfinance.calls == []
+    assert ngnmarket.calls == []
+    assert asset_repo.added[0].name == "Apple Inc."
+    assert asset_repo.added[0].exchange == "NASDAQ"
+    assert trade_repo.added[0].id == trade_id
+    assert trade_repo.added[0].market_data_provider == "tradingview"

@@ -24,7 +24,11 @@ export class AssetController {
 
     async validateTicker(
         ticker: string,
-        provider: "yfinance" | "tiingo" | "ngnmarket" = "yfinance",
+        provider:
+            | "yfinance"
+            | "tiingo"
+            | "ngnmarket"
+            | "tradingview" = "yfinance",
         currency: string = "USD",
     ): Promise<ValidateTickerResponse> {
         const response = await this.client.get("/assets/validate", {

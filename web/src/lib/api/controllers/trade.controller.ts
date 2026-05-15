@@ -78,7 +78,11 @@ export class TradeController {
         portfolioId: string,
         dateFormat: string,
         profileName?: string | null,
-        marketDataProvider: "yfinance" | "tiingo" | "ngnmarket" = "yfinance",
+        marketDataProvider:
+            | "yfinance"
+            | "tiingo"
+            | "ngnmarket"
+            | "tradingview" = "yfinance",
     ): Promise<ConfirmImportResponse> {
         const formData = new FormData();
         formData.append("file", file);

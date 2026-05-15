@@ -16,6 +16,18 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
     def __init__(self) -> None:
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        # Lazy-init TradingView adapter to avoid importing it at module level
+        self._tradingview = None
+
+    @property
+    def tradingview(self):
+        if self._tradingview is None:
+            from adapters.outbound.market_data.tradingview_adapter import (
+                TradingviewAdapter,
+            )
+
+            self._tradingview = TradingviewAdapter()
+        return self._tradingview
 
     @staticmethod
     def _scalar(value) -> float:
@@ -97,6 +109,13 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         if ngnmarket_metadata:
             logger.info(f"Using NGNMarket fallback metadata for {ticker}")
             return ngnmarket_metadata
+
+        tradingview_metadata = await self.tradingview.get_asset_metadata(
+            ticker, currency
+        )
+        if tradingview_metadata:
+            logger.info(f"Using TradingView fallback metadata for {ticker}")
+            return tradingview_metadata
 
         logger.warning(f"Incomplete metadata for {ticker}")
         return None

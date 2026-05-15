@@ -88,7 +88,7 @@ export interface GetPriceHistoryResponse {
 
 export interface ValidateTickerResponse {
     ticker: string;
-    provider: "yfinance" | "tiingo" | "ngnmarket";
+    provider: "yfinance" | "tiingo" | "ngnmarket" | "tradingview";
     supported: boolean;
 }
 

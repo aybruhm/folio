@@ -18,7 +18,11 @@
         trade_currency: string;
         fees: string;
         asset_class?: string;
-        market_data_provider?: "yfinance" | "tiingo" | "ngnmarket";
+        market_data_provider?:
+            | "yfinance"
+            | "tiingo"
+            | "ngnmarket"
+            | "tradingview";
     } = {
         ticker: "",
         trade_type: "buy",
@@ -43,6 +47,7 @@
         { label: "Yahoo Finance", value: "yfinance" },
         { label: "Tiingo", value: "tiingo" },
         { label: "NGNMarket", value: "ngnmarket" },
+        { label: "TradingView", value: "tradingview" },
     ];
 
     const assetClasses = [
