@@ -31,6 +31,11 @@ class EnvironSettings(BaseModel):
     )
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
     SECURE_COOKIES: bool = os.getenv("API_ENV", "development") == "production"
+    # Optional: set to e.g. ".domain.com" when frontend and API are on
+    # different subdomains, so cookies are scoped across both and browsers
+    # treat them as first-party (not blocked by tracking protection).
+    # Leave empty for same-origin or reverse-proxy setups.
+    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "")
 
     # Market data
     YFINANCE_CACHE_TTL: int = int(os.getenv("YFINANCE_CACHE_TTL", "3600"))  # 1 hour
