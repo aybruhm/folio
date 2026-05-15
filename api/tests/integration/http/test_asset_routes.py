@@ -46,6 +46,14 @@ class FakeNgnMarketAdapter:
         return self.metadata
 
 
+class FakeTradingviewAdapter:
+    def __init__(self, metadata=None):
+        self.metadata = metadata
+
+    async def get_asset_metadata(self, ticker, currency):
+        return self.metadata
+
+
 @pytest.mark.integration
 @pytest.mark.happy_path
 def test_asset_search_and_history_routes(client, monkeypatch):
@@ -139,6 +147,11 @@ def test_validate_ticker_route_supports_all_providers(client, monkeypatch):
         "NgnMarketAdapter",
         lambda: FakeNgnMarketAdapter(metadata={"ticker": "NGX30"}),
     )
+    monkeypatch.setattr(
+        asset_routes,
+        "TradingviewAdapter",
+        lambda: FakeTradingviewAdapter(metadata={"ticker": "NASDAQ:AAPL"}),
+    )
 
     yfinance_response = client.get(
         "/api/v1/assets/validate",
@@ -161,3 +174,11 @@ def test_validate_ticker_route_supports_all_providers(client, monkeypatch):
     assert ngn_response.status_code == 200
     assert ngn_response.json()["supported"] is True
     assert ngn_response.json()["provider"] == "ngnmarket"
+
+    tradingview_response = client.get(
+        "/api/v1/assets/validate",
+        params={"ticker": "NASDAQ:AAPL", "provider": "tradingview", "currency": "USD"},
+    )
+    assert tradingview_response.status_code == 200
+    assert tradingview_response.json()["supported"] is True
+    assert tradingview_response.json()["provider"] == "tradingview"

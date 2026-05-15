@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
+from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from infrastructure.db.session import get_session
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 def _normalize_provider(provider: str) -> str:
     normalized = (provider or "yfinance").strip().lower()
     return (
-        normalized if normalized in {"yfinance", "tiingo", "ngnmarket"} else "yfinance"
+        normalized
+        if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
+        else "yfinance"
     )
 
 
@@ -60,6 +63,10 @@ async def validate_ticker(
         elif selected == "ngnmarket":
             adapter = NgnMarketAdapter()
             metadata = await adapter.get_asset_metadata(ticker, currency)
+        elif selected == "tradingview":
+            adapter = TradingviewAdapter()
+            metadata = await adapter.get_asset_metadata(ticker, currency)
+            print(f"TradingView metadata for {ticker}: {metadata}")
         else:
             adapter = YFinanceAdapter()
             metadata = await adapter.get_asset_metadata(ticker, currency)
