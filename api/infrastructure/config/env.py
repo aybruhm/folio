@@ -47,6 +47,10 @@ class EnvironSettings(BaseModel):
         "NGNMARKET_API_BASE_URL", "https://api.ngnmarket.com/v1"
     )
     NGNMARKET_API_KEY: str = os.getenv("NGNMARKET_API_KEY", "")
+    RAPID_API_BASE_URL: str = os.getenv(
+        "RAPID_API_BASE_URL", "https://tradingview-data1.p.rapidapi.com/"
+    )
+    RAPID_API_KEY: str = os.getenv("RAPID_API_KEY", "")
 
     # Scheduler
     SCHEDULER_ENABLED: bool = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
