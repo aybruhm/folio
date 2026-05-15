@@ -40,7 +40,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 | Frontend | SvelteKit, TypeScript, Tailwind, shadcn-svelte, bits-ui |
 | Backend  | FastAPI, SQLAlchemy (async)       |
 | Database | PostgreSQL                        |
-| Data     | yfinance, tiingo, ngnmarket       |
+| Data     | yfinance, tiingo, ngnmarket, tradingview       |
 | Infra    | Docker, Docker Compose            |
 
 ## Getting Started
