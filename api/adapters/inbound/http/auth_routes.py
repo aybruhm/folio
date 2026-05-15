@@ -26,11 +26,16 @@ class LoginBody(BaseModel):
 def _set_auth_cookies(
     response: Response, access_token: str, refresh_token: str
 ) -> None:
+    # In production (secure=True) we use SameSite=None so cookies flow
+    # cross-origin (e.g. Railway with separate frontend/API domains).
+    # For same-origin setups this is identical to Lax and has no downside.
+    samesite = "none" if settings.SECURE_COOKIES else "lax"
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        samesite="lax",
+        samesite=samesite,
         secure=settings.SECURE_COOKIES,
         path="/",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -39,7 +44,7 @@ def _set_auth_cookies(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="lax",
+        samesite=samesite,
         secure=settings.SECURE_COOKIES,
         path="/",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
