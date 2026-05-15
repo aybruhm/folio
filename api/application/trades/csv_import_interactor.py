@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
+from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from adapters.outbound.persistence.trade_repository import TradeRepository
@@ -24,13 +25,14 @@ class CsvImportInteractor(ICsvImportUseCase):
         self.yfinance = YFinanceAdapter()
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        self.tradingview = TradingviewAdapter()
 
     @staticmethod
     def _normalize_provider(provider: str | None) -> str:
         normalized = (provider or "yfinance").strip().lower()
         return (
             normalized
-            if normalized in {"yfinance", "tiingo", "ngnmarket"}
+            if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
             else "yfinance"
         )
 
@@ -39,6 +41,9 @@ class CsvImportInteractor(ICsvImportUseCase):
 
         if selected == "tiingo":
             metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
+            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
             metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
@@ -50,7 +55,22 @@ class CsvImportInteractor(ICsvImportUseCase):
             metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
+            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
             metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
+            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+
+        if selected == "tradingview":
+            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
+            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
+            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
             return await self.yfinance.get_asset_metadata(ticker, currency.value)
