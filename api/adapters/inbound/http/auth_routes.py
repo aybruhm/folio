@@ -29,7 +29,8 @@ def _set_auth_cookies(
     # In production (secure=True) we use SameSite=None so cookies flow
     # cross-origin (e.g. Railway with separate frontend/API domains).
     # For same-origin setups this is identical to Lax and has no downside.
-    samesite = "none" if settings.SECURE_COOKIES else "lax"
+    samesite: str = "none" if settings.SECURE_COOKIES else "lax"
+    domain: str | None = settings.COOKIE_DOMAIN or None
 
     response.set_cookie(
         key="access_token",
@@ -37,6 +38,7 @@ def _set_auth_cookies(
         httponly=True,
         samesite=samesite,
         secure=settings.SECURE_COOKIES,
+        domain=domain,
         path="/",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
@@ -46,14 +48,16 @@ def _set_auth_cookies(
         httponly=True,
         samesite=samesite,
         secure=settings.SECURE_COOKIES,
+        domain=domain,
         path="/",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
     )
 
 
 def _clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie(key="access_token", path="/")
-    response.delete_cookie(key="refresh_token", path="/")
+    domain: str | None = settings.COOKIE_DOMAIN or None
+    response.delete_cookie(key="access_token", path="/", domain=domain)
+    response.delete_cookie(key="refresh_token", path="/", domain=domain)
 
 
 def _user_response(user: User) -> dict:
