@@ -85,6 +85,7 @@ export class PortfolioController {
         const response = await this.client.get(`/portfolios/analytics`, {
             params: {
                 timeframe: params.timeframe || "1y",
+                ...(params.in_currency && { in_currency: params.in_currency }),
             },
         });
         return response.data;

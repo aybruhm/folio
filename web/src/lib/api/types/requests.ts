@@ -83,6 +83,7 @@ export interface GetHoldingsQuery {
 export interface GetPortfolioAnalyticsQuery {
     portfolio_id: string;
     timeframe?: string;
+    in_currency?: string | null;
 }
 
 export interface GetPerformanceQuery {
@@ -96,6 +97,7 @@ export interface GetAllocationQuery {
 
 export interface ListPortfolioAnalyticsQuery {
     timeframe?: string;
+    in_currency?: string;
 }
 
 export interface AddBenchmarkQuery {
