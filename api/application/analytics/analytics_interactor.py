@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
+from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from adapters.outbound.persistence.price_repository import (
@@ -33,6 +34,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         self.yfinance = YFinanceAdapter()
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        self.tradingview = TradingviewAdapter()
         self.base_currency = portfolio_base_currency
 
     @staticmethod
@@ -40,7 +42,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         normalized = (provider or "yfinance").strip().lower()
         return (
             normalized
-            if normalized in {"yfinance", "tiingo", "ngnmarket"}
+            if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
             else "yfinance"
         )
 
@@ -58,6 +60,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 if price is not None:
                     return (date.today(), round(float(price) * 100))
             return (date.today(), 0)
+
+        if selected == "tradingview":
+            return await self.tradingview.get_current_price(symbol)
 
         return await self.yfinance.get_current_price(symbol)
 
@@ -78,10 +83,79 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
         _, price = await self._get_price_from_provider(symbol, provider)
 
-        if price == 0 and provider != "yfinance":
-            _, price = await self.yfinance.get_current_price(symbol)
+        if price == 0:
+            # Cascade through every other provider in priority order
+            fallback_order = ["tiingo", "tradingview", "ngnmarket", "yfinance"]
+            for fallback in fallback_order:
+                if fallback == provider:
+                    continue
+                _, price = await self._get_price_from_provider(symbol, fallback)
+                if price > 0:
+                    break
 
         return price
+
+    async def _get_fx_rate(self, from_ccy: str, to_ccy: str) -> int:
+        """Return the ×100 rate for *from_ccy* → *to_ccy*.
+
+        Fetches the rate directly from Yahoo Finance using the
+        ``{from}{to}=X`` ticker format.  Falls back to the inverse pair
+        when the direct rate rounds to zero (weak→strong currency).
+        """
+        if from_ccy == to_ccy:
+            return 100
+
+        if not hasattr(self, "_fx_rate_cache"):
+            self._fx_rate_cache: dict[tuple[str, str], int] = {}
+
+        key = (from_ccy, to_ccy)
+        if key in self._fx_rate_cache:
+            return self._fx_rate_cache[key]
+
+        # Allow tests to inject a fake Ticker via _fx_ticker_factory
+        factory = getattr(self, "_fx_ticker_factory", None)
+        if factory is None:
+            import yfinance as yf
+
+            factory = yf.Ticker
+
+        async def _fetch_one(frm: str, to: str) -> int:
+            ticker = f"{frm}{to}=X"
+            try:
+                t = factory(ticker)
+                data = t.history(period="1d")
+                if data.empty:
+                    return 0
+                close = float(data["Close"].iloc[-1])
+                return round(close * 100)
+            except Exception:
+                return 0
+
+        # Try direct rate first
+        rate = await _fetch_one(from_ccy, to_ccy)
+
+        # If direct rate is zero (weak→strong), try inverse and use division
+        if rate == 0:
+            inv_rate = await _fetch_one(to_ccy, from_ccy)
+            if inv_rate > 0:
+                self._fx_rate_cache[key] = -inv_rate
+                return -inv_rate
+
+        self._fx_rate_cache[key] = rate
+        return rate
+
+    async def _convert_amount(self, amount: int, from_ccy: str, to_ccy: str) -> int:
+        """Convert *amount* (×100 int) from *from_ccy* to *to_ccy*."""
+        if from_ccy == to_ccy:
+            return amount
+        rate = await self._get_fx_rate(from_ccy, to_ccy)
+        if rate == 0:
+            return amount
+        if rate < 0:
+            # Inverse rate: amount * 100 / |rate|
+            return (amount * 100) // -rate
+        # Direct rate: amount * rate / 100
+        return (amount * rate) // 100
 
     async def get_holdings(
         self, portfolio_id: UUID, in_currency: Optional[Currency] = None
@@ -113,6 +187,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         for ticker, holding_data in holdings_by_asset.items():
             asset = await self.asset_repo.get_by_id(holding_data["asset_id"])
             is_cash = bool(asset and asset.asset_class.value == "cash")
+            # The asset's native currency (what prices are quoted in)
+            asset_currency = asset.currency if asset else self.base_currency
             provider_hint = None
             if holding_data["trades"]:
                 provider_hint = getattr(
@@ -123,34 +199,43 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 provider_hint = getattr(asset, "market_data_provider", None)
 
             if is_cash:
-                # For cash instruments, quantity is often encoded as 1.0 per flow and
-                # amount is carried in price. Net cash balance must be derived from
-                # signed trade values, not unit counts.
-                cash_balance_int = 0  # ×100
+                cash_balance_int = 0  # ×100 — built in base currency
                 for trade in holding_data["trades"]:
                     trade_value_int = (trade.quantity * trade.price) // 10000
+                    converted = await self._convert_amount(
+                        trade_value_int,
+                        trade.trade_currency.value,
+                        self.base_currency.value,
+                    )
                     if trade.trade_type.value == "buy":
-                        cash_balance_int += trade_value_int
+                        cash_balance_int += converted
                     elif trade.trade_type.value == "sell":
-                        cash_balance_int -= trade_value_int
+                        cash_balance_int -= converted
 
                 if cash_balance_int <= 0:
                     continue
 
                 cost_basis_int = cash_balance_int
                 market_value_int = cash_balance_int
-                current_price_int = 100  # $1.00
+                current_price_int = 100  # $1.00 equivalent
                 total_return_int = 0
                 quantity_int = cash_balance_int * 100  # at $1, quantity×10000
             else:
-                # FIFO lots for remaining open position.
-                lots: list[dict] = []  # [{"qty": int(×10000), "cost": int(×100)}]
+                # FIFO lots — costs converted to base currency per trade
+                lots: list[
+                    dict
+                ] = []  # [{"qty": int(×10000), "cost": int(×100 in base ccy)}]
                 for trade in holding_data["trades"]:
                     if trade.trade_type.value == "buy":
-                        lot_cost_int = (
+                        trade_cost_in_trade_ccy = (
                             trade.quantity * trade.price
                         ) // 10000 + trade.fees
-                        lots.append({"qty": trade.quantity, "cost": lot_cost_int})
+                        trade_cost_in_base = await self._convert_amount(
+                            trade_cost_in_trade_ccy,
+                            trade.trade_currency.value,
+                            self.base_currency.value,
+                        )
+                        lots.append({"qty": trade.quantity, "cost": trade_cost_in_base})
                     elif trade.trade_type.value == "sell":
                         remaining_to_sell = trade.quantity
                         while remaining_to_sell > 0 and lots:
@@ -169,16 +254,26 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 if quantity_int <= 0:
                     continue
 
+                # Cost basis is already in base currency
                 cost_basis_int = sum(lot["cost"] for lot in lots)
-                current_price_int = await self._resolve_price(
+
+                # Price comes from the provider in the asset's native currency
+                price_in_asset_ccy = await self._resolve_price(
                     holding_data["asset_id"], ticker, provider_hint=provider_hint
                 )
-                if current_price_int == 0:
+                if price_in_asset_ccy == 0:
                     latest = await self.price_repo.get_latest(holding_data["asset_id"])
                     if latest:
-                        current_price_int = latest[1]
+                        price_in_asset_ccy = latest[1]
 
-                # quantity×10000 * price×100 → ÷10000 → ×100
+                # Convert price from asset currency to base currency
+                current_price_int = await self._convert_amount(
+                    price_in_asset_ccy,
+                    asset_currency.value,
+                    self.base_currency.value,
+                )
+
+                # Market value = qty × price (in base currency)
                 market_value_int = (quantity_int * current_price_int) // 10000
                 total_return_int = market_value_int - cost_basis_int
 
@@ -230,15 +325,20 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     if hasattr(t.trade_date, "date")
                     else t.trade_date
                 )
-                amount = (t.quantity * t.price) // 10000 + t.fees
+                # Trade value in trade currency (×100 int)
+                trade_value_int = (t.quantity * t.price) // 10000 + t.fees
+                # Convert to base currency
+                converted = await self._convert_amount(
+                    trade_value_int,
+                    t.trade_currency.value,
+                    self.base_currency.value,
+                )
+                amount = converted / 100
 
-                # For this app's flow semantics:
-                # - buy means cash enters the portfolio (contribution): positive flow
-                # - sell means cash leaves the portfolio (withdrawal): negative flow
                 if t.trade_type.value == "buy":
-                    cash_flows.append((trade_date, amount / 100))
+                    cash_flows.append((trade_date, amount))
                 else:
-                    cash_flows.append((trade_date, -(amount / 100)))
+                    cash_flows.append((trade_date, -amount))
 
         holdings = await self.get_holdings(portfolio_id)
         beginning_value = 0.0
@@ -355,6 +455,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         asset_ids = {t.asset_id: t.ticker for t in trades_sorted}
         price_map: dict = {}  # ticker -> {date -> price_int (×100)}
         ticker_is_cash: dict = {}
+        ticker_asset_currency: dict = {}  # ticker -> Currency (asset's native currency)
         fallback_current_price: dict = {}
         latest_provider_for_ticker = {}
         for t in trades_sorted:
@@ -369,6 +470,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             asset = await self.asset_repo.get_by_id(asset_id)
             is_cash = bool(asset and asset.asset_class.value == "cash")
             ticker_is_cash[ticker] = is_cash
+            ticker_asset_currency[ticker] = (
+                asset.currency if asset else self.base_currency
+            )
 
             provider_hint = latest_provider_for_ticker.get(ticker)
             if not provider_hint and asset:
@@ -412,11 +516,10 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
             portfolio_value = 0.0
             for ticker, qty_int in positions.items():
+                asset_ccy = ticker_asset_currency.get(ticker, self.base_currency)
+
                 if ticker_is_cash.get(ticker):
-                    # Cash instruments in this app represent flows as quantity=1 and
-                    # price=amount. Value should be the net signed amount, not unit
-                    # count × $1.
-                    cash_balance_int = 0  # ×100
+                    cash_balance_int = 0  # ×100 — built in base currency
                     for t in trades_sorted:
                         t_date = (
                             t.trade_date.date()
@@ -428,10 +531,15 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                         if t.ticker != ticker:
                             continue
                         trade_value_int = (t.quantity * t.price) // 10000
+                        converted = await self._convert_amount(
+                            trade_value_int,
+                            t.trade_currency.value,
+                            self.base_currency.value,
+                        )
                         if t.trade_type.value == "buy":
-                            cash_balance_int += trade_value_int
+                            cash_balance_int += converted
                         elif t.trade_type.value == "sell":
-                            cash_balance_int -= trade_value_int
+                            cash_balance_int -= converted
 
                     if cash_balance_int > 0:
                         portfolio_value += cash_balance_int / 100
@@ -448,8 +556,14 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 if price_int == 0:
                     price_int = int(fallback_current_price.get(ticker, 0))
 
-                # qty×10000 * price×100 → ÷1000000 → actual dollar value
-                portfolio_value += (qty_int * price_int) / 1000000
+                # Value in asset currency (×100 int), then convert to base
+                value_in_asset_ccy = (qty_int * price_int) // 10000
+                converted = await self._convert_amount(
+                    value_in_asset_ccy,
+                    asset_ccy.value,
+                    self.base_currency.value,
+                )
+                portfolio_value += converted / 100
 
             label = sample_date.strftime("%b %Y")
             point = {"name": label, "value": round(portfolio_value, 2)}
@@ -457,6 +571,15 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 result[-1] = point
             else:
                 result.append(point)
+
+        # Replace the last data point with the actual current holdings value
+        # so the chart always ends at the real portfolio value, not a stale
+        # historical price.
+        holdings = await self.get_holdings(portfolio_id, self.base_currency)
+        current_total = sum(h["market_value"] for h in holdings)
+        if result:
+            today_label = date.today().strftime("%b %Y")
+            result[-1] = {"name": today_label, "value": round(current_total, 2)}
 
         return result
 
@@ -475,7 +598,15 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
             )
             key = t_date.strftime("%b %Y")
-            amount = (t.quantity * t.price) // 10000 / 100
+            # Trade value in trade currency (×100 int)
+            trade_value_int = (t.quantity * t.price) // 10000
+            # Convert to base currency
+            converted = await self._convert_amount(
+                trade_value_int,
+                t.trade_currency.value,
+                self.base_currency.value,
+            )
+            amount = converted / 100
             if t.trade_type.value == "buy":
                 monthly[key] = monthly.get(key, 0.0) + amount
             else:
