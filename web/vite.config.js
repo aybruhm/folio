@@ -4,7 +4,6 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
     plugins: [
-        sveltekit(),
         VitePWA({
             registerType: "autoUpdate",
             workbox: {
@@ -55,8 +54,49 @@ export default defineConfig({
                 theme_color: "#0f172a",
                 background_color: "#0f172a",
                 display: "standalone",
+                id: "/",
+                orientation: "portrait",
+                lang: "en-US",
                 scope: "/",
                 start_url: "/",
+                categories: ["finance", "productivity"],
+                screenshots: [
+                    {
+                        src: "/screenshots/dashboard-01.png",
+                        sizes: "464x952",
+                        type: "image/png",
+                        form_factor: "narrow",
+                        label: "Dashboard overview with portfolio summary",
+                    },
+                    {
+                        src: "/screenshots/portfolio.png",
+                        sizes: "464x752",
+                        type: "image/png",
+                        form_factor: "narrow",
+                        label: "Portfolio holdings view",
+                    },
+                    {
+                        src: "/screenshots/trades-01.png",
+                        sizes: "464x952",
+                        type: "image/png",
+                        form_factor: "narrow",
+                        label: "Trade history and activity",
+                    },
+                    {
+                        src: "/screenshots/analytics-01.png",
+                        sizes: "464x952",
+                        type: "image/png",
+                        form_factor: "narrow",
+                        label: "Analytics and performance charts",
+                    },
+                    {
+                        src: "/screenshots/dashboard-desktop.png",
+                        sizes: "464x952",
+                        type: "image/png",
+                        form_factor: "wide",
+                        label: "Desktop dashboard overview with portfolio summary",
+                    },
+                ],
                 icons: [
                     {
                         src: "/icon-192.png",
@@ -70,14 +110,22 @@ export default defineConfig({
                         type: "image/png",
                         purpose: "any",
                     },
+                    {
+                        src: "/icon-maskable-512.png",
+                        sizes: "512x512",
+                        type: "image/png",
+                        purpose: "maskable",
+                    },
                 ],
             },
             injectRegister: "script",
-            injectManifest: {
-                globPatterns: ["client/**/*.{js,css,html,svg,ico,png}"],
-                maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+            devOptions: {
+                enabled: true,
+                type: "module",
+                navigateFallback: "/",
             },
         }),
+        sveltekit(),
     ],
     server: {
         host: "0.0.0.0",
@@ -88,6 +136,7 @@ export default defineConfig({
                 changeOrigin: true,
             },
         },
+        allowedHosts: ["situated-enjoyably-omen.ngrok-free.dev"],
         hmr: {
             host: "localhost",
             port: 3000,

@@ -4,8 +4,9 @@
   "description": "Track, analyze, and optimize your investment portfolio with advanced analytics and portfolio management tools.",
   "start_url": "/",
   "scope": "/",
+  "lang": "en-US",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
   "categories": ["finance", "productivity"],
@@ -23,24 +24,46 @@
       "purpose": "any"
     },
     {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any"
     }
   ],
   "screenshots": [
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
+      "src": "/screenshots/dashboard-01.png",
+      "sizes": "464x952",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "narrow",
+      "label": "Dashboard overview with portfolio summary"
     },
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
+      "src": "/screenshots/portfolio.png",
+      "sizes": "464x752",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Portfolio holdings view"
+    },
+    {
+      "src": "/screenshots/trades-01.png",
+      "sizes": "464x952",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Trade history and activity"
+    },
+    {
+      "src": "/screenshots/analytics-01.png",
+      "sizes": "464x952",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Analytics and performance charts"
     }
   ],
   "shortcuts": [
