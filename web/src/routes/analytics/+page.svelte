@@ -71,6 +71,7 @@
                             await portfolioController.getPortfolioAnalytics({
                                 portfolio_id: p.id,
                                 timeframe,
+                                in_currency: "USD",
                             });
 
                         totalTwr += parseFloat(response.twr || "0");
@@ -334,6 +335,7 @@
                     data={analyticsData.performance_history}
                     title=""
                     height="h-72 md:h-96"
+                    currency="USD"
                 />
             </Card>
 

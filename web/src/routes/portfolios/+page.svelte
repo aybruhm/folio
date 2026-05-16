@@ -159,7 +159,10 @@
                                         <span
                                             class="text-sm md:text-base font-semibold text-foreground"
                                         >
-                                            {formatCurrency(currentValue)}
+                                            {formatCurrency(
+                                                currentValue,
+                                                portfolio.base_currency,
+                                            )}
                                         </span>
                                     </div>
                                     <div class="flex justify-between">

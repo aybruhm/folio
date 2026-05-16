@@ -72,6 +72,7 @@
             const analyticsList =
                 await portfolioController.listPortfolioAnalytics({
                     timeframe: "1y",
+                    in_currency: "USD",
                 });
 
             const analyticsData = (analyticsList || []).reduce(
@@ -227,7 +228,7 @@
                     <div
                         class="text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight break-all"
                     >
-                        {formatCurrency(stats.current_value)}
+                        {formatCurrency(stats.current_value, "USD")}
                     </div>
                 </Card>
 
@@ -235,7 +236,7 @@
                     <div
                         class="text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight break-all"
                     >
-                        {formatCurrency(stats.cost_basis)}
+                        {formatCurrency(stats.cost_basis, "USD")}
                     </div>
                 </Card>
 
@@ -245,7 +246,7 @@
                         class:text-positive={isPositive}
                         class:text-negative={!isPositive}
                     >
-                        {formatCurrency(stats.gain_loss)}
+                        {formatCurrency(stats.gain_loss, "USD")}
                     </div>
                 </Card>
 
@@ -266,6 +267,7 @@
                     data={stats.performance_history}
                     title=""
                     height="h-72 md:h-96"
+                    currency="USD"
                 />
             </Card>
 
@@ -278,6 +280,7 @@
                     data={stats.contribution_history}
                     title=""
                     height="h-72 md:h-96"
+                    currency="USD"
                 />
             </Card>
 
@@ -316,7 +319,7 @@
                                 <div
                                     class="text-sm md:text-base font-semibold text-foreground"
                                 >
-                                    {formatCurrency(holding.value)}
+                                    {formatCurrency(holding.value, "USD")}
                                 </div>
                             </div>
                         </div>

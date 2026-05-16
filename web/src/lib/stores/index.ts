@@ -56,5 +56,16 @@ export const portfolioCount = derived(
     ($portfolios) => $portfolios.length,
 );
 
+export const baseCurrency = derived(
+    [currentPortfolio, portfolios],
+    ([$cp, $portfolios]) => {
+        if ($cp?.id && $cp?.base_currency) return $cp.base_currency;
+        // Aggregated view: use the first portfolio's base currency if available
+        if ($portfolios.length > 0)
+            return $portfolios[0].base_currency || "USD";
+        return "USD";
+    },
+);
+
 export const authUser = writable<AuthUser | null>(null);
 export const isAuthenticated = derived(authUser, ($user) => $user !== null);
