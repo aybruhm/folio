@@ -55,9 +55,25 @@ def _set_auth_cookies(
 
 
 def _clear_auth_cookies(response: Response) -> None:
+    samesite: str = "none" if settings.SECURE_COOKIES else "lax"
     domain: str | None = settings.COOKIE_DOMAIN or None
-    response.delete_cookie(key="access_token", path="/", domain=domain)
-    response.delete_cookie(key="refresh_token", path="/", domain=domain)
+
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        domain=domain,
+        secure=settings.SECURE_COOKIES,
+        httponly=True,
+        samesite=samesite,
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        path="/",
+        domain=domain,
+        secure=settings.SECURE_COOKIES,
+        httponly=True,
+        samesite=samesite,
+    )
 
 
 def _user_response(user: User) -> dict:
