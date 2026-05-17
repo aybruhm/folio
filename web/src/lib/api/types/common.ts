@@ -50,6 +50,7 @@ export interface Trade extends BaseEntity {
   quantity: number | string;
   price: number | string;
   trade_currency: Currency;
+  market_data_provider: string;
   fees: number | string;
   notes?: string;
 }

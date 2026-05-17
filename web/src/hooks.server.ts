@@ -15,6 +15,7 @@ const API_REFRESH_PATH = `${API_BASE}/api/v1/auth/refresh`;
 
 interface CookieAttributes {
     path: string;
+    domain?: string;
     httpOnly?: boolean;
     secure?: boolean;
     sameSite?: boolean | "lax" | "strict" | "none";
@@ -67,6 +68,13 @@ async function tryRefreshToken(
             const attrs: CookieAttributes = { path: "/" };
             if (cookieStr.includes("HttpOnly")) attrs.httpOnly = true;
             if (cookieStr.includes("Secure")) attrs.secure = true;
+
+            const pathMatch = cookieStr.match(/Path=([^;]+)/i);
+            if (pathMatch) attrs.path = pathMatch[1].trim();
+
+            const domainMatch = cookieStr.match(/Domain=([^;]+)/i);
+            if (domainMatch) attrs.domain = domainMatch[1].trim();
+
             const sameSiteMatch = cookieStr.match(/SameSite=(\w+)/i);
             if (sameSiteMatch) {
                 attrs.sameSite =

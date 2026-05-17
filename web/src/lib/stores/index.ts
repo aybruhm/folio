@@ -1,4 +1,5 @@
 import { writable, derived } from "svelte/store";
+import { browser } from "$app/environment";
 
 export interface AuthUser {
     id: string;
@@ -33,13 +34,69 @@ export interface UserPreferences {
 }
 
 export const portfolios = writable<Portfolio[]>([]);
-export const currentPortfolio = writable<Portfolio>({
+
+const CURRENT_PORTFOLIO_STORAGE_KEY = "folio.currentPortfolioId";
+
+export const AGGREGATED_PORTFOLIO: Portfolio = {
     id: "",
     name: "",
     base_currency: "USD",
     created_at: "",
     updated_at: "",
-});
+};
+
+function persistCurrentPortfolioSelection(id: string) {
+    if (!browser) return;
+
+    if (!id) {
+        localStorage.removeItem(CURRENT_PORTFOLIO_STORAGE_KEY);
+        return;
+    }
+
+    localStorage.setItem(CURRENT_PORTFOLIO_STORAGE_KEY, id);
+}
+
+function getSavedPortfolioId(): string {
+    if (!browser) return "";
+    return localStorage.getItem(CURRENT_PORTFOLIO_STORAGE_KEY) || "";
+}
+
+function createCurrentPortfolioStore() {
+    const { subscribe, set: baseSet, update: baseUpdate } =
+        writable<Portfolio>(AGGREGATED_PORTFOLIO);
+
+    return {
+        subscribe,
+        set: (portfolio: Portfolio) => {
+            baseSet(portfolio);
+            persistCurrentPortfolioSelection(portfolio?.id || "");
+        },
+        update: (updater: (value: Portfolio) => Portfolio) => {
+            baseUpdate((current) => {
+                const next = updater(current);
+                persistCurrentPortfolioSelection(next?.id || "");
+                return next;
+            });
+        },
+    };
+}
+
+export const currentPortfolio = createCurrentPortfolioStore();
+
+export function selectInitialPortfolio(availablePortfolios: Portfolio[]) {
+    const savedId = getSavedPortfolioId();
+
+    if (!savedId) {
+        currentPortfolio.set(availablePortfolios[0] || AGGREGATED_PORTFOLIO);
+        return;
+    }
+
+    const matched = availablePortfolios.find((p) => p.id === savedId);
+    currentPortfolio.set(
+        matched || availablePortfolios[0] || AGGREGATED_PORTFOLIO,
+    );
+}
+
 export const trades = writable<Trade[]>([]);
 
 export const userPreferences = writable<UserPreferences>({

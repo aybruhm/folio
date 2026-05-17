@@ -6,12 +6,15 @@
     import OfflineStatus from "$lib/components/OfflineStatus.svelte";
     import { onMount } from "svelte";
     import { page } from "$app/stores";
-    import { portfolios, currentPortfolio } from "$lib/stores";
+    import {
+        portfolios,
+        selectInitialPortfolio,
+        type Portfolio,
+    } from "$lib/stores";
     import { initializeAuthStore } from "$lib/stores/offlineAuth";
     import { syncQueuedData } from "$lib/stores/offline";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
-    import type { Portfolio } from "$lib/api/types";
 
     let isDark = true;
     let sidebarOpen = false;
@@ -70,10 +73,17 @@
     async function loadPortfolios() {
         try {
             const data = await portfolioController.listPortfolios();
-            portfolios.set((data || []) as any);
-            if (data && data.length > 0) {
-                currentPortfolio.set(data[0] as any);
-            }
+            const portfolioList: Portfolio[] = ((data || []) as any[]).map(
+                (p) => ({
+                    ...p,
+                    name: p.name || "",
+                    base_currency: p.base_currency || "USD",
+                    created_at: p.created_at || "",
+                    updated_at: p.updated_at || "",
+                }),
+            );
+            portfolios.set(portfolioList as any);
+            selectInitialPortfolio(portfolioList);
         } catch (e) {
             console.error("Failed to load portfolios:", e);
         }
