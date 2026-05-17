@@ -191,7 +191,7 @@
             price: String(row.price),
             trade_currency: row.trade_currency,
             fees: String(row.fees ?? 0),
-            market_data_provider: "yfinance",
+            market_data_provider: row.market_data_provider,
         };
         showEditModal = true;
     }

@@ -246,5 +246,6 @@ class TradeInteractor(ITradeUseCase):
             "trade_currency": trade.trade_currency.value,
             "fees": trade.fees / 100,
             "notes": trade.notes,
+            "market_data_provider": trade.market_data_provider,
             "created_at": trade.created_at.isoformat(),
         }
