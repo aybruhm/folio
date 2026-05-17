@@ -26,6 +26,23 @@ services:
                 max-size: "10m"
                 max-file: "3"
 
+    cache:
+        image: valkey/valkey:9.0.4
+        container_name: folio-cache
+        restart: unless-stopped
+        command: redis-server --save 60 1 --loglevel warning
+        volumes:
+            - folio_cache_data:/var/lib/redis/data
+        networks:
+            - folio-network
+        expose:
+            - "6379"
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+
     api:
         build:
             context: .
@@ -39,10 +56,13 @@ services:
         environment:
             # Override for Docker networking
             DATABASE_URL: postgresql+asyncpg://${DB_USER:-folio}:${DB_PASSWORD:-folio_dev_password}@db:5432/${DB_NAME:-folio}
+            REDIS_URL: redis://cache:6379/0
         ports:
             - "${API_PORT:-8000}:8000"
         depends_on:
             db:
+                condition: service_healthy
+            cache:
                 condition: service_healthy
         volumes:
             - ./api:/app
@@ -100,6 +120,8 @@ services:
 
 volumes:
     postgres_data:
+        driver: local
+    folio_cache_data:
         driver: local
 
 networks:
