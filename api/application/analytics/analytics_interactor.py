@@ -119,10 +119,19 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if from_ccy == to_ccy:
             return 100
 
+        # In-memory fallback cache (survives Valkey connection failures)
+        if not hasattr(self, "_fx_rate_cache"):
+            self._fx_rate_cache: dict[tuple[str, str], int] = {}
+
+        mem_key = (from_ccy, to_ccy)
+        if mem_key in self._fx_rate_cache:
+            return self._fx_rate_cache[mem_key]
+
         # Check Valkey cache first
         cache = PriceCache()
         cached = await cache.get_fx_rate(from_ccy, to_ccy)
         if cached is not None:
+            self._fx_rate_cache[mem_key] = cached
             return cached
 
         # Allow tests to inject a fake Ticker via _fx_ticker_factory
@@ -151,9 +160,11 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if rate == 0:
             inv_rate = await _fetch_one(to_ccy, from_ccy)
             if inv_rate > 0:
+                self._fx_rate_cache[mem_key] = -inv_rate
                 await cache.set_fx_rate(from_ccy, to_ccy, -inv_rate)
                 return -inv_rate
 
+        self._fx_rate_cache[mem_key] = rate
         await cache.set_fx_rate(from_ccy, to_ccy, rate)
         return rate
 
