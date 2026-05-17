@@ -139,7 +139,7 @@ class IAssetPricePort(ABC):
 class IFxRatePort(ABC):
     @abstractmethod
     async def get_fx_rate(
-        self, from_currency: Currency, to_currency: Currency, date: date
+        self, from_currency: Currency, to_currency: Currency, on_date: date
     ) -> Optional[int]: ...
 
     @abstractmethod

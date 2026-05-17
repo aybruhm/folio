@@ -13,13 +13,14 @@ def _asyncpg_url(url: str) -> str:
 
 
 class EnvironSettings(BaseModel):
-    # Database
+    # Platform
     DATABASE_URL: str = _asyncpg_url(
         os.getenv(
             "DATABASE_URL",
             "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres",
         )
     )
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     # API
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -42,6 +43,9 @@ class EnvironSettings(BaseModel):
     YFINANCE_PRICE_HISTORY_CACHE_TTL: int = int(
         os.getenv("YFINANCE_PRICE_HISTORY_CACHE_TTL", "86400")
     )  # 1 day
+    MARKET_DATA_CACHE_TTL: int = int(
+        os.getenv("MARKET_DATA_CACHE_TTL", "1800")
+    )  # 30 minutes — cached in Valkey
     TIINGO_API_KEY: str = os.getenv("TIINGO_API_KEY", "")
     NGNMARKET_API_BASE_URL: str = os.getenv(
         "NGNMARKET_API_BASE_URL", "https://api.ngnmarket.com/v1"

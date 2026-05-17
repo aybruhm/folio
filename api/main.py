@@ -17,12 +17,22 @@ from infrastructure.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting Folio API...")
+    # Pre-warm Valkey connection (lazy-init on first use, but explicit here)
+    try:
+        from infrastructure.cache.valkey_client import get_valkey_client
+
+        get_valkey_client()
+        print("Valkey cache client initialised")
+    except Exception as exc:
+        print(f"Valkey cache client initialisation failed (non-fatal): {exc}")
     try:
         yield
     finally:
         from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+        from infrastructure.cache.valkey_client import close_valkey_client
 
         await NgnMarketAdapter.close_shared_session()
+        await close_valkey_client()
         print("Shutting down Folio API...")
 
 

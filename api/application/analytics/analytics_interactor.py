@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.price_cache import PriceCache
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
@@ -81,6 +82,14 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if provider == "tiingo" and "." in symbol:
             symbol = symbol.replace(".", "-")
 
+        # Check Valkey cache before making any upstream calls.
+        # A cached sentinel (price=0) means the ticker is unsupported
+        # across all providers — skip the cascade entirely.
+        cache = PriceCache()
+        cached = await cache.get_price(symbol)
+        if cached is not None:
+            return cached[1]
+
         _, price = await self._get_price_from_provider(symbol, provider)
 
         if price == 0:
@@ -93,24 +102,37 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 if price > 0:
                     break
 
+        # If all providers returned 0, the YFinanceAdapter will have
+        # already cached a sentinel in get_current_price.  If a
+        # non-yfinance provider was used directly we cache one here.
+        if price == 0:
+            await cache.set_price(symbol, date.today(), 0)
+
         return price
 
     async def _get_fx_rate(self, from_ccy: str, to_ccy: str) -> int:
         """Return the ×100 rate for *from_ccy* → *to_ccy*.
 
-        Fetches the rate directly from Yahoo Finance using the
-        ``{from}{to}=X`` ticker format.  Falls back to the inverse pair
-        when the direct rate rounds to zero (weak→strong currency).
+        Checks the Valkey-backed PriceCache first; falls back to a
+        direct Yahoo Finance lookup via the ``{from}{to}=X`` ticker.
         """
         if from_ccy == to_ccy:
             return 100
 
+        # In-memory fallback cache (survives Valkey connection failures)
         if not hasattr(self, "_fx_rate_cache"):
             self._fx_rate_cache: dict[tuple[str, str], int] = {}
 
-        key = (from_ccy, to_ccy)
-        if key in self._fx_rate_cache:
-            return self._fx_rate_cache[key]
+        mem_key = (from_ccy, to_ccy)
+        if mem_key in self._fx_rate_cache:
+            return self._fx_rate_cache[mem_key]
+
+        # Check Valkey cache first
+        cache = PriceCache()
+        cached = await cache.get_fx_rate(from_ccy, to_ccy)
+        if cached is not None:
+            self._fx_rate_cache[mem_key] = cached
+            return cached
 
         # Allow tests to inject a fake Ticker via _fx_ticker_factory
         factory = getattr(self, "_fx_ticker_factory", None)
@@ -138,10 +160,12 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if rate == 0:
             inv_rate = await _fetch_one(to_ccy, from_ccy)
             if inv_rate > 0:
-                self._fx_rate_cache[key] = -inv_rate
+                self._fx_rate_cache[mem_key] = -inv_rate
+                await cache.set_fx_rate(from_ccy, to_ccy, -inv_rate)
                 return -inv_rate
 
-        self._fx_rate_cache[key] = rate
+        self._fx_rate_cache[mem_key] = rate
+        await cache.set_fx_rate(from_ccy, to_ccy, rate)
         return rate
 
     async def _convert_amount(self, amount: int, from_ccy: str, to_ccy: str) -> int:
