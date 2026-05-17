@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 import yfinance as yf
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.price_cache import PriceCache
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from domain.ports.outbound.repositories import IAssetPricePort, IFxRatePort
 from domain.value_objects.money import AssetMetadata, Currency
@@ -16,6 +17,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
     def __init__(self) -> None:
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        self.cache = PriceCache()
         # Lazy-init TradingView adapter to avoid importing it at module level
         self._tradingview = None
 
@@ -57,22 +59,41 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             return []
 
     async def get_current_price(self, ticker: str) -> Tuple[date, int]:
+        # Check Valkey cache first
+        cached = await self.cache.get_price(ticker)
+        if cached is not None:
+            return cached
+
         try:
             t = yf.Ticker(ticker)
             data = t.history(period="1d")
             if data.empty:
                 logger.warning(f"No current price found for {ticker}")
+                # Cache sentinel so we don't retry within TTL
+                await self.cache.set_price(ticker, date.today(), 0)
                 return (date.today(), 0)
 
-            close = float(data["Close"].iloc[-1])
-            return (data.index[-1].date(), round(close * 100))
+            price_date = data.index[-1].date()
+            close = round(float(data["Close"].iloc[-1]) * 100)
+
+            # Populate Valkey cache
+            await self.cache.set_price(ticker, price_date, close)
+
+            return (price_date, close)
         except Exception as e:
             logger.error(f"Error fetching current price for {ticker}: {e}")
+            # Cache sentinel so we don't retry within TTL
+            await self.cache.set_price(ticker, date.today(), 0)
             return (date.today(), 0)
 
     async def get_asset_metadata(
         self, ticker: str, currency: str = "USD"
     ) -> Optional[AssetMetadata]:
+        # Check Valkey cache first
+        cached = await self.cache.get_metadata(ticker)
+        if cached is not None:
+            return cached
+
         symbols = [ticker, f"{ticker.upper()}-{currency}"]
 
         if self._is_fx_pair(ticker):
@@ -86,7 +107,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
                     continue
 
                 asset_class = self._determine_asset_class(symbol, info)
-                return AssetMetadata(
+                metadata = AssetMetadata(
                     ticker=ticker,
                     name=info.get("longName") or info.get("shortName") or ticker,
                     asset_class=asset_class,
@@ -97,17 +118,21 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
                     country=info.get("country"),
                     isin=info.get("isin"),
                 )
+                await self.cache.set_metadata(metadata)
+                return metadata
             except Exception as e:
                 logger.error(f"Error fetching metadata for {symbol}: {e}")
 
         tiingo_metadata = await self.tiingo.get_asset_metadata(ticker, currency)
         if tiingo_metadata:
             logger.info(f"Using Tiingo fallback metadata for {ticker}")
+            await self.cache.set_metadata(tiingo_metadata)
             return tiingo_metadata
 
         ngnmarket_metadata = await self.ngnmarket.get_asset_metadata(ticker, currency)
         if ngnmarket_metadata:
             logger.info(f"Using NGNMarket fallback metadata for {ticker}")
+            await self.cache.set_metadata(ngnmarket_metadata)
             return ngnmarket_metadata
 
         tradingview_metadata = await self.tradingview.get_asset_metadata(
@@ -115,38 +140,60 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         )
         if tradingview_metadata:
             logger.info(f"Using TradingView fallback metadata for {ticker}")
+            await self.cache.set_metadata(tradingview_metadata)
             return tradingview_metadata
 
         logger.warning(f"Incomplete metadata for {ticker}")
         return None
 
     async def get_fx_rate(
-        self, from_currency: Currency, to_currency: Currency, date: date
+        self, from_currency: Currency, to_currency: Currency, on_date: date
     ) -> Optional[int]:
         if from_currency == to_currency:
             return 100  # 1.00 × 100
 
+        # Check Valkey historical FX cache
+        cached = await self.cache.get_historical_fx_rate(
+            from_currency.value, to_currency.value, on_date
+        )
+        if cached is not None:
+            return cached
+
         try:
             ticker = f"{from_currency.value}{to_currency.value}=X"
             t = yf.Ticker(ticker)
-            data = t.history(start=date, end=date + timedelta(days=1))
+            data = t.history(start=on_date, end=on_date + timedelta(days=1))
 
             if data.empty:
-                logger.warning(f"No FX rate found for {ticker} on {date}")
-                return await self.ngnmarket.get_fx_rate(
-                    from_currency, to_currency, date
+                logger.warning(f"No FX rate found for {ticker} on {on_date}")
+                rate = await self.ngnmarket.get_fx_rate(
+                    from_currency, to_currency, on_date
                 )
+                if rate is not None:
+                    await self.cache.set_historical_fx_rate(
+                        from_currency.value, to_currency.value, on_date, rate
+                    )
+                return rate
 
-            return round(float(data["Close"].iloc[-1]) * 100)
+            rate = round(float(data["Close"].iloc[-1]) * 100)
+            await self.cache.set_historical_fx_rate(
+                from_currency.value, to_currency.value, on_date, rate
+            )
+            return rate
         except Exception as e:
             logger.error(f"Error fetching FX rate {from_currency}/{to_currency}: {e}")
-            return await self.ngnmarket.get_fx_rate(from_currency, to_currency, date)
+            return await self.ngnmarket.get_fx_rate(from_currency, to_currency, on_date)
 
     async def get_current_rate(
         self, from_currency: Currency, to_currency: Currency
     ) -> Optional[int]:
         if from_currency == to_currency:
             return 100  # 1.00 × 100
+
+        # Check Valkey cache first
+        cached = await self.cache.get_fx_rate(from_currency.value, to_currency.value)
+        if cached is not None:
+            return cached
 
         try:
             ticker = f"{from_currency.value}{to_currency.value}=X"
@@ -155,9 +202,16 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
             if data.empty:
                 logger.warning(f"No current rate found for {ticker}")
-                return await self.ngnmarket.get_current_rate(from_currency, to_currency)
+                rate = await self.ngnmarket.get_current_rate(from_currency, to_currency)
+                if rate is not None:
+                    await self.cache.set_fx_rate(
+                        from_currency.value, to_currency.value, rate
+                    )
+                return rate
 
-            return round(float(data["Close"].iloc[-1]) * 100)
+            rate = round(float(data["Close"].iloc[-1]) * 100)
+            await self.cache.set_fx_rate(from_currency.value, to_currency.value, rate)
+            return rate
         except Exception as e:
             logger.error(
                 f"Error fetching current FX rate {from_currency}/{to_currency}: {e}"
