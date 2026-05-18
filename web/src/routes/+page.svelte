@@ -262,7 +262,11 @@
             </div>
 
             <!-- Performance Chart -->
-            <Card title="Performance" subtitle="Portfolio value over time">
+            <Card
+                title="Performance"
+                subtitle="Portfolio value over time"
+                className="md:px-4"
+            >
                 <LineChart
                     data={stats.performance_history}
                     title=""
@@ -275,6 +279,7 @@
             <Card
                 title="Contribution History"
                 subtitle="Net contributions over time"
+                className="md:px-4"
             >
                 <LineChart
                     data={stats.contribution_history}
