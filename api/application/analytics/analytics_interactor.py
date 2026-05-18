@@ -90,7 +90,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if cached is not None:
             return cached[1]
 
-        _, price = await self._get_price_from_provider(symbol, provider)
+        price_date, price = await self._get_price_from_provider(symbol, provider)
 
         if price == 0:
             # Cascade through every other provider in priority order
@@ -98,15 +98,22 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             for fallback in fallback_order:
                 if fallback == provider:
                     continue
-                _, price = await self._get_price_from_provider(symbol, fallback)
+                price_date, price = await self._get_price_from_provider(
+                    symbol, fallback
+                )
                 if price > 0:
                     break
 
+        # Persist successful non-yfinance lookups too, so reloads don't
+        # repeatedly hit upstream APIs (especially rate-limited providers).
+        if price > 0:
+            await cache.set_price(symbol, price_date or date.today(), price)
+            return price
+
         # If all providers returned 0, the YFinanceAdapter will have
-        # already cached a sentinel in get_current_price.  If a
+        # already cached a sentinel in get_current_price. If a
         # non-yfinance provider was used directly we cache one here.
-        if price == 0:
-            await cache.set_price(symbol, date.today(), 0)
+        await cache.set_price(symbol, date.today(), 0)
 
         return price
 
