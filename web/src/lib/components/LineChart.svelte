@@ -7,13 +7,10 @@
     export let height: string = "h-80";
     export let currency: string = "USD";
 
-    const W = 1200,
-        H = 420;
-    const ML = 60,
-        MR = 16,
-        MT = 16,
+    const W = 1300,
+        H = 360;
+    const MT = 16,
         MB = 40;
-    const innerW = W - ML - MR;
     const innerH = H - MT - MB;
 
     $: minVal = data.length ? Math.min(...data.map((d) => d.value)) : 0;
@@ -22,11 +19,6 @@
     $: yMin = minVal - yPad;
     $: yMax = maxVal + yPad;
     $: yRange = yMax - yMin;
-
-    function xPos(i: number): number {
-        if (data.length <= 1) return ML + innerW / 2;
-        return ML + (i / (data.length - 1)) * innerW;
-    }
 
     function yPos(v: number): number {
         return MT + innerH - ((v - yMin) / yRange) * innerH;
@@ -42,7 +34,13 @@
         return d;
     }
 
-    $: pts = data.map((d, i) => ({ x: xPos(i), y: yPos(d.value) }));
+    $: pts = data.map((d, i) => ({
+        x:
+            data.length <= 1
+                ? chartML + innerW / 2
+                : chartML + (i / (data.length - 1)) * innerW,
+        y: yPos(d.value),
+    }));
     $: linePath = buildPath(pts);
     $: areaPath =
         pts.length >= 2
@@ -56,10 +54,40 @@
 
     $: xTicks = (() => {
         if (!data.length) return [];
+        if (data.length === 1) {
+            return [
+                {
+                    label: data[0].name,
+                    x: chartML + innerW / 2,
+                    anchor: "middle",
+                },
+            ];
+        }
+
         const count = Math.min(6, data.length);
+        const edgePad = isMobile ? 8 : 4;
+
         return Array.from({ length: count }, (_, i) => {
             const idx = Math.round((i / (count - 1)) * (data.length - 1));
-            return { label: data[idx].name, x: xPos(idx) };
+            const baseX = chartML + (idx / (data.length - 1)) * innerW;
+
+            if (i === 0) {
+                return {
+                    label: data[idx].name,
+                    x: chartML + edgePad,
+                    anchor: "start",
+                };
+            }
+
+            if (i === count - 1) {
+                return {
+                    label: data[idx].name,
+                    x: W - chartMR - edgePad,
+                    anchor: "end",
+                };
+            }
+
+            return { label: data[idx].name, x: baseX, anchor: "middle" };
         });
     })();
 
@@ -71,7 +99,7 @@
         if (!svgEl || !data.length) return;
         const rect = svgEl.getBoundingClientRect();
         const svgX = ((e.clientX - rect.left) / rect.width) * W;
-        const frac = Math.max(0, Math.min(1, (svgX - ML) / innerW));
+        const frac = Math.max(0, Math.min(1, (svgX - chartML) / innerW));
         hoverIdx = Math.round(frac * (data.length - 1));
     }
 
@@ -84,12 +112,32 @@
         update();
         media.addEventListener("change", update);
 
+        const resizeObserver =
+            typeof ResizeObserver !== "undefined" && chartWrapperEl
+                ? new ResizeObserver(() => {
+                      chartPxWidth = Math.max(
+                          minChartWidth,
+                          chartWrapperEl.clientWidth || minChartWidth,
+                      );
+                  })
+                : null;
+
+        if (resizeObserver && chartWrapperEl) {
+            resizeObserver.observe(chartWrapperEl);
+        }
+
+        chartPxWidth = Math.max(
+            minChartWidth,
+            chartWrapperEl?.clientWidth || minChartWidth,
+        );
+
         return () => {
             media.removeEventListener("change", update);
+            resizeObserver?.disconnect();
         };
     });
 
-    $: hoverX = hoverIdx >= 0 ? xPos(hoverIdx) : -1;
+    $: hoverX = hoverIdx >= 0 ? (pts[hoverIdx]?.x ?? -1) : -1;
     $: hoverY = hoverIdx >= 0 ? yPos(data[hoverIdx]?.value ?? 0) : -1;
     $: tooltipRight = hoverIdx >= 0 && hoverIdx > data.length * 0.65;
 
@@ -98,13 +146,29 @@
     // This keeps horizontal scroll useful without a giant empty-looking gap.
     $: minChartWidth = Math.min(W, Math.max(640, data.length * 22));
 
+    let chartWrapperEl: HTMLDivElement;
+    let chartPxWidth = W;
+
+    $: chartML = isMobile ? 62 : 42;
+    $: chartMR = isMobile ? 12 : 8;
+    $: innerW = W - chartML - chartMR;
+
+    $: if (chartWrapperEl) {
+        chartPxWidth = Math.max(
+            minChartWidth,
+            chartWrapperEl.clientWidth || minChartWidth,
+        );
+    }
+
     // SVG text uses viewBox units, not CSS px. Because the chart may render
-    // narrower than its 1200-unit viewBox on mobile, we convert target pixel
+    // narrower than its 1300-unit viewBox on mobile, we convert target pixel
     // sizes into SVG units so font size visually matches the intended size.
-    $: viewScale = minChartWidth / W;
+    $: viewScale = chartPxWidth / W;
     $: svgUnitsPerPx = 1 / Math.max(viewScale, 0.01);
 
-    $: axisFontSize = (isMobile ? 11 : 10) * svgUnitsPerPx;
+    $: axisFontSize = (isMobile ? 12 : 10) * svgUnitsPerPx;
+    $: axisLabelColor = "hsl(var(--muted-foreground))";
+    $: axisLabelWeight = "400";
     $: tooltipTitleFontSize = (isMobile ? 12 : 10) * svgUnitsPerPx;
     $: tooltipValueFontSize = (isMobile ? 14 : 13) * svgUnitsPerPx;
 
@@ -125,7 +189,10 @@
     }
 </script>
 
-<div class="{height} relative select-none overflow-x-auto">
+<div
+    bind:this={chartWrapperEl}
+    class="{height} relative select-none overflow-x-auto"
+>
     {#if data.length === 0}
         <div
             class="flex items-center justify-center h-full text-muted-foreground text-sm"
@@ -138,6 +205,8 @@
                 bind:this={svgEl}
                 viewBox="0 0 {W} {H}"
                 class="w-full h-full cursor-crosshair"
+                role="img"
+                aria-label={title || "Line chart"}
                 on:mousemove={onMouseMove}
                 on:mouseleave={() => (hoverIdx = -1)}
             >
@@ -160,39 +229,32 @@
                             stop-opacity="0.02"
                         />
                     </linearGradient>
-                    <clipPath id="chartClip">
-                        <rect x={ML} y={MT} width={innerW} height={innerH} />
-                    </clipPath>
                 </defs>
 
                 <!-- Grid lines + Y labels -->
                 {#each yTicks as tick}
                     <line
-                        x1={ML}
+                        x1={chartML}
                         y1={tick.y}
-                        x2={W - MR}
+                        x2={W - chartMR}
                         y2={tick.y}
                         stroke="hsl(var(--border))"
                         stroke-width="1"
                         opacity="0.6"
                     />
                     <text
-                        x={ML - 6}
+                        x={chartML - 2}
                         y={tick.y + 4}
                         text-anchor="end"
                         font-size={axisFontSize}
-                        fill="hsl(var(--muted-foreground))"
-                        >{abbrev(tick.val)}</text
+                        fill={axisLabelColor}
+                        font-weight={axisLabelWeight}>{abbrev(tick.val)}</text
                     >
                 {/each}
 
                 <!-- Area fill -->
                 {#if areaPath}
-                    <path
-                        d={areaPath}
-                        fill="url(#lineAreaGrad)"
-                        clip-path="url(#chartClip)"
-                    />
+                    <path d={areaPath} fill="url(#lineAreaGrad)" />
                 {/if}
 
                 <!-- Line -->
@@ -204,7 +266,13 @@
                         stroke-width="2"
                         stroke-linejoin="round"
                         stroke-linecap="round"
-                        clip-path="url(#chartClip)"
+                    />
+                {:else if pts.length === 1}
+                    <circle
+                        cx={pts[0].x}
+                        cy={pts[0].y}
+                        r="3.5"
+                        fill="hsl(var(--accent))"
                     />
                 {/if}
 
@@ -213,7 +281,7 @@
                     <text
                         x={tick.x}
                         y={H - 4}
-                        text-anchor="middle"
+                        text-anchor={tick.anchor}
                         font-size={axisFontSize}
                         fill="hsl(var(--muted-foreground))">{tick.label}</text
                     >
