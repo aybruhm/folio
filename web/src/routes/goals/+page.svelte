@@ -4,6 +4,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import GoalForm from "$lib/components/GoalForm.svelte";
     import Badge from "$lib/components/Badge.svelte";
+    import Amount from "$lib/components/Amount.svelte";
     import { currentPortfolio, baseCurrency } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { PortfolioController, GoalController } from "$lib/api/controllers";
@@ -256,10 +257,12 @@
                                     <span
                                         class="text-sm md:text-base font-semibold text-foreground"
                                     >
-                                        {formatCurrency(
-                                            goal.target_net_worth,
-                                            $baseCurrency,
-                                        )}
+                                        <Amount
+                                            value={formatCurrency(
+                                                goal.target_net_worth,
+                                                $baseCurrency,
+                                            )}
+                                        />
                                     </span>
                                 </div>
                                 <div class="flex justify-between">
@@ -270,10 +273,12 @@
                                     <span
                                         class="text-sm md:text-base font-semibold text-foreground"
                                     >
-                                        {formatCurrency(
-                                            currentPortfolioValue,
-                                            $baseCurrency,
-                                        )}
+                                        <Amount
+                                            value={formatCurrency(
+                                                currentPortfolioValue,
+                                                $baseCurrency,
+                                            )}
+                                        />
                                     </span>
                                 </div>
                             </div>

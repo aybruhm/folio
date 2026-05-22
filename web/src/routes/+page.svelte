@@ -2,6 +2,7 @@
     import Card from "$lib/components/Card.svelte";
     import LineChart from "$lib/components/LineChart.svelte";
     import DonutChart from "$lib/components/DonutChart.svelte";
+    import Amount from "$lib/components/Amount.svelte";
     import { formatCurrency, formatPercent } from "$lib/utils/format";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
@@ -228,7 +229,9 @@
                     <div
                         class="text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight break-all"
                     >
-                        {formatCurrency(stats.current_value, "USD")}
+                        <Amount
+                            value={formatCurrency(stats.current_value, "USD")}
+                        />
                     </div>
                 </Card>
 
@@ -236,7 +239,9 @@
                     <div
                         class="text-xl sm:text-2xl md:text-3xl font-bold text-foreground leading-tight break-all"
                     >
-                        {formatCurrency(stats.cost_basis, "USD")}
+                        <Amount
+                            value={formatCurrency(stats.cost_basis, "USD")}
+                        />
                     </div>
                 </Card>
 
@@ -246,7 +251,9 @@
                         class:text-positive={isPositive}
                         class:text-negative={!isPositive}
                     >
-                        {formatCurrency(stats.gain_loss, "USD")}
+                        <Amount
+                            value={formatCurrency(stats.gain_loss, "USD")}
+                        />
                     </div>
                 </Card>
 
@@ -256,7 +263,7 @@
                         class:text-positive={isPositive}
                         class:text-negative={!isPositive}
                     >
-                        {formatPercent(stats.return_percent)}
+                        <Amount value={formatPercent(stats.return_percent)} />
                     </div>
                 </Card>
             </div>
@@ -317,14 +324,21 @@
                                     {holding.ticker}
                                 </span>
                                 <span class="text-xs text-muted-foreground">
-                                    {formatPercent(holding.percent)} of portfolio
+                                    <Amount
+                                        value={formatPercent(holding.percent)}
+                                    /> of portfolio
                                 </span>
                             </div>
                             <div class="text-right ml-2 shrink-0">
                                 <div
                                     class="text-sm md:text-base font-semibold text-foreground"
                                 >
-                                    {formatCurrency(holding.value, "USD")}
+                                    <Amount
+                                        value={formatCurrency(
+                                            holding.value,
+                                            "USD",
+                                        )}
+                                    />
                                 </div>
                             </div>
                         </div>

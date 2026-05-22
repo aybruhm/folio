@@ -2,6 +2,7 @@
     import Card from "$lib/components/Card.svelte";
     import Button from "$lib/components/Button.svelte";
     import HoldingsTable from "$lib/components/HoldingsTable.svelte";
+    import Amount from "$lib/components/Amount.svelte";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
     import { currentPortfolio, baseCurrency } from "$lib/stores";
@@ -135,10 +136,12 @@
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <Card title="Current Value">
                         <p class="text-xl font-bold text-foreground">
-                            {formatCurrency(
-                                analytics.current_value,
-                                $baseCurrency,
-                            )}
+                            <Amount
+                                value={formatCurrency(
+                                    analytics.current_value,
+                                    $baseCurrency,
+                                )}
+                            />
                         </p>
                     </Card>
                     <Card title="Total Gain/Loss">
@@ -147,10 +150,12 @@
                             class:text-positive={analytics.total_gain_loss >= 0}
                             class:text-negative={analytics.total_gain_loss < 0}
                         >
-                            {formatCurrency(
-                                analytics.total_gain_loss,
-                                $baseCurrency,
-                            )}
+                            <Amount
+                                value={formatCurrency(
+                                    analytics.total_gain_loss,
+                                    $baseCurrency,
+                                )}
+                            />
                         </p>
                     </Card>
                     <Card title="TWR">

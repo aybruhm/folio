@@ -3,6 +3,7 @@
     import Button from "$lib/components/Button.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import PortfolioForm from "$lib/components/PortfolioForm.svelte";
+    import Amount from "$lib/components/Amount.svelte";
     import { portfolios } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
@@ -159,10 +160,12 @@
                                         <span
                                             class="text-sm md:text-base font-semibold text-foreground"
                                         >
-                                            {formatCurrency(
-                                                currentValue,
-                                                portfolio.base_currency,
-                                            )}
+                                            <Amount
+                                                value={formatCurrency(
+                                                    currentValue,
+                                                    portfolio.base_currency,
+                                                )}
+                                            />
                                         </span>
                                     </div>
                                     <div class="flex justify-between">
