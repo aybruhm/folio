@@ -124,5 +124,36 @@ export const baseCurrency = derived(
     },
 );
 
+function createHideAmountsStore() {
+    const HIDE_AMOUNTS_STORAGE_KEY = "folio.hideAmounts";
+
+    const stored = browser ? localStorage.getItem(HIDE_AMOUNTS_STORAGE_KEY) : null;
+    const initial = stored === "true";
+
+    const { subscribe, set, update } = writable<boolean>(initial);
+
+    return {
+        subscribe,
+        set: (value: boolean) => {
+            if (browser) {
+                localStorage.setItem(HIDE_AMOUNTS_STORAGE_KEY, String(value));
+            }
+            set(value);
+        },
+        toggle: () => {
+            update((current) => {
+                const next = !current;
+                if (browser) {
+                    localStorage.setItem(HIDE_AMOUNTS_STORAGE_KEY, String(next));
+                }
+                return next;
+            });
+        },
+        update,
+    };
+}
+
+export const hideAmounts = createHideAmountsStore();
+
 export const authUser = writable<AuthUser | null>(null);
 export const isAuthenticated = derived(authUser, ($user) => $user !== null);
