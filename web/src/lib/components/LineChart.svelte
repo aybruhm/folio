@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { formatCurrency } from "$lib/utils/format";
+    import { hideAmounts } from "$lib/stores";
 
     export let data: { name: string; value: number }[] = [];
     export let title: string = "";
@@ -248,7 +249,10 @@
                         text-anchor="end"
                         font-size={axisFontSize}
                         fill={axisLabelColor}
-                        font-weight={axisLabelWeight}>{abbrev(tick.val)}</text
+                        font-weight={axisLabelWeight}
+                        >{#if $hideAmounts}••••••{:else}{abbrev(
+                                tick.val,
+                            )}{/if}</text
                     >
                 {/each}
 
@@ -336,7 +340,10 @@
                         font-size={tooltipValueFontSize}
                         font-weight="600"
                         fill="hsl(var(--foreground))"
-                        >{formatCurrency(data[hoverIdx].value, currency)}</text
+                        >{#if $hideAmounts}••••••{:else}{formatCurrency(
+                                data[hoverIdx].value,
+                                currency,
+                            )}{/if}</text
                     >
                 {/if}
             </svg>

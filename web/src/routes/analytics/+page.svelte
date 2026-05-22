@@ -5,6 +5,7 @@
     import DonutChart from "$lib/components/DonutChart.svelte";
     import Select from "$lib/components/Select.svelte";
     import Badge from "$lib/components/Badge.svelte";
+    import Amount from "$lib/components/Amount.svelte";
     import { currentPortfolio, portfolios } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
@@ -303,7 +304,7 @@
                             class:text-negative={parseFloat(analyticsData.twr) <
                                 0}
                         >
-                            {formatPercent(analyticsData.twr)}
+                            <Amount value={formatPercent(analyticsData.twr)} />
                         </div>
                         <Badge variant="default">Standard Measure</Badge>
                     </div>
@@ -322,7 +323,7 @@
                             class:text-negative={parseFloat(analyticsData.mwr) <
                                 0}
                         >
-                            {formatPercent(analyticsData.mwr)}
+                            <Amount value={formatPercent(analyticsData.mwr)} />
                         </div>
                         <Badge variant="secondary">IRR Method</Badge>
                     </div>
