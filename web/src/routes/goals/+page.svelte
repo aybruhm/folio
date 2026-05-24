@@ -62,6 +62,7 @@
             const analyticsPromise = portfolioController.listPortfolioAnalytics(
                 {
                     timeframe: "1y",
+                    in_currency: "USD",
                 },
             );
 
