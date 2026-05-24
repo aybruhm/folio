@@ -62,7 +62,8 @@ class PerformanceService:
             for flow_date, flow_amount in cash_flows:
                 days_diff = (flow_date - start_date).days
                 years_diff = days_diff / 365.25
-                total += flow_amount / ((1 + rate) ** years_diff)
+                # Negate: IRR uses investor-centric convention (buys are outflows)
+                total += (-flow_amount) / ((1 + rate) ** years_diff)
 
             days_end = (end_date - start_date).days
             years_end = days_end / 365.25
