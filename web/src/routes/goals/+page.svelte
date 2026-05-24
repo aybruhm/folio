@@ -59,20 +59,22 @@
             loading = true;
 
             const goalsPromise = goalController.listGoals();
-            const analyticsPromise = $currentPortfolio?.id
-                ? portfolioController.getPortfolioAnalytics({
-                      portfolio_id: $currentPortfolio.id,
-                      timeframe: "1y",
-                  })
-                : Promise.resolve({ current_value: 0 });
+            const analyticsPromise = portfolioController.listPortfolioAnalytics(
+                {
+                    timeframe: "1y",
+                },
+            );
 
-            const [goalsResponse, analyticsData] = await Promise.all([
+            const [goalsResponse, allAnalytics] = await Promise.all([
                 goalsPromise,
                 analyticsPromise,
             ]);
 
             goals = goalsResponse;
-            currentPortfolioValue = Number(analyticsData.current_value ?? 0);
+            currentPortfolioValue = allAnalytics.reduce(
+                (sum, a) => sum + Number(a.current_value ?? 0),
+                0,
+            );
         } catch (e) {
             console.error("Failed to load goals:", e);
         } finally {
