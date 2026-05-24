@@ -1,10 +1,8 @@
-from datetime import datetime
 from uuid import UUID, uuid4
 
 import pytest
 
 from adapters.inbound.http import portfolio_routes
-from domain.entities.models import Portfolio
 from domain.value_objects.money import Currency
 
 
@@ -107,7 +105,9 @@ class FakePortfolioInteractor:
 
 
 def _patch_portfolio_interactor(monkeypatch, interactor):
-    monkeypatch.setattr(portfolio_routes, "PortfolioInteractor", lambda session: interactor)
+    monkeypatch.setattr(
+        portfolio_routes, "PortfolioInteractor", lambda session: interactor
+    )
 
 
 class FakeAnalyticsInteractor:
@@ -119,6 +119,7 @@ class FakeAnalyticsInteractor:
                 "current_price": 185.2,
                 "market_value": 1852.0,
                 "cost_basis": 1500.0,
+                "total_invested": 1500.0,
                 "total_return": 352.0,
                 "total_return_percent": 23.47,
             }
@@ -141,7 +142,9 @@ class FakeAnalyticsInteractor:
 
 
 def _patch_analytics_interactor(monkeypatch, interactor):
-    monkeypatch.setattr(portfolio_routes, "AnalyticsInteractor", lambda session, currency: interactor)
+    monkeypatch.setattr(
+        portfolio_routes, "AnalyticsInteractor", lambda session, currency: interactor
+    )
 
 
 class ErrorAnalyticsInteractor(FakeAnalyticsInteractor):
@@ -190,7 +193,17 @@ class ErrorAnalyticsInteractor(FakeAnalyticsInteractor):
         ("delete", "/api/v1/portfolios/{id}", None, None, 204, None),
     ],
 )
-def test_portfolio_crud_routes(authed_client, monkeypatch, fake_user, method, path, payload, params, expected_status, expected_key):
+def test_portfolio_crud_routes(
+    authed_client,
+    monkeypatch,
+    fake_user,
+    method,
+    path,
+    payload,
+    params,
+    expected_status,
+    expected_key,
+):
     interactor = FakePortfolioInteractor(fake_user.id)
     _patch_portfolio_interactor(monkeypatch, interactor)
     portfolio_id = interactor.portfolio_id
@@ -222,7 +235,9 @@ def test_portfolio_crud_routes(authed_client, monkeypatch, fake_user, method, pa
         ("/api/v1/portfolios/{id}/allocation", "allocations"),
     ],
 )
-def test_portfolio_analytics_routes(authed_client, monkeypatch, fake_user, path, expected_body):
+def test_portfolio_analytics_routes(
+    authed_client, monkeypatch, fake_user, path, expected_body
+):
     interactor = FakePortfolioInteractor(fake_user.id)
     _patch_portfolio_interactor(monkeypatch, interactor)
     _patch_analytics_interactor(monkeypatch, FakeAnalyticsInteractor())
@@ -242,7 +257,9 @@ def test_portfolio_analytics_routes(authed_client, monkeypatch, fake_user, path,
         ("missing", "/api/v1/portfolios/{id}/analytics", 400),
     ],
 )
-def test_portfolio_error_paths(authed_client, monkeypatch, fake_user, mode, path, expected_status):
+def test_portfolio_error_paths(
+    authed_client, monkeypatch, fake_user, mode, path, expected_status
+):
     interactor = FakePortfolioInteractor(fake_user.id, mode=mode)
     _patch_portfolio_interactor(monkeypatch, interactor)
     _patch_analytics_interactor(monkeypatch, FakeAnalyticsInteractor())
@@ -253,8 +270,13 @@ def test_portfolio_error_paths(authed_client, monkeypatch, fake_user, mode, path
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-@pytest.mark.parametrize("method,path", [("put", "/api/v1/portfolios/{id}"), ("delete", "/api/v1/portfolios/{id}")])
-def test_portfolio_update_delete_missing_paths(authed_client, monkeypatch, fake_user, method, path):
+@pytest.mark.parametrize(
+    "method,path",
+    [("put", "/api/v1/portfolios/{id}"), ("delete", "/api/v1/portfolios/{id}")],
+)
+def test_portfolio_update_delete_missing_paths(
+    authed_client, monkeypatch, fake_user, method, path
+):
     interactor = FakePortfolioInteractor(fake_user.id, mode="missing")
     _patch_portfolio_interactor(monkeypatch, interactor)
     _patch_analytics_interactor(monkeypatch, FakeAnalyticsInteractor())
@@ -268,7 +290,9 @@ def test_portfolio_update_delete_missing_paths(authed_client, monkeypatch, fake_
 
 @pytest.mark.integration
 @pytest.mark.edge_case
-def test_portfolio_holdings_allows_currency_override(authed_client, monkeypatch, fake_user):
+def test_portfolio_holdings_allows_currency_override(
+    authed_client, monkeypatch, fake_user
+):
     interactor = FakePortfolioInteractor(fake_user.id)
     _patch_portfolio_interactor(monkeypatch, interactor)
     _patch_analytics_interactor(monkeypatch, FakeAnalyticsInteractor())
@@ -282,7 +306,9 @@ def test_portfolio_holdings_allows_currency_override(authed_client, monkeypatch,
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-def test_portfolio_create_generic_exception_returns_400(authed_client, monkeypatch, fake_user):
+def test_portfolio_create_generic_exception_returns_400(
+    authed_client, monkeypatch, fake_user
+):
     interactor = FakePortfolioInteractor(fake_user.id, mode="create-error")
     _patch_portfolio_interactor(monkeypatch, interactor)
     response = authed_client.post(
@@ -294,7 +320,9 @@ def test_portfolio_create_generic_exception_returns_400(authed_client, monkeypat
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-def test_portfolio_update_delete_wrong_owner_paths(authed_client, monkeypatch, fake_user):
+def test_portfolio_update_delete_wrong_owner_paths(
+    authed_client, monkeypatch, fake_user
+):
     interactor = FakePortfolioInteractor(fake_user.id, mode="wrong-owner")
     _patch_portfolio_interactor(monkeypatch, interactor)
     update = authed_client.put(
@@ -308,7 +336,9 @@ def test_portfolio_update_delete_wrong_owner_paths(authed_client, monkeypatch, f
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-def test_portfolio_update_delete_generic_exception_paths(authed_client, monkeypatch, fake_user):
+def test_portfolio_update_delete_generic_exception_paths(
+    authed_client, monkeypatch, fake_user
+):
     _patch_analytics_interactor(monkeypatch, FakeAnalyticsInteractor())
     update_interactor = FakePortfolioInteractor(fake_user.id, mode="update-error")
     _patch_portfolio_interactor(monkeypatch, update_interactor)
@@ -320,26 +350,35 @@ def test_portfolio_update_delete_generic_exception_paths(authed_client, monkeypa
 
     delete_interactor = FakePortfolioInteractor(fake_user.id, mode="delete-error")
     _patch_portfolio_interactor(monkeypatch, delete_interactor)
-    delete = authed_client.delete(f"/api/v1/portfolios/{delete_interactor.portfolio_id}")
+    delete = authed_client.delete(
+        f"/api/v1/portfolios/{delete_interactor.portfolio_id}"
+    )
     assert delete.status_code == 400
 
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-def test_portfolio_analytics_subroutes_generic_exception_paths(authed_client, monkeypatch, fake_user):
+def test_portfolio_analytics_subroutes_generic_exception_paths(
+    authed_client, monkeypatch, fake_user
+):
     interactor = FakePortfolioInteractor(fake_user.id)
     _patch_portfolio_interactor(monkeypatch, interactor)
 
     _patch_analytics_interactor(monkeypatch, ErrorAnalyticsInteractor("holdings"))
     holdings = authed_client.get(
-        f"/api/v1/portfolios/{interactor.portfolio_id}/holdings", params={"in_currency": "XXX"}
+        f"/api/v1/portfolios/{interactor.portfolio_id}/holdings",
+        params={"in_currency": "XXX"},
     )
     assert holdings.status_code == 400
 
     _patch_analytics_interactor(monkeypatch, ErrorAnalyticsInteractor("performance"))
-    performance = authed_client.get(f"/api/v1/portfolios/{interactor.portfolio_id}/performance")
+    performance = authed_client.get(
+        f"/api/v1/portfolios/{interactor.portfolio_id}/performance"
+    )
     assert performance.status_code == 400
 
     _patch_analytics_interactor(monkeypatch, ErrorAnalyticsInteractor("allocation"))
-    allocation = authed_client.get(f"/api/v1/portfolios/{interactor.portfolio_id}/allocation")
+    allocation = authed_client.get(
+        f"/api/v1/portfolios/{interactor.portfolio_id}/allocation"
+    )
     assert allocation.status_code == 400
