@@ -231,6 +231,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
             if is_cash:
                 cash_balance_int = 0  # ×100 — built in base currency
+                total_invested_int = (
+                    0  # sum of all deposits (buys), never reduced by sells
+                )
                 for trade in holding_data["trades"]:
                     trade_value_int = (trade.quantity * trade.price) // 10000
                     converted = await self._convert_amount(
@@ -240,6 +243,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     )
                     if trade.trade_type.value == "buy":
                         cash_balance_int += converted
+                        total_invested_int += converted
                     elif trade.trade_type.value == "sell":
                         cash_balance_int -= converted
 
@@ -256,6 +260,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 lots: list[
                     dict
                 ] = []  # [{"qty": int(×10000), "cost": int(×100 in base ccy)}]
+                total_invested_int = 0  # sum of all buy costs, never reduced by sells
                 for trade in holding_data["trades"]:
                     if trade.trade_type.value == "buy":
                         trade_cost_in_trade_ccy = (
@@ -266,6 +271,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                             trade.trade_currency.value,
                             self.base_currency.value,
                         )
+                        total_invested_int += trade_cost_in_base
                         lots.append({"qty": trade.quantity, "cost": trade_cost_in_base})
                     elif trade.trade_type.value == "sell":
                         remaining_to_sell = trade.quantity
@@ -316,6 +322,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     "current_price": current_price_int / 100,
                     "market_value": market_value_int / 100,
                     "cost_basis": cost_basis_int / 100,
+                    "total_invested": total_invested_int / 100,
                     "total_return": total_return_int / 100,
                     "total_return_percent": (
                         round(total_return_int / cost_basis_int * 100, 2)

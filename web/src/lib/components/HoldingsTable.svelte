@@ -20,6 +20,7 @@
         { key: "average_cost", label: "Avg Cost", sortable: true },
         { key: "current_price", label: "Current Price", sortable: true },
         { key: "current_value", label: "Current Value", sortable: true },
+        { key: "total_invested", label: "Invested capital", sortable: true },
         { key: "gain_loss", label: "Gain/Loss", sortable: true },
         { key: "return_pct", label: "Return %", sortable: true },
         { key: "actions", label: "", sortable: false },
@@ -118,6 +119,14 @@
                                 ><Amount
                                     value={formatCurrency(
                                         row.current_value,
+                                        row.currency,
+                                    )}
+                                /></td
+                            >
+                            <td class="p-4 align-middle"
+                                ><Amount
+                                    value={formatCurrency(
+                                        row.total_invested,
                                         row.currency,
                                     )}
                                 /></td

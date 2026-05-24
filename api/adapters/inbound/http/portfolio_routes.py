@@ -332,17 +332,20 @@ async def get_holdings(
                 ),
                 "current_price": h["current_price"],
                 "total_value": h["market_value"],
+                "total_invested": h["total_invested"],
                 "gain_loss": h["total_return"],
                 "gain_loss_percent": h["total_return_percent"],
             }
             for h in holdings
         ]
         total_value = sum(float(h["market_value"]) for h in holdings)
+        total_invested = sum(float(h["total_invested"]) for h in holdings)
 
         return {
             "data": data,
             "currency": currency.value,
             "total_value": float(total_value),
+            "total_invested": float(total_invested),
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -66,6 +66,7 @@
                                 average_cost: h.avg_price,
                                 current_price: h.current_price,
                                 current_value: h.total_value,
+                                total_invested: h.total_invested,
                                 gain_loss: h.gain_loss,
                                 return_pct: h.gain_loss_percent,
                                 currency: response.currency ?? "USD",
@@ -90,6 +91,7 @@
                     average_cost: h.avg_price,
                     current_price: h.current_price,
                     current_value: h.total_value,
+                    total_invested: h.total_invested,
                     gain_loss: h.gain_loss,
                     return_pct: h.gain_loss_percent,
                     currency: response.currency ?? "USD",
@@ -108,6 +110,7 @@
                             average_cost: 0,
                             current_price: holding.current_price,
                             current_value: 0,
+                            total_invested: 0,
                             gain_loss: 0,
                             return_pct: 0,
                             currency: holding.currency,
@@ -118,6 +121,9 @@
                     );
                     holdingsByTicker[ticker].current_value += parseFloat(
                         holding.current_value,
+                    );
+                    holdingsByTicker[ticker].total_invested += parseFloat(
+                        holding.total_invested || 0,
                     );
                     holdingsByTicker[ticker].gain_loss += parseFloat(
                         holding.gain_loss,
@@ -196,7 +202,7 @@
         }
     }
 
-    $: (searchTerm, filterHoldings());
+    $: searchTerm, filterHoldings();
 </script>
 
 <svelte:head>
