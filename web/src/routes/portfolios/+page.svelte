@@ -1,5 +1,6 @@
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
+    import Skeleton from "$lib/components/Skeleton.svelte";
     import Button from "$lib/components/Button.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import PortfolioForm from "$lib/components/PortfolioForm.svelte";
@@ -117,8 +118,34 @@
         </div>
 
         {#if loading}
-            <div class="flex justify-center py-12">
-                <div class="text-muted-foreground">Loading portfolios...</div>
+            <div
+                class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3"
+            >
+                {#each Array(6) as _}
+                    <Card>
+                        <div class="space-y-4">
+                            <Skeleton className="h-5 w-3/4" />
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <Skeleton className="h-4 w-16" />
+                                    <Skeleton className="h-4 w-28" />
+                                </div>
+                                <div class="flex justify-between">
+                                    <Skeleton className="h-4 w-12" />
+                                    <Skeleton className="h-4 w-16" />
+                                </div>
+                                <div class="flex justify-between">
+                                    <Skeleton className="h-4 w-12" />
+                                    <Skeleton className="h-4 w-16" />
+                                </div>
+                            </div>
+                            <div class="flex gap-2 pt-2">
+                                <Skeleton className="h-8 w-16 rounded-md" />
+                                <Skeleton className="h-8 w-16 rounded-md" />
+                            </div>
+                        </div>
+                    </Card>
+                {/each}
             </div>
         {:else if $portfolios.length === 0}
             <Card

@@ -1,5 +1,6 @@
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
+    import Skeleton from "$lib/components/Skeleton.svelte";
     import LineChart from "$lib/components/LineChart.svelte";
     import DonutChart from "$lib/components/DonutChart.svelte";
     import Amount from "$lib/components/Amount.svelte";
@@ -217,11 +218,35 @@
         </div>
 
         {#if loading}
-            <div class="flex justify-center py-12">
-                <div class="text-muted-foreground">
-                    Loading portfolio data...
-                </div>
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+                {#each Array(4) as _}
+                    <Card>
+                        <Skeleton className="h-8 w-3/4" />
+                        <Skeleton className="h-4 w-1/2 mt-2" />
+                    </Card>
+                {/each}
             </div>
+            {#each Array(2) as _}
+                <Card><Skeleton className="h-48 md:h-72 w-full" /></Card>
+            {/each}
+            <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+                {#each Array(2) as _}
+                    <Card><Skeleton className="h-48 w-full" /></Card>
+                {/each}
+            </div>
+            <Card>
+                <div class="space-y-3">
+                    {#each Array(10) as _}
+                        <div class="flex items-center justify-between">
+                            <div class="space-y-1.5 flex-1">
+                                <Skeleton className="h-4 w-20" />
+                                <Skeleton className="h-3 w-32" />
+                            </div>
+                            <Skeleton className="h-4 w-24" />
+                        </div>
+                    {/each}
+                </div>
+            </Card>
         {:else}
             <!-- Stats Cards -->
             <div class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

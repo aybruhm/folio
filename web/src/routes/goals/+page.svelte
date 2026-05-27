@@ -1,5 +1,6 @@
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
+    import Skeleton from "$lib/components/Skeleton.svelte";
     import Button from "$lib/components/Button.svelte";
     import Modal from "$lib/components/Modal.svelte";
     import GoalForm from "$lib/components/GoalForm.svelte";
@@ -215,8 +216,36 @@
         </div>
 
         {#if loading}
-            <div class="flex justify-center py-12">
-                <div class="text-muted-foreground">Loading goals...</div>
+            <div class="space-y-4">
+                {#each Array(3) as _}
+                    <Card>
+                        <div class="space-y-4">
+                            <Skeleton className="h-5 w-40" />
+                            <div class="space-y-2">
+                                <div class="flex justify-between">
+                                    <Skeleton className="h-4 w-16" />
+                                    <Skeleton className="h-4 w-28" />
+                                </div>
+                                <div class="flex justify-between">
+                                    <Skeleton className="h-4 w-16" />
+                                    <Skeleton className="h-4 w-28" />
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <div class="flex justify-between">
+                                    <Skeleton className="h-3 w-16" />
+                                    <Skeleton className="h-4 w-20" />
+                                </div>
+                                <Skeleton className="h-2 w-full rounded-full" />
+                                <Skeleton className="h-3 w-24" />
+                            </div>
+                            <div class="flex gap-2 pt-2">
+                                <Skeleton className="h-8 w-16 rounded-md" />
+                                <Skeleton className="h-8 w-16 rounded-md" />
+                            </div>
+                        </div>
+                    </Card>
+                {/each}
             </div>
         {:else if goals.length === 0}
             <Card

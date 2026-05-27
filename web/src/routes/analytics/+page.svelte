@@ -1,5 +1,6 @@
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
+    import Skeleton from "$lib/components/Skeleton.svelte";
     import LineChart from "$lib/components/LineChart.svelte";
     import BarChart from "$lib/components/BarChart.svelte";
     import DonutChart from "$lib/components/DonutChart.svelte";
@@ -285,8 +286,22 @@
         </Card>
 
         {#if loading}
-            <div class="flex justify-center py-12">
-                <div class="text-muted-foreground">Loading analytics...</div>
+            <Card><Skeleton className="h-10 w-full" /></Card>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Card>
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-8 w-40 mt-2" />
+                </Card>
+                <Card>
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-8 w-40 mt-2" />
+                </Card>
+            </div>
+            <Card><Skeleton className="h-48 md:h-96 w-full" /></Card>
+            <Card><Skeleton className="h-48 md:h-96 w-full" /></Card>
+            <div class="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+                <Card><Skeleton className="h-48 w-full" /></Card>
+                <Card><Skeleton className="h-48 w-full" /></Card>
             </div>
         {:else}
             <!-- Metrics Cards -->
