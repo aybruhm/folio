@@ -1,5 +1,6 @@
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
+    import Skeleton from "$lib/components/Skeleton.svelte";
     import Button from "$lib/components/Button.svelte";
     import HoldingsTable from "$lib/components/HoldingsTable.svelte";
     import Amount from "$lib/components/Amount.svelte";
@@ -116,9 +117,37 @@
         </div>
 
         {#if loading}
-            <div class="flex justify-center py-12">
-                <div class="text-muted-foreground">Loading portfolio...</div>
+            <div class="flex items-center gap-4 mb-6">
+                <Skeleton className="h-8 w-24 rounded-md" />
+                <div class="space-y-2">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-24" />
+                </div>
             </div>
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {#each Array(4) as _}
+                    <Card>
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-6 w-32 mt-2" />
+                    </Card>
+                {/each}
+            </div>
+            <Card>
+                <div class="space-y-3">
+                    <div class="flex gap-4 border-b border-border pb-3">
+                        {#each Array(4) as _}
+                            <Skeleton className="h-4 flex-1" />
+                        {/each}
+                    </div>
+                    {#each Array(4) as _}
+                        <div class="flex gap-4">
+                            {#each Array(4) as _}
+                                <Skeleton className="h-4 flex-1" />
+                            {/each}
+                        </div>
+                    {/each}
+                </div>
+            </Card>
         {:else if !portfolio}
             <Card
                 title="Portfolio not found"

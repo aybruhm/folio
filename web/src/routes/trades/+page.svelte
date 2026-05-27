@@ -1,5 +1,6 @@
 <script lang="ts">
     import Card from "$lib/components/Card.svelte";
+    import Skeleton from "$lib/components/Skeleton.svelte";
     import TradeTable from "$lib/components/TradeTable.svelte";
     import Button from "$lib/components/Button.svelte";
     import Modal from "$lib/components/Modal.svelte";
@@ -366,9 +367,28 @@
 
         <!-- Trades Table -->
         {#if loading}
-            <div class="flex justify-center py-12">
-                <div class="text-muted-foreground">Loading trades...</div>
-            </div>
+            <Card>
+                <div class="flex gap-4">
+                    <Skeleton className="h-10 flex-1 rounded-md" />
+                    <Skeleton className="h-10 w-40 rounded-md" />
+                </div>
+            </Card>
+            <Card>
+                <div class="space-y-3">
+                    <div class="flex gap-4 border-b border-border pb-3">
+                        {#each Array(6) as _}
+                            <Skeleton className="h-4 flex-1" />
+                        {/each}
+                    </div>
+                    {#each Array(8) as _}
+                        <div class="flex gap-4">
+                            {#each Array(6) as _}
+                                <Skeleton className="h-4 flex-1" />
+                            {/each}
+                        </div>
+                    {/each}
+                </div>
+            </Card>
         {:else if totalTrades === 0}
             <Card
                 title="No trades"
