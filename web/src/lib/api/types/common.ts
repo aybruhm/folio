@@ -39,7 +39,7 @@ export interface PortfolioStats {
     allocation?: { label: string; value: number }[];
     performance_history?: { name: string; value: number }[];
     contribution_history?: { name: string; value: number }[];
-    top_holdings?: { ticker: string; value: number | string; percent: number | string }[];
+    top_holdings?: { ticker: string; name?: string; value: number | string; percent: number | string }[];
 }
 
 export interface Trade extends BaseEntity {

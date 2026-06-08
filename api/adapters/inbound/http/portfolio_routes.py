@@ -100,6 +100,7 @@ async def _build_portfolio_analytics(
         "top_holdings": [
             {
                 "ticker": h.get("ticker"),
+                "name": h.get("name", h.get("ticker")),
                 "value": float(h.get("market_value", 0)),
                 "percent": float(h.get("weight_percent", 0)),
             }

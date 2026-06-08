@@ -53,7 +53,7 @@ export interface GetPortfolioAnalyticsResponse {
     twr: string;
     mwr: string;
     allocation: { label: string; value: number }[];
-    top_holdings: { ticker: string; value: number; percent: number }[];
+    top_holdings: { ticker: string; name?: string; value: number; percent: number }[];
     performance_history: { name: string; value: number }[];
     contribution_history: { name: string; value: number }[];
     sector_breakdown: { label: string; value: number }[];
@@ -83,7 +83,7 @@ export interface GetPriceHistoryResponse {
     ticker: string;
     data: Array<{
         date: string;
-        close: number;
+        close: string | number;
     }>;
 }
 
