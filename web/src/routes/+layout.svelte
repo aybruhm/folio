@@ -93,7 +93,7 @@
 {#if isAuthRoute}
     <slot />
 {:else}
-    <div class="flex h-screen flex-col bg-background text-foreground">
+    <div class="flex h-screen flex-col text-foreground">
         <Navigation
             {isDark}
             on:toggleTheme={toggleTheme}
@@ -115,6 +115,6 @@
     :global(body) {
         margin: 0;
         padding: 0;
-        font-family: "Inter", "Geist", system-ui, sans-serif;
+        font-family: "DM Sans", system-ui, sans-serif;
     }
 </style>
