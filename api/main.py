@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -13,27 +14,42 @@ from adapters.inbound.http import (
 )
 from infrastructure.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting Folio API...")
+    logger.info("Starting Folio API...")
     # Pre-warm Valkey connection (lazy-init on first use, but explicit here)
     try:
         from infrastructure.cache.valkey_client import get_valkey_client
 
         get_valkey_client()
-        print("Valkey cache client initialised")
+        logger.info("Valkey cache client initialised")
     except Exception as exc:
-        print(f"Valkey cache client initialisation failed (non-fatal): {exc}")
+        logger.error(f"Valkey cache client initialisation failed (non-fatal): {exc}")
+
+    # Start the background scheduler for cache warming and EOD jobs
+    try:
+        from infrastructure.scheduler.jobs import init_scheduler
+
+        await init_scheduler()
+    except Exception as exc:
+        logger.error(f"Scheduler initialisation failed (non-fatal): {exc}")
+
     try:
         yield
     finally:
+        from infrastructure.scheduler.jobs import shutdown_scheduler
+
+        await shutdown_scheduler()
+
         from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
         from infrastructure.cache.valkey_client import close_valkey_client
 
         await NgnMarketAdapter.close_shared_session()
         await close_valkey_client()
-        print("Shutting down Folio API...")
+        logger.info("Shutting down Folio API...")
 
 
 app = FastAPI(
