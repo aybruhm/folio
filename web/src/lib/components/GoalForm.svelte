@@ -28,6 +28,7 @@
     export let isLoading = false;
 
     let errors: Record<string, string> = {};
+    let isSubmitting = false;
 
     async function handleSubmit() {
         errors = {};
@@ -41,12 +42,15 @@
 
         if (Object.keys(errors).length > 0) return;
 
+        isSubmitting = true;
         try {
             await onSubmit(goal);
         } catch (e: unknown) {
             const message =
                 e instanceof Error ? e.message : "An error occurred";
             errors.submit = message;
+        } finally {
+            isSubmitting = false;
         }
     }
 </script>
@@ -104,8 +108,12 @@
     {/if}
 
     <div class="flex gap-3">
-        <Button type="submit" variant="default" disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Goal"}
+        <Button
+            type="submit"
+            variant="default"
+            disabled={isSubmitting || isLoading}
+        >
+            {isSubmitting || isLoading ? "Saving..." : "Save Goal"}
         </Button>
     </div>
 </form>

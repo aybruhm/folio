@@ -65,6 +65,7 @@
     }));
 
     let errors: Record<string, string> = {};
+    let isSubmitting = false;
     let validatingTicker = false;
     let validationResult: "supported" | "unsupported" | null = null;
     let validationMessage = "";
@@ -126,12 +127,15 @@
 
         if (Object.keys(errors).length > 0) return;
 
+        isSubmitting = true;
         try {
             dispatch("submit", trade);
         } catch (e: unknown) {
             const message =
                 e instanceof Error ? e.message : "An error occurred";
             errors.submit = message;
+        } finally {
+            isSubmitting = false;
         }
     }
 </script>
@@ -270,8 +274,12 @@
     {/if}
 
     <div class="flex gap-3">
-        <Button type="submit" variant="default" disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Trade"}
+        <Button
+            type="submit"
+            variant="default"
+            disabled={isSubmitting || isLoading}
+        >
+            {isSubmitting || isLoading ? "Saving..." : "Save Trade"}
         </Button>
     </div>
 </form>

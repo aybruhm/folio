@@ -29,6 +29,7 @@
     let tradeController: TradeController;
     let portfolioController: PortfolioController;
     let selectedTradeIds = new Set<string>();
+    let tradeFormLoading = false;
 
     const tradeTypeOptions = [
         { label: "All Types", value: "all" },
@@ -161,6 +162,7 @@
     }
 
     async function handleCreateTrade(trade: any) {
+        tradeFormLoading = true;
         try {
             const tradeRequest: CreateTradeRequest = {
                 portfolio_id: $currentPortfolio.id,
@@ -179,6 +181,8 @@
             showNewModal = false;
         } catch (e) {
             console.error("Failed to create trade:", e);
+        } finally {
+            tradeFormLoading = false;
         }
     }
 
@@ -199,6 +203,7 @@
     }
 
     async function handleUpdateTrade(trade: any) {
+        tradeFormLoading = true;
         try {
             const tradeRequest: CreateTradeRequest = {
                 portfolio_id: $currentPortfolio.id,
@@ -218,6 +223,8 @@
             editingTrade = null;
         } catch (e) {
             console.error("Failed to update trade:", e);
+        } finally {
+            tradeFormLoading = false;
         }
     }
 
@@ -452,6 +459,7 @@
     onClose={() => (showNewModal = false)}
 >
     <TradeForm
+        isLoading={tradeFormLoading}
         on:submit={(e) => handleCreateTrade(e.detail)}
         trade={{
             ticker: "",
@@ -482,6 +490,7 @@
         }}
     >
         <TradeForm
+            isLoading={tradeFormLoading}
             on:submit={(e) => handleUpdateTrade(e.detail)}
             trade={editingTrade}
         />

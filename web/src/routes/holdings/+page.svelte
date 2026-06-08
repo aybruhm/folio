@@ -19,6 +19,7 @@
     let portfolioController: PortfolioController;
     let tradeController: TradeController;
     let showNewModal = false;
+    let tradeFormLoading = false;
 
     let lastLoadKey = "";
     let loadInProgress = false;
@@ -161,6 +162,7 @@
     }
 
     async function handleCreateTrade(trade: any) {
+        tradeFormLoading = true;
         try {
             const tradeRequest: CreateTradeRequest = {
                 portfolio_id: $currentPortfolio.id,
@@ -179,6 +181,8 @@
             showNewModal = false;
         } catch (e) {
             console.error("Failed to create trade:", e);
+        } finally {
+            tradeFormLoading = false;
         }
     }
 
@@ -323,6 +327,7 @@
     onClose={() => (showNewModal = false)}
 >
     <TradeForm
+        isLoading={tradeFormLoading}
         on:submit={(e) => handleCreateTrade(e.detail)}
         trade={{
             ticker: "",
