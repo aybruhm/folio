@@ -318,6 +318,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 {
                     "asset_id": str(holding_data["asset_id"]),
                     "ticker": ticker,
+                    "name": asset.name if asset else ticker,
                     "quantity": quantity_int / 10000,
                     "current_price": current_price_int / 100,
                     "market_value": market_value_int / 100,

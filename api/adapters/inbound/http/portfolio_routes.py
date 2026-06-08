@@ -324,6 +324,7 @@ async def get_holdings(
         data = [
             {
                 "ticker": h["ticker"],
+                "name": h.get("name", h["ticker"]),
                 "quantity": h["quantity"],
                 "avg_price": (
                     float(h["cost_basis"]) / float(h["quantity"])
