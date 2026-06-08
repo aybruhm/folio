@@ -89,9 +89,20 @@
                             <td class="p-4 align-middle">
                                 <button
                                     on:click={() => onSelectHolding(row.ticker)}
-                                    class="text-blue-600 hover:underline dark:text-blue-400"
+                                    class="text-left"
                                 >
-                                    {row.ticker}
+                                    <span
+                                        class="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+                                    >
+                                        {row.ticker}
+                                    </span>
+                                    {#if row.name && row.name !== row.ticker}
+                                        <span
+                                            class="block text-xs text-muted-foreground"
+                                        >
+                                            {row.name}
+                                        </span>
+                                    {/if}
                                 </button>
                             </td>
                             <td class="p-4 align-middle"

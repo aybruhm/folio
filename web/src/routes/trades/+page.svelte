@@ -256,7 +256,9 @@
               const normalizedSearch = searchTerm.trim().toLowerCase();
               const matchesSearch =
                   !normalizedSearch ||
-                  String(t.ticker).toLowerCase().includes(normalizedSearch);
+                  String(t.ticker).toLowerCase().includes(normalizedSearch) ||
+                  (t.name &&
+                      String(t.name).toLowerCase().includes(normalizedSearch));
               return matchesType && matchesSearch;
           })
         : trades;
@@ -347,8 +349,8 @@
         <Card>
             <SearchPagination
                 bind:search={searchTerm}
-                searchLabel="Search by ticker"
-                searchPlaceholder="e.g. AAPL"
+                searchLabel="Search by ticker or name"
+                searchPlaceholder="e.g. AAPL or Apple"
                 bind:page={currentPage}
                 bind:pageSize
                 total={totalTrades}

@@ -32,6 +32,7 @@ export type UpdateGoalResponse = Goal;
 export interface GetHoldingsResponse {
     data: Array<{
         ticker: string;
+        name: string;
         quantity: number;
         avg_price: number;
         current_price: number;

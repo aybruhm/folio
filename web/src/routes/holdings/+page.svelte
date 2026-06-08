@@ -63,6 +63,7 @@
                         const holdingsData = (response.data || []).map(
                             (h: any) => ({
                                 ticker: h.ticker,
+                                name: h.name || h.ticker,
                                 quantity: h.quantity,
                                 average_cost: h.avg_price,
                                 current_price: h.current_price,
@@ -88,6 +89,7 @@
                 });
                 allHoldings = (response.data || []).map((h: any) => ({
                     ticker: h.ticker,
+                    name: h.name || h.ticker,
                     quantity: h.quantity,
                     average_cost: h.avg_price,
                     current_price: h.current_price,
@@ -107,6 +109,7 @@
                     if (!holdingsByTicker[ticker]) {
                         holdingsByTicker[ticker] = {
                             ticker,
+                            name: holding.name,
                             quantity: 0,
                             average_cost: 0,
                             current_price: holding.current_price,
@@ -149,8 +152,10 @@
             filteredHoldings = holdings;
         } else {
             const term = searchTerm.toLowerCase();
-            filteredHoldings = holdings.filter((h) =>
-                h.ticker.toLowerCase().includes(term),
+            filteredHoldings = holdings.filter(
+                (h) =>
+                    h.ticker.toLowerCase().includes(term) ||
+                    (h.name && h.name.toLowerCase().includes(term)),
             );
         }
     }
@@ -257,7 +262,7 @@
         <Card>
             <Input
                 label="Search holdings"
-                placeholder="Search by ticker (e.g., AAPL)"
+                placeholder="Search by ticker or name (e.g., AAPL or Apple)"
                 bind:value={searchTerm}
             />
         </Card>
