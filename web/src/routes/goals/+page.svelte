@@ -6,10 +6,10 @@
     import GoalForm from "$lib/components/GoalForm.svelte";
     import Badge from "$lib/components/Badge.svelte";
     import Amount from "$lib/components/Amount.svelte";
-    import { currentPortfolio, baseCurrency } from "$lib/stores";
+    import { currentPortfolio } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { PortfolioController, GoalController } from "$lib/api/controllers";
-    import type { CreateGoalRequest, Goal } from "$lib/api/types";
+    import type { CreateGoalRequest, Goal, Currency } from "$lib/api/types";
     import {
         formatCurrency,
         formatDate,
@@ -22,6 +22,7 @@
         target_amount: string;
         target_date: string;
         expected_annual_return: string;
+        currency: string;
         description: string;
     };
 
@@ -87,13 +88,14 @@
 
     async function handleCreateGoal(goal: GoalFormData) {
         try {
+            const currency = (goal.currency || "USD") as Currency;
             const goalRequest: CreateGoalRequest = {
                 name: goal.name,
                 target_net_worth: goal.target_amount,
-                target_net_worth_currency: "USD",
+                target_net_worth_currency: currency,
                 target_date: goal.target_date,
                 monthly_savings: 0,
-                monthly_savings_currency: "USD",
+                monthly_savings_currency: currency,
                 expected_annual_return: goal.expected_annual_return || "0.07",
             };
             await goalController.createGoal(goalRequest);
@@ -111,6 +113,7 @@
             target_amount: String(goal.target_net_worth),
             target_date: goal.target_date.slice(0, 10),
             expected_annual_return: String(goal.expected_annual_return),
+            currency: goal.target_net_worth_currency || "USD",
             description: "",
         };
         showEditModal = true;
@@ -119,13 +122,14 @@
     async function handleUpdateGoal(data: GoalFormData) {
         if (!editingGoal) return;
         try {
+            const currency = (data.currency || "USD") as Currency;
             const goalRequest: CreateGoalRequest = {
                 name: data.name,
                 target_net_worth: data.target_amount,
-                target_net_worth_currency: "USD",
+                target_net_worth_currency: currency,
                 target_date: data.target_date,
                 monthly_savings: 0,
-                monthly_savings_currency: "USD",
+                monthly_savings_currency: currency,
                 expected_annual_return: data.expected_annual_return || "0.07",
             };
             await goalController.updateGoal(editingGoal.id, goalRequest);
@@ -292,7 +296,8 @@
                                         <Amount
                                             value={formatCurrency(
                                                 goal.target_net_worth,
-                                                $baseCurrency,
+                                                goal.target_net_worth_currency ||
+                                                    "USD",
                                             )}
                                         />
                                     </span>
@@ -308,7 +313,8 @@
                                         <Amount
                                             value={formatCurrency(
                                                 currentPortfolioValue,
-                                                $baseCurrency,
+                                                goal.target_net_worth_currency ||
+                                                    "USD",
                                             )}
                                         />
                                     </span>
@@ -375,6 +381,7 @@
                 .toISOString()
                 .split("T")[0],
             expected_annual_return: "0.07",
+            currency: "USD",
             description: "",
         }}
     />
