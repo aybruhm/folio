@@ -90,6 +90,11 @@ async def register(
     response: Response,
     session: AsyncSession = Depends(get_session),
 ):
+    if not settings.ENABLE_REGISTRATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled",
+        )
     if len(body.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

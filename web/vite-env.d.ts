@@ -3,6 +3,7 @@
 declare module "$env/dynamic/public" {
     export const env: {
         PUBLIC_API_BASE_URL: string;
+        PUBLIC_ENABLE_REGISTRATION: string;
         [key: string]: string | undefined;
     };
 }
