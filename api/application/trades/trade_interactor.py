@@ -167,7 +167,11 @@ class TradeInteractor(ITradeUseCase):
             raise ValueError(f"Trade {trade_id} not found")
 
         asset = await self.asset_repo.get_by_id(trade.asset_id)
-        return self._trade_to_dict(trade, asset.name if asset else None)
+        return self._trade_to_dict(
+            trade,
+            asset.name if asset else None,
+            asset.asset_class.value if asset else None,
+        )
 
     async def list_trades(
         self,
@@ -194,13 +198,17 @@ class TradeInteractor(ITradeUseCase):
 
         result = []
         for t in trades:
-            name = await self._get_asset_name(t.asset_id)
-            result.append(self._trade_to_dict(t, name))
+            name, asset_class = await self._get_asset_info(t.asset_id)
+            result.append(self._trade_to_dict(t, name, asset_class))
         return result, total
 
-    async def _get_asset_name(self, asset_id: UUID) -> Optional[str]:
+    async def _get_asset_info(
+        self, asset_id: UUID
+    ) -> tuple[Optional[str], Optional[str]]:
         asset = await self.asset_repo.get_by_id(asset_id)
-        return asset.name if asset else None
+        if asset:
+            return asset.name, asset.asset_class.value
+        return None, None
 
     async def update_trade(self, trade_id: UUID, request: CreateTradeRequest) -> None:
         trade = await self.trade_repo.get_by_id(trade_id)
@@ -242,13 +250,18 @@ class TradeInteractor(ITradeUseCase):
         return await self.trade_repo.delete_batch(trade_ids)
 
     @staticmethod
-    def _trade_to_dict(trade: Trade, asset_name: Optional[str] = None) -> dict:
+    def _trade_to_dict(
+        trade: Trade,
+        asset_name: Optional[str] = None,
+        asset_class: Optional[str] = None,
+    ) -> dict:
         return {
             "id": str(trade.id),
             "portfolio_id": str(trade.portfolio_id),
             "asset_id": str(trade.asset_id),
             "ticker": trade.ticker,
             "name": asset_name,
+            "asset_class": asset_class,
             "trade_type": trade.trade_type.value,
             "trade_date": trade.trade_date.isoformat(),
             "quantity": trade.quantity / 10000,
