@@ -47,8 +47,9 @@ async def init_scheduler():
 
 async def shutdown_scheduler():
     global scheduler
-    if scheduler:
+    if scheduler and scheduler.running:
         scheduler.shutdown(wait=False)
+        logger.info("Scheduler shut down")
 
 
 async def warm_cache_prices_job():
