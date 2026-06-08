@@ -45,40 +45,13 @@ class TradeInteractor(ITradeUseCase):
         selected = self._normalize_provider(provider)
 
         if selected == "tiingo":
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+            return await self.tiingo.get_asset_metadata(ticker, currency.value)
 
         if selected == "ngnmarket":
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+            return await self.ngnmarket.get_asset_metadata(ticker, currency.value)
 
         if selected == "tradingview":
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+            return await self.tradingview.get_asset_metadata(ticker, currency.value)
 
         return await self.yfinance.get_asset_metadata(ticker, currency.value)
 
@@ -166,7 +139,12 @@ class TradeInteractor(ITradeUseCase):
         if not trade:
             raise ValueError(f"Trade {trade_id} not found")
 
-        return self._trade_to_dict(trade)
+        asset = await self.asset_repo.get_by_id(trade.asset_id)
+        return self._trade_to_dict(
+            trade,
+            asset.name if asset else None,
+            asset.asset_class.value if asset else None,
+        )
 
     async def list_trades(
         self,
@@ -191,7 +169,19 @@ class TradeInteractor(ITradeUseCase):
         else:
             raise ValueError("portfolio_id required for listing trades")
 
-        return [self._trade_to_dict(t) for t in trades], total
+        result = []
+        for t in trades:
+            name, asset_class = await self._get_asset_info(t.asset_id)
+            result.append(self._trade_to_dict(t, name, asset_class))
+        return result, total
+
+    async def _get_asset_info(
+        self, asset_id: UUID
+    ) -> tuple[Optional[str], Optional[str]]:
+        asset = await self.asset_repo.get_by_id(asset_id)
+        if asset:
+            return asset.name, asset.asset_class.value
+        return None, None
 
     async def update_trade(self, trade_id: UUID, request: CreateTradeRequest) -> None:
         trade = await self.trade_repo.get_by_id(trade_id)
@@ -233,12 +223,18 @@ class TradeInteractor(ITradeUseCase):
         return await self.trade_repo.delete_batch(trade_ids)
 
     @staticmethod
-    def _trade_to_dict(trade: Trade) -> dict:
+    def _trade_to_dict(
+        trade: Trade,
+        asset_name: Optional[str] = None,
+        asset_class: Optional[str] = None,
+    ) -> dict:
         return {
             "id": str(trade.id),
             "portfolio_id": str(trade.portfolio_id),
             "asset_id": str(trade.asset_id),
             "ticker": trade.ticker,
+            "name": asset_name,
+            "asset_class": asset_class,
             "trade_type": trade.trade_type.value,
             "trade_date": trade.trade_date.isoformat(),
             "quantity": trade.quantity / 10000,

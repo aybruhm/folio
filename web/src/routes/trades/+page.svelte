@@ -29,6 +29,7 @@
     let tradeController: TradeController;
     let portfolioController: PortfolioController;
     let selectedTradeIds = new Set<string>();
+    let tradeFormLoading = false;
 
     const tradeTypeOptions = [
         { label: "All Types", value: "all" },
@@ -161,6 +162,7 @@
     }
 
     async function handleCreateTrade(trade: any) {
+        tradeFormLoading = true;
         try {
             const tradeRequest: CreateTradeRequest = {
                 portfolio_id: $currentPortfolio.id,
@@ -179,6 +181,8 @@
             showNewModal = false;
         } catch (e) {
             console.error("Failed to create trade:", e);
+        } finally {
+            tradeFormLoading = false;
         }
     }
 
@@ -192,12 +196,14 @@
             price: String(row.price),
             trade_currency: row.trade_currency,
             fees: String(row.fees ?? 0),
+            asset_class: row.asset_class || "",
             market_data_provider: row.market_data_provider,
         };
         showEditModal = true;
     }
 
     async function handleUpdateTrade(trade: any) {
+        tradeFormLoading = true;
         try {
             const tradeRequest: CreateTradeRequest = {
                 portfolio_id: $currentPortfolio.id,
@@ -217,6 +223,8 @@
             editingTrade = null;
         } catch (e) {
             console.error("Failed to update trade:", e);
+        } finally {
+            tradeFormLoading = false;
         }
     }
 
@@ -256,7 +264,9 @@
               const normalizedSearch = searchTerm.trim().toLowerCase();
               const matchesSearch =
                   !normalizedSearch ||
-                  String(t.ticker).toLowerCase().includes(normalizedSearch);
+                  String(t.ticker).toLowerCase().includes(normalizedSearch) ||
+                  (t.name &&
+                      String(t.name).toLowerCase().includes(normalizedSearch));
               return matchesType && matchesSearch;
           })
         : trades;
@@ -347,8 +357,8 @@
         <Card>
             <SearchPagination
                 bind:search={searchTerm}
-                searchLabel="Search by ticker"
-                searchPlaceholder="e.g. AAPL"
+                searchLabel="Search by ticker or name"
+                searchPlaceholder="e.g. AAPL or Apple"
                 bind:page={currentPage}
                 bind:pageSize
                 total={totalTrades}
@@ -449,6 +459,7 @@
     onClose={() => (showNewModal = false)}
 >
     <TradeForm
+        isLoading={tradeFormLoading}
         on:submit={(e) => handleCreateTrade(e.detail)}
         trade={{
             ticker: "",
@@ -479,6 +490,7 @@
         }}
     >
         <TradeForm
+            isLoading={tradeFormLoading}
             on:submit={(e) => handleUpdateTrade(e.detail)}
             trade={editingTrade}
         />

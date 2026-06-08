@@ -31,6 +31,9 @@ class EnvironSettings(BaseModel):
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
     )
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    ENABLE_REGISTRATION: bool = (
+        os.getenv("ENABLE_REGISTRATION", "true").lower() != "false"
+    )
     SECURE_COOKIES: bool = os.getenv("API_ENV", "development") == "production"
     # Optional: set to e.g. ".domain.com" when frontend and API are on
     # different subdomains, so cookies are scoped across both and browsers

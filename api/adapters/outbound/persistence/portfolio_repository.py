@@ -1,11 +1,12 @@
+from typing import List, Optional
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from uuid import UUID
-from typing import List, Optional
 
 from domain.entities.models import Portfolio
-from domain.value_objects.money import Currency
 from domain.ports.outbound.repositories import IPortfolioRepository
+from domain.value_objects.money import Currency
 from infrastructure.db.models import PortfolioModel
 
 
@@ -41,6 +42,10 @@ class PortfolioRepository(IPortfolioRepository):
         result = await self.session.execute(
             select(PortfolioModel).where(PortfolioModel.user_id == user_id)
         )
+        return [self._to_domain(m) for m in result.scalars().all()]
+
+    async def list_all(self) -> List[Portfolio]:
+        result = await self.session.execute(select(PortfolioModel))
         return [self._to_domain(m) for m in result.scalars().all()]
 
     async def update(self, portfolio: Portfolio) -> None:

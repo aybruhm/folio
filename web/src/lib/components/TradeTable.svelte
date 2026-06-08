@@ -134,7 +134,16 @@
                                     class="cursor-pointer"
                                 />
                             </td>
-                            <td class="p-4 align-middle">{row.ticker}</td>
+                            <td class="p-4 align-middle">
+                                <span class="font-medium">{row.ticker}</span>
+                                {#if row.name && row.name !== row.ticker}
+                                    <span
+                                        class="block text-xs text-muted-foreground"
+                                    >
+                                        {row.name}
+                                    </span>
+                                {/if}
+                            </td>
                             <td class="p-4 align-middle"
                                 >{formatDateTime(row.trade_date)}</td
                             >

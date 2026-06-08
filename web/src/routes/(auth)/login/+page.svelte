@@ -3,11 +3,14 @@
     import { page } from "$app/stores";
     import { api } from "$lib/api/client";
     import { authUser } from "$lib/stores";
+    import { env } from "$env/dynamic/public";
 
     let email = "";
     let password = "";
     let errorMessage = "";
     let isSubmitting = false;
+
+    const registrationEnabled = env.PUBLIC_ENABLE_REGISTRATION !== "false";
 
     async function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
@@ -105,15 +108,17 @@
                 </button>
             </form>
 
-            <p class="mt-6 text-center text-sm text-muted-foreground">
-                Don't have an account?
-                <a
-                    href="/register"
-                    class="text-primary hover:text-primary/80 ml-1"
-                >
-                    Register →
-                </a>
-            </p>
+            {#if registrationEnabled}
+                <p class="mt-6 text-center text-sm text-muted-foreground">
+                    Don't have an account?
+                    <a
+                        href="/register"
+                        class="text-primary hover:text-primary/80 ml-1"
+                    >
+                        Register →
+                    </a>
+                </p>
+            {/if}
         </div>
     </div>
 </div>

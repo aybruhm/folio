@@ -19,6 +19,7 @@
     let portfolioController: PortfolioController;
     let tradeController: TradeController;
     let showNewModal = false;
+    let tradeFormLoading = false;
 
     let lastLoadKey = "";
     let loadInProgress = false;
@@ -63,6 +64,7 @@
                         const holdingsData = (response.data || []).map(
                             (h: any) => ({
                                 ticker: h.ticker,
+                                name: h.name || h.ticker,
                                 quantity: h.quantity,
                                 average_cost: h.avg_price,
                                 current_price: h.current_price,
@@ -88,6 +90,7 @@
                 });
                 allHoldings = (response.data || []).map((h: any) => ({
                     ticker: h.ticker,
+                    name: h.name || h.ticker,
                     quantity: h.quantity,
                     average_cost: h.avg_price,
                     current_price: h.current_price,
@@ -107,6 +110,7 @@
                     if (!holdingsByTicker[ticker]) {
                         holdingsByTicker[ticker] = {
                             ticker,
+                            name: holding.name,
                             quantity: 0,
                             average_cost: 0,
                             current_price: holding.current_price,
@@ -149,13 +153,16 @@
             filteredHoldings = holdings;
         } else {
             const term = searchTerm.toLowerCase();
-            filteredHoldings = holdings.filter((h) =>
-                h.ticker.toLowerCase().includes(term),
+            filteredHoldings = holdings.filter(
+                (h) =>
+                    h.ticker.toLowerCase().includes(term) ||
+                    (h.name && h.name.toLowerCase().includes(term)),
             );
         }
     }
 
     async function handleCreateTrade(trade: any) {
+        tradeFormLoading = true;
         try {
             const tradeRequest: CreateTradeRequest = {
                 portfolio_id: $currentPortfolio.id,
@@ -174,6 +181,8 @@
             showNewModal = false;
         } catch (e) {
             console.error("Failed to create trade:", e);
+        } finally {
+            tradeFormLoading = false;
         }
     }
 
@@ -257,7 +266,7 @@
         <Card>
             <Input
                 label="Search holdings"
-                placeholder="Search by ticker (e.g., AAPL)"
+                placeholder="Search by ticker or name (e.g., AAPL or Apple)"
                 bind:value={searchTerm}
             />
         </Card>
@@ -318,6 +327,7 @@
     onClose={() => (showNewModal = false)}
 >
     <TradeForm
+        isLoading={tradeFormLoading}
         on:submit={(e) => handleCreateTrade(e.detail)}
         trade={{
             ticker: "",
