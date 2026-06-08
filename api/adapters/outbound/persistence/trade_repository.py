@@ -88,6 +88,13 @@ class TradeRepository(ITradeRepository):
         models = result.scalars().all()
         return [self._to_domain(m) for m in models]
 
+    async def list_all_tickers(self) -> List[str]:
+        """Return distinct tickers from all trades."""
+        from sqlalchemy import distinct
+
+        result = await self.session.execute(select(distinct(TradeModel.ticker)))
+        return [row[0] for row in result.all()]
+
     async def update(self, trade: Trade) -> None:
         model = await self.session.get(TradeModel, trade.id)
         if model:

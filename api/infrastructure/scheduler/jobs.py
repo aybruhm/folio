@@ -1,14 +1,13 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from datetime import date, timedelta
 import logging
 
-from infrastructure.config import settings
-from adapters.outbound.persistence.trade_repository import TradeRepository
-from adapters.outbound.persistence.price_repository import PriceHistoryRepository
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from infrastructure.db.session import engine
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from adapters.outbound.persistence.trade_repository import TradeRepository
+from infrastructure.config import settings
+
+logging.basicConfig()
+logging.getLogger("apscheduler").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 scheduler = None
@@ -22,150 +21,107 @@ def get_scheduler():
 async def init_scheduler():
     global scheduler
 
-    job_stores = {
-        "default": SQLAlchemyJobStore(engine=engine, tablename="apscheduler_jobs")
-    }
-
-    scheduler = AsyncIOScheduler(jobstores=job_stores)
+    scheduler = AsyncIOScheduler()
 
     if settings.SCHEDULER_ENABLED:
         scheduler.add_job(
-            refresh_prices_job,
-            "cron",
-            hour=18,
-            minute=0,
-            id="refresh_prices",
-            name="Refresh EOD prices for all holdings",
+            warm_cache_prices_job,
+            "interval",
+            minutes=45,
+            id="warm_cache_prices",
+            name="Warm Valkey cache with current prices",
             replace_existing=True,
         )
 
         scheduler.add_job(
-            refresh_fx_rates_job,
-            "cron",
-            hour=18,
-            minute=30,
-            id="refresh_fx_rates",
-            name="Refresh FX rates for all portfolio currencies",
-            replace_existing=True,
-        )
-
-        scheduler.add_job(
-            refresh_benchmarks_job,
-            "cron",
-            hour=18,
-            minute=0,
-            id="refresh_benchmarks",
-            name="Refresh benchmark prices",
+            warm_cache_fx_job,
+            "interval",
+            minutes=45,
+            id="warm_cache_fx",
+            name="Warm Valkey cache with current FX rates",
             replace_existing=True,
         )
 
         scheduler.start()
-        logger.info("Scheduler initialized and started")
 
 
 async def shutdown_scheduler():
     global scheduler
     if scheduler:
         scheduler.shutdown(wait=False)
-        logger.info("Scheduler shut down")
 
 
-async def refresh_prices_job():
-    logger.info("Starting price refresh job")
+async def warm_cache_prices_job():
+    """
+    Refresh current prices in the Valkey cache for all portfolio tickers.
+
+    Calls YFinanceAdapter.get_current_price() which reads-through / writes-through
+    the Valkey cache automatically.  This job just ensures the cache stays warm
+    so that holdings reads are fast.
+    """
+
+    logger.info("Starting cache warm (prices)")
     try:
-        from sqlalchemy.ext.asyncio import create_async_engine
         from infrastructure.db.session import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()
-
             trade_repo = TradeRepository(session)
-            trades, _ = await trade_repo.list_by_portfolio(None, skip=0, limit=10000)
 
-            tickers = set(t.ticker for t in trades)
-            price_repo = PriceHistoryRepository(session)
+            tickers = await trade_repo.list_all_tickers()
 
-            for ticker in tickers:
+            for ticker in sorted(tickers):
                 try:
-                    current_date = date.today()
-                    price_data = await yfinance.get_current_price(ticker)
+                    await yfinance.get_current_price(ticker)
+                    logger.debug(f"Cache warmed for {ticker}")
+                except Exception as exc:
+                    logger.warning(f"Cache warm failed for {ticker}: {exc}")
 
-                    if price_data:
-                        await price_repo.add(
-                            asset_id=None,
-                            date_val=current_date,
-                            close=price_data[1],
-                            currency=None,
-                        )
-                    logger.info(f"Updated price for {ticker}")
-                except Exception as e:
-                    logger.error(f"Error updating price for {ticker}: {e}")
-
-            await session.commit()
-        logger.info("Price refresh job completed")
+        logger.info(f"Cache warm (prices) completed — {len(tickers)} tickers")
     except Exception as e:
-        logger.error(f"Price refresh job failed: {e}")
+        logger.error(f"Cache warm (prices) failed: {e}")
 
 
-async def refresh_fx_rates_job():
-    logger.info("Starting FX refresh job")
+async def warm_cache_fx_job():
+    """
+    Refresh current FX rates in the Valkey cache for all active currencies.
+
+    Calls YFinanceAdapter.get_current_rate() which reads-through / writes-through
+    the Valkey cache automatically.
+    """
+
+    logger.info("Starting cache warm (FX)")
     try:
-        from infrastructure.db.session import async_session
+        from adapters.outbound.persistence.portfolio_repository import (
+            PortfolioRepository,
+        )
         from domain.value_objects.money import Currency
+        from infrastructure.db.session import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()
-            fx_repo = FxRateRepository(session)
+            portfolio_repo = PortfolioRepository(session)
 
-            currencies = [Currency.USD, Currency.GBP, Currency.EUR, Currency.JPY]
-            base = Currency.USD
+            portfolios = await portfolio_repo.list_all()
+            base_currencies = {
+                p.base_currency.value for p in portfolios if p.base_currency
+            }
 
-            for target in currencies:
-                if target == base:
+            to_currencies = set(base_currencies)
+            from_currency = Currency.USD
+
+            for target in sorted(to_currencies):
+                if target == from_currency.value:
                     continue
 
                 try:
-                    rate = await yfinance.get_current_rate(base, target)
-                    if rate:
-                        await fx_repo.add(base, target, date.today(), rate)
-                        logger.info(f"Updated FX rate {base}/{target}: {rate}")
-                except Exception as e:
-                    logger.error(f"Error updating FX rate {base}/{target}: {e}")
+                    await yfinance.get_current_rate(from_currency, Currency(target))
+                    logger.debug(f"Cache warmed for FX {from_currency.value}/{target}")
+                except Exception as exc:
+                    logger.warning(
+                        f"Cache warm FX {from_currency.value}/{target} failed: {exc}"
+                    )
 
-            await session.commit()
-        logger.info("FX refresh job completed")
+        logger.info(f"Cache warm (FX) completed — {len(to_currencies)} pairs")
     except Exception as e:
-        logger.error(f"FX refresh job failed: {e}")
-
-
-async def refresh_benchmarks_job():
-    logger.info("Starting benchmark refresh job")
-    try:
-        from infrastructure.db.session import async_session
-
-        async with async_session() as session:
-            yfinance = YFinanceAdapter()
-            price_repo = PriceHistoryRepository(session)
-
-            benchmarks = ["^GSPC", "IWDA.L", "^NDX"]
-
-            for ticker in benchmarks:
-                try:
-                    current_date = date.today()
-                    price_data = await yfinance.get_current_price(ticker)
-
-                    if price_data:
-                        await price_repo.add(
-                            asset_id=None,
-                            date_val=current_date,
-                            close=price_data[1],
-                            currency=None,
-                        )
-                    logger.info(f"Updated benchmark price for {ticker}")
-                except Exception as e:
-                    logger.error(f"Error updating benchmark {ticker}: {e}")
-
-            await session.commit()
-        logger.info("Benchmark refresh job completed")
-    except Exception as e:
-        logger.error(f"Benchmark refresh job failed: {e}")
+        logger.error(f"Cache warm (FX) failed: {e}")
