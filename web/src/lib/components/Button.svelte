@@ -14,10 +14,10 @@
 
   const variants = {
     default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+    destructive: 'bg-[#F87171]/15 text-[#F87171] border border-[#F87171]/30 hover:bg-[#F87171]/25',
+    outline: 'border border-input bg-background hover:bg-muted hover:text-foreground',
     secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    ghost: 'hover:bg-accent hover:text-accent-foreground',
+    ghost: 'hover:bg-muted hover:text-foreground',
     link: 'text-primary underline-offset-4 hover:underline'
   }
 

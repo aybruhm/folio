@@ -53,8 +53,8 @@
                         {#if hoveredIdx === i}
                             <span
                                 class="text-xs font-semibold px-1 rounded"
-                                class:text-accent={isPos}
-                                class:text-destructive={!isPos}
+                                class:text-positive={isPos}
+                                class:text-negative={!isPos}
                             >
                                 {#if $hideAmounts}
                                     ••••••
@@ -74,9 +74,7 @@
                             class="w-full rounded-t transition-all duration-150"
                             style="
                 height: {h}px;
-                background-color: {isPos
-                                ? 'hsl(var(--accent))'
-                                : 'hsl(var(--destructive))'};
+                background-color: {isPos ? '#34D399' : '#F87171'};
                 opacity: {hoveredIdx === -1 || hoveredIdx === i ? 1 : 0.5};
               "
                         />
