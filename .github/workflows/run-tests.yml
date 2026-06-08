@@ -39,7 +39,7 @@ jobs:
 
             - name: Import Codecov GPG key
               run: |
-                  curl -s https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --import
+                  gpg --keyserver keyserver.ubuntu.com --recv-keys 806BB28AED779869
 
             - name: Upload coverage reports
               uses: codecov/codecov-action@v5
