@@ -45,12 +45,15 @@ class FakePriceRepository:
 
 
 class FakeYFinanceAdapter:
-    def __init__(self):
+    def __init__(self, price: int = 0):
+        self._price = price
         self.current_price_calls = []
         self.price_history_calls = []
 
     async def get_current_price(self, symbol):
         self.current_price_calls.append(symbol)
+        if self._price:
+            return date(2024, 1, 1), self._price
         return date(2024, 1, 1), 0
 
     async def get_price_history(self, ticker, start, end):
@@ -134,6 +137,7 @@ def _patch_analytics_deps(
     assets=None,
     latest=None,
     history=None,
+    yfinance_price=0,
     tiingo_price=12345,
     tradingview_price=0,
     ngnmarket_chart=True,
@@ -142,7 +146,7 @@ def _patch_analytics_deps(
     trade_repo = FakeTradeRepository(trades)
     asset_repo = FakeAssetRepository(assets)
     price_repo = FakePriceRepository(latest=latest, history=history)
-    yfinance = FakeYFinanceAdapter()
+    yfinance = FakeYFinanceAdapter(price=yfinance_price)
     tiingo = FakeTiingoAdapter(price=tiingo_price)
     ngnmarket = FakeNgnMarketAdapter(
         chart_data=(
@@ -707,14 +711,13 @@ async def test_resolve_price_cascades_through_fallback_providers(monkeypatch):
     holdings = await interactor.get_holdings(portfolio.id)
 
     assert len(holdings) == 1
-    # yfinance returns 0, tiingo returns 0, tradingview returns 0, ngnmarket returns 0
-    # so fallback to price history (empty) → 0
+    # yfinance returns 0, no cascade to other providers
     assert holdings[0]["current_price"] == 0.0
-    # Every provider was consulted
+    # Only the primary provider (yfinance) was consulted
     assert yfinance.current_price_calls == ["AAPL"]
-    assert tiingo.current_price_calls == ["AAPL"]
-    assert tradingview.current_price_calls == ["AAPL"]
-    assert ngnmarket.chart_calls == ["AAPL"]
+    assert tiingo.current_price_calls == []
+    assert tradingview.current_price_calls == []
+    assert ngnmarket.chart_calls == []
 
 
 @pytest.mark.asyncio
@@ -807,7 +810,7 @@ async def test_get_holdings_converts_with_direct_rate_when_nonzero(monkeypatch):
         trades=trades,
         assets={asset.id: asset},
         history={asset.id: []},
-        tiingo_price=19000,  # provide a price via tiingo cascade
+        yfinance_price=19000,
         ngnmarket_chart=False,
         tradingview_price=0,
         base_currency=Currency.NGN,
@@ -920,7 +923,7 @@ async def test_get_holdings_multi_currency_btc_trades(monkeypatch):
         trades=trades,
         assets={asset.id: asset},
         history={asset.id: []},
-        tiingo_price=8500000,  # $85,000.00 current price via cascade
+        yfinance_price=8500000,  # $85,000.00
         ngnmarket_chart=False,
         tradingview_price=0,
     )

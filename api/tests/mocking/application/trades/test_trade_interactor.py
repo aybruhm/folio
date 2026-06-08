@@ -35,6 +35,12 @@ class FakeAssetRepository:
     async def get_by_ticker(self, ticker: str):
         return self.assets.get(ticker)
 
+    async def get_by_id(self, asset_id):
+        for asset in self.assets.values():
+            if asset.id == asset_id:
+                return asset
+        return None
+
     async def update_classification(
         self, asset_id, asset_class, currency, market_data_provider="yfinance"
     ):
