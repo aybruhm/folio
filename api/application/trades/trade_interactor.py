@@ -45,40 +45,13 @@ class TradeInteractor(ITradeUseCase):
         selected = self._normalize_provider(provider)
 
         if selected == "tiingo":
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+            return await self.tiingo.get_asset_metadata(ticker, currency.value)
 
         if selected == "ngnmarket":
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+            return await self.ngnmarket.get_asset_metadata(ticker, currency.value)
 
         if selected == "tradingview":
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+            return await self.tradingview.get_asset_metadata(ticker, currency.value)
 
         return await self.yfinance.get_asset_metadata(ticker, currency.value)
 

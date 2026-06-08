@@ -83,26 +83,14 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             symbol = symbol.replace(".", "-")
 
         # Check Valkey cache before making any upstream calls.
-        # A cached sentinel (price=0) means the ticker is unsupported
-        # across all providers — skip the cascade entirely.
+        # A cached sentinel (price=0) means the ticker previously
+        # returned no price — skip the lookup entirely.
         cache = PriceCache()
         cached = await cache.get_price(symbol)
         if cached is not None:
             return cached[1]
 
         price_date, price = await self._get_price_from_provider(symbol, provider)
-
-        if price == 0:
-            # Cascade through every other provider in priority order
-            fallback_order = ["tiingo", "tradingview", "ngnmarket", "yfinance"]
-            for fallback in fallback_order:
-                if fallback == provider:
-                    continue
-                price_date, price = await self._get_price_from_provider(
-                    symbol, fallback
-                )
-                if price > 0:
-                    break
 
         # Persist successful non-yfinance lookups too, so reloads don't
         # repeatedly hit upstream APIs (especially rate-limited providers).

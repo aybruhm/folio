@@ -4,9 +4,7 @@ from typing import List, Optional, Tuple
 
 import yfinance as yf
 
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
 from adapters.outbound.market_data.price_cache import PriceCache
-from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from domain.ports.outbound.repositories import IAssetPricePort, IFxRatePort
 from domain.value_objects.money import AssetMetadata, Currency
 
@@ -15,21 +13,7 @@ logger = logging.getLogger(__name__)
 
 class YFinanceAdapter(IAssetPricePort, IFxRatePort):
     def __init__(self) -> None:
-        self.tiingo = TiingoAdapter()
-        self.ngnmarket = NgnMarketAdapter()
         self.cache = PriceCache()
-        # Lazy-init TradingView adapter to avoid importing it at module level
-        self._tradingview = None
-
-    @property
-    def tradingview(self):
-        if self._tradingview is None:
-            from adapters.outbound.market_data.tradingview_adapter import (
-                TradingviewAdapter,
-            )
-
-            self._tradingview = TradingviewAdapter()
-        return self._tradingview
 
     @staticmethod
     def _scalar(value) -> float:
@@ -123,27 +107,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             except Exception as e:
                 logger.error(f"Error fetching metadata for {symbol}: {e}")
 
-        tiingo_metadata = await self.tiingo.get_asset_metadata(ticker, currency)
-        if tiingo_metadata:
-            logger.info(f"Using Tiingo fallback metadata for {ticker}")
-            await self.cache.set_metadata(tiingo_metadata)
-            return tiingo_metadata
-
-        ngnmarket_metadata = await self.ngnmarket.get_asset_metadata(ticker, currency)
-        if ngnmarket_metadata:
-            logger.info(f"Using NGNMarket fallback metadata for {ticker}")
-            await self.cache.set_metadata(ngnmarket_metadata)
-            return ngnmarket_metadata
-
-        tradingview_metadata = await self.tradingview.get_asset_metadata(
-            ticker, currency
-        )
-        if tradingview_metadata:
-            logger.info(f"Using TradingView fallback metadata for {ticker}")
-            await self.cache.set_metadata(tradingview_metadata)
-            return tradingview_metadata
-
-        logger.warning(f"Incomplete metadata for {ticker}")
+        logger.warning(f"No metadata found for {ticker} via yfinance")
         return None
 
     async def get_fx_rate(
@@ -166,14 +130,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
             if data.empty:
                 logger.warning(f"No FX rate found for {ticker} on {on_date}")
-                rate = await self.ngnmarket.get_fx_rate(
-                    from_currency, to_currency, on_date
-                )
-                if rate is not None:
-                    await self.cache.set_historical_fx_rate(
-                        from_currency.value, to_currency.value, on_date, rate
-                    )
-                return rate
+                return None
 
             rate = round(float(data["Close"].iloc[-1]) * 100)
             await self.cache.set_historical_fx_rate(
@@ -182,7 +139,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             return rate
         except Exception as e:
             logger.error(f"Error fetching FX rate {from_currency}/{to_currency}: {e}")
-            return await self.ngnmarket.get_fx_rate(from_currency, to_currency, on_date)
+            return None
 
     async def get_current_rate(
         self, from_currency: Currency, to_currency: Currency
@@ -202,12 +159,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
             if data.empty:
                 logger.warning(f"No current rate found for {ticker}")
-                rate = await self.ngnmarket.get_current_rate(from_currency, to_currency)
-                if rate is not None:
-                    await self.cache.set_fx_rate(
-                        from_currency.value, to_currency.value, rate
-                    )
-                return rate
+                return None
 
             rate = round(float(data["Close"].iloc[-1]) * 100)
             await self.cache.set_fx_rate(from_currency.value, to_currency.value, rate)
@@ -216,7 +168,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             logger.error(
                 f"Error fetching current FX rate {from_currency}/{to_currency}: {e}"
             )
-            return await self.ngnmarket.get_current_rate(from_currency, to_currency)
+            return None
 
     @staticmethod
     def _determine_asset_class(ticker: str, info: dict) -> str:
