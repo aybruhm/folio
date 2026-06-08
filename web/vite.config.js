@@ -47,10 +47,10 @@ export default defineConfig({
                 ],
             },
             manifest: {
-                name: "Folio - Investment Portfolio Tracker",
+                name: "Folio - Portfolio Tracker",
                 short_name: "Folio",
                 description:
-                    "Track, analyze, and optimize your investment portfolio",
+                    "Track your wealth, clearly.",
                 theme_color: "#0f172a",
                 background_color: "#0f172a",
                 display: "standalone",

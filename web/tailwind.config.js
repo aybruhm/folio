@@ -33,7 +33,8 @@ export default {
             },
             fontFamily: {
                 mono: ['JetBrains Mono', 'monospace'],
-                sans: ['Inter', 'Geist', 'system-ui', 'sans-serif']
+                sans: ['DM Sans', 'system-ui', 'sans-serif'],
+                serif: ['Instrument Serif', 'Georgia', 'serif']
             }
         }
     },

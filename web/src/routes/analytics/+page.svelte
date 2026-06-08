@@ -256,14 +256,14 @@
     <title>Analytics — Folio</title>
 </svelte:head>
 
-<div class="min-h-screen bg-background p-4 md:p-6">
+<div class="min-h-screen p-4 md:p-6">
     <div class="mx-auto max-w-6xl space-y-6">
         <!-- Header -->
         <div
             class="flex flex-col gap-4 sm:gap-6 sm:items-center sm:justify-between"
         >
             <div class="space-y-2">
-                <h1 class="text-2xl md:text-3xl font-bold text-foreground">
+                <h1 class="font-serif text-3xl md:text-4xl text-foreground">
                     Analytics
                 </h1>
                 <p class="text-xs md:text-sm text-muted-foreground">
@@ -312,7 +312,7 @@
                 >
                     <div class="flex items-baseline gap-2">
                         <div
-                            class="text-4xl font-bold"
+                            class="font-serif text-4xl"
                             class:text-positive={parseFloat(
                                 analyticsData.twr,
                             ) >= 0}
@@ -331,7 +331,7 @@
                 >
                     <div class="flex items-baseline gap-2">
                         <div
-                            class="text-4xl font-bold"
+                            class="font-serif text-4xl"
                             class:text-positive={parseFloat(
                                 analyticsData.mwr,
                             ) >= 0}

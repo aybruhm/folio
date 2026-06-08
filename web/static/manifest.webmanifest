@@ -1,5 +1,5 @@
 {
-  "name": "Folio - Investment Portfolio Tracker",
+  "name": "Folio - Portfolio Tracker",
   "short_name": "Folio",
   "description": "Track, analyze, and optimize your investment portfolio with advanced analytics and portfolio management tools.",
   "start_url": "/",
@@ -7,8 +7,8 @@
   "lang": "en-US",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#0f172a",
-  "background_color": "#0f172a",
+  "theme_color": "#0B0E16",
+  "background_color": "#0B0E16",
   "categories": ["finance", "productivity"],
   "icons": [
     {
