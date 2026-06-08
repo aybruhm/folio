@@ -4,6 +4,7 @@
     import Button from "./Button.svelte";
     import { createEventDispatcher } from "svelte";
     import { CURRENCIES } from "$lib/constants/currencies";
+    import { formatCurrency } from "$lib/utils/format";
     import { api } from "$lib/api/client";
     import { AssetController } from "$lib/api/controllers";
 
@@ -76,6 +77,16 @@
 
     $: canValidate =
         Boolean(trade.ticker?.trim()) && Boolean(trade.market_data_provider);
+
+    $: totalAmount = (
+        (parseFloat(trade.quantity || "0") || 0) *
+            (parseFloat(trade.price || "0") || 0) +
+        (parseFloat(trade.fees || "0") || 0)
+    ).toFixed(2);
+
+    $: showTotal =
+        parseFloat(trade.quantity || "0") > 0 &&
+        parseFloat(trade.price || "0") > 0;
 
     async function validateTicker() {
         if (!canValidate) return;
@@ -233,6 +244,24 @@
             bind:value={trade.fees}
         />
     </div>
+
+    {#if showTotal}
+        <div class="rounded-md border border-border bg-muted/50 p-3">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-muted-foreground"
+                    >Total</span
+                >
+                <span class="text-lg font-semibold text-foreground">
+                    {formatCurrency(totalAmount, trade.trade_currency)}
+                </span>
+            </div>
+            <div class="mt-1 text-xs text-muted-foreground">
+                (Quantity × Price){#if parseFloat(trade.fees || "0") > 0}
+                    + Fees
+                {/if}
+            </div>
+        </div>
+    {/if}
 
     {#if errors.submit}
         <div class="text-red-600 dark:text-red-400 text-sm">
