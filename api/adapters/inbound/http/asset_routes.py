@@ -3,6 +3,7 @@ import logging
 from datetime import date, timedelta
 from typing import Optional
 
+import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.persistence.asset_repository import AssetRepository
+from domain.value_objects.money import Currency
 from infrastructure.db.session import get_session
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,26 @@ def _normalize_provider(provider: str) -> str:
         if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
         else "yfinance"
     )
+
+
+async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date, int]:
+    if from_ccy == "USD":
+        return {}
+    try:
+        t = yf.Ticker(f"{from_ccy}USD=X")
+        data = t.history(start=start, end=end)
+        if not data.empty:
+            return {idx.date(): round(float(row["Close"]) * 100) for idx, row in data.iterrows()}
+    except Exception:
+        pass
+    try:
+        t = yf.Ticker(f"USD{from_ccy}=X")
+        data = t.history(start=start, end=end)
+        if not data.empty:
+            return {idx.date(): -round(float(row["Close"]) * 100) for idx, row in data.iterrows()}
+    except Exception:
+        pass
+    return {}
 
 
 class BatchHistoryRequest(BaseModel):
@@ -45,6 +67,7 @@ async def get_price_history_batch(
     repo = AssetRepository(session)
     assets = await repo.list_all()
     provider_map = {a.ticker.upper(): a.market_data_provider for a in assets}
+    currency_map = {a.ticker.upper(): a.currency for a in assets}
 
     yfinance = YFinanceAdapter()
     tiingo = TiingoAdapter()
@@ -65,12 +88,28 @@ async def get_price_history_batch(
         try:
             adapter = _pick_adapter(ticker)
             history = await adapter.get_price_history(ticker, start, end)
+
+            currency = currency_map.get(ticker.upper(), Currency.USD)
+            fx_rates: dict[date, int] = {}
+            if currency != Currency.USD:
+                fx_rates = await _fetch_fx_history(currency.value, start, end)
+
+            def _convert(d: date, price: int) -> str:
+                rate = fx_rates.get(d)
+                if not rate:
+                    return str(price / 100)
+                if rate < 0:
+                    converted = (price * 100) // (-rate)
+                else:
+                    converted = (price * rate) // 100
+                return str(converted / 100)
+
             return {
                 "ticker": ticker,
                 "start_date": start.isoformat(),
                 "end_date": end.isoformat(),
                 "data": [
-                    {"date": d.isoformat(), "close": str(price / 100)}
+                    {"date": d.isoformat(), "close": _convert(d, price)}
                     for d, price in history
                 ],
             }
