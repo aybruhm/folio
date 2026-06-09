@@ -205,85 +205,64 @@
             const startStr = start.toISOString().slice(0, 10);
             const endStr = end.toISOString().slice(0, 10);
 
-            const results: PerformanceHolding[] = [];
+            const holdingByTicker = Object.fromEntries(holdings.map((h) => [h.ticker, h]));
 
-            for (const h of holdings) {
-                try {
-                    const history = await assetController.getPriceHistory({
-                        ticker: h.ticker,
-                        start_date: startStr,
-                        end_date: endStr,
-                    });
+            const batch = await assetController.getBatchPriceHistory({
+                tickers: holdings.map((h) => h.ticker),
+                start_date: startStr,
+                end_date: endStr,
+            });
 
-                    const prices = (history.data || [])
-                        .map((d) => Number(d.close))
-                        .filter((p) => p > 0 && Number.isFinite(p));
+            const results: PerformanceHolding[] = batch.results.map((history) => {
+                const h = holdingByTicker[history.ticker];
+                const prices = (history.data || [])
+                    .map((d) => Number(d.close))
+                    .filter((p) => p > 0 && Number.isFinite(p));
 
-                    if (prices.length < 2) {
-                        const fallback = prices[prices.length - 1] || 0;
-                        results.push({
-                            ticker: h.ticker,
-                            name: h.name,
-                            value: h.value,
-                            percent: h.percent,
-                            currentPrice: fallback,
-                            dayChange: 0,
-                            weekAvg: fallback,
-                            monthAvg: fallback,
-                            monthChange: 0,
-                        });
-                        continue;
-                    }
-
-                    const currentPrice = prices[prices.length - 1];
-                    const prevPrice = prices[prices.length - 2];
-                    const dayChange =
-                        prevPrice > 0
-                            ? ((currentPrice - prevPrice) / prevPrice) * 100
-                            : 0;
-
-                    const weekPrices = prices.slice(-7);
-                    const weekAvg =
-                        weekPrices.length > 0
-                            ? weekPrices.reduce((a, b) => a + b, 0) / weekPrices.length
-                            : currentPrice;
-
-                    const monthAvg =
-                        prices.length > 0
-                            ? prices.reduce((a, b) => a + b, 0) / prices.length
-                            : currentPrice;
-
-                    const oldestPrice = prices[0];
-                    const monthChange =
-                        oldestPrice > 0
-                            ? ((currentPrice - oldestPrice) / oldestPrice) * 100
-                            : 0;
-
-                    results.push({
-                        ticker: h.ticker,
-                        name: h.name,
-                        value: h.value,
-                        percent: h.percent,
-                        currentPrice,
-                        dayChange,
-                        weekAvg,
-                        monthAvg,
-                        monthChange,
-                    });
-                } catch {
-                    results.push({
-                        ticker: h.ticker,
-                        name: h.name,
-                        value: h.value,
-                        percent: h.percent,
-                        currentPrice: 0,
+                if (prices.length < 2) {
+                    const fallback = prices[prices.length - 1] || 0;
+                    return {
+                        ticker: history.ticker,
+                        name: h?.name ?? history.ticker,
+                        value: h?.value ?? 0,
+                        percent: h?.percent ?? 0,
+                        currentPrice: fallback,
                         dayChange: 0,
-                        weekAvg: 0,
-                        monthAvg: 0,
+                        weekAvg: fallback,
+                        monthAvg: fallback,
                         monthChange: 0,
-                    });
+                    };
                 }
-            }
+
+                const currentPrice = prices[prices.length - 1];
+                const prevPrice = prices[prices.length - 2];
+                const dayChange =
+                    prevPrice > 0 ? ((currentPrice - prevPrice) / prevPrice) * 100 : 0;
+
+                const weekPrices = prices.slice(-7);
+                const weekAvg =
+                    weekPrices.reduce((a, b) => a + b, 0) / weekPrices.length;
+
+                const monthAvg = prices.reduce((a, b) => a + b, 0) / prices.length;
+
+                const oldestPrice = prices[0];
+                const monthChange =
+                    oldestPrice > 0
+                        ? ((currentPrice - oldestPrice) / oldestPrice) * 100
+                        : 0;
+
+                return {
+                    ticker: history.ticker,
+                    name: h?.name ?? history.ticker,
+                    value: h?.value ?? 0,
+                    percent: h?.percent ?? 0,
+                    currentPrice,
+                    dayChange,
+                    weekAvg,
+                    monthAvg,
+                    monthChange,
+                };
+            });
 
             performanceHoldings = results;
         } finally {
