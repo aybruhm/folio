@@ -102,6 +102,38 @@ class TradingviewAdapter:
             logger.warning(f"TradingView metadata lookup failed for {ticker}: {e}")
             return None
 
+    async def get_price_history(
+        self, ticker: str, start: date, end: date
+    ) -> list[tuple[date, int]]:
+        if not self._enabled or not self._can_make_request():
+            return []
+
+        symbol = self._normalise_symbol(ticker)
+        days = max((end - start).days + 1, 1)
+        raw = await self._get(
+            f"/api/price/{symbol}", params={"timeframe": "1D", "range": str(days)}
+        )
+        if not raw or not raw.get("success"):
+            return []
+
+        data = raw.get("data") or {}
+        history = data.get("history") or []
+
+        result: list[tuple[date, int]] = []
+        for candle in history:
+            ts = candle.get("time")
+            close = candle.get("close")
+            if ts is None or close is None:
+                continue
+            try:
+                candle_date = datetime.fromtimestamp(ts, tz=timezone.utc).date()
+            except Exception:
+                continue
+            if start <= candle_date <= end:
+                result.append((candle_date, round(float(close) * 100)))
+
+        return sorted(result)
+
     async def get_current_price(
         self, ticker: str, currency: str = "USD"
     ) -> tuple[date, int]:
