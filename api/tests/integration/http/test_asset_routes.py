@@ -15,6 +15,13 @@ class FakeAssetRepository:
     async def search_by_ticker(self, query, limit=10):
         return self.assets
 
+    async def get_by_ticker(self, ticker):
+        upper = ticker.upper()
+        return next((a for a in self.assets if a.ticker.upper() == upper), None)
+
+    async def list_all(self):
+        return self.assets
+
 
 class FakeYFinanceAdapter:
     def __init__(self, history=None, metadata=None):
@@ -108,6 +115,7 @@ def test_asset_routes_reject_bad_search_and_history_errors(client, monkeypatch):
 @pytest.mark.edge_case
 def test_asset_history_defaults_date_range_when_not_provided(client, monkeypatch):
     yfinance = FakeYFinanceAdapter([(date(2024, 1, 1), 10000)])
+    monkeypatch.setattr(asset_routes, "AssetRepository", lambda session: FakeAssetRepository([]))
     monkeypatch.setattr(asset_routes, "YFinanceAdapter", lambda: yfinance)
 
     response = client.get("/api/v1/assets/MSFT/history")
