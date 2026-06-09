@@ -2,8 +2,10 @@ import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
+from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from adapters.outbound.persistence.trade_repository import TradeRepository
 from infrastructure.config import settings
 
 logging.basicConfig()
@@ -54,31 +56,48 @@ async def shutdown_scheduler():
 
 async def warm_cache_prices_job():
     """
-    Refresh current prices in the Valkey cache for all portfolio tickers.
-
-    Calls YFinanceAdapter.get_current_price() which reads-through / writes-through
-    the Valkey cache automatically.  This job just ensures the cache stays warm
-    so that holdings reads are fast.
+    Refresh current prices in the Valkey cache for all portfolio assets,
+    routing each asset to its stored market_data_provider.
     """
 
     logger.info("Starting cache warm (prices)")
     try:
+        from adapters.outbound.persistence.asset_repository import AssetRepository
+        from domain.value_objects.money import AssetClass
         from infrastructure.db.session import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()
-            trade_repo = TradeRepository(session)
+            tiingo = TiingoAdapter()
+            tradingview = TradingviewAdapter()
+            ngnmarket = NgnMarketAdapter()
+            asset_repo = AssetRepository(session)
 
-            tickers = await trade_repo.list_all_tickers()
+            assets = await asset_repo.list_all()
+            warmed = 0
 
-            for ticker in sorted(tickers):
+            for asset in assets:
+                if asset.asset_class == AssetClass.CASH:
+                    continue
+
+                ticker = asset.ticker
+                provider = (asset.market_data_provider or "yfinance").strip().lower()
                 try:
-                    await yfinance.get_current_price(ticker)
-                    logger.debug(f"Cache warmed for {ticker}")
-                except Exception as exc:
-                    logger.warning(f"Cache warm failed for {ticker}: {exc}")
+                    if provider == "tiingo":
+                        await tiingo.get_current_price(ticker)
+                    elif provider == "tradingview":
+                        await tradingview.get_current_price(ticker)
+                    elif provider == "ngnmarket":
+                        await ngnmarket.get_index_chart(ticker)
+                    else:
+                        await yfinance.get_current_price(ticker)
 
-        logger.info(f"Cache warm (prices) completed — {len(tickers)} tickers")
+                    warmed += 1
+                    logger.debug(f"Cache warmed for {ticker} via {provider}")
+                except Exception as exc:
+                    logger.warning(f"Cache warm failed for {ticker} ({provider}): {exc}")
+
+        logger.info(f"Cache warm (prices) completed — {warmed} assets")
     except Exception as e:
         logger.error(f"Cache warm (prices) failed: {e}")
 
