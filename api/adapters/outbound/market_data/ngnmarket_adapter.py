@@ -50,6 +50,36 @@ class NgnMarketAdapter:
             logger.debug(f"NGNMarket metadata mapping failed for {ticker}: {e}")
             return None
 
+    async def get_price_history(
+        self, ticker: str, start: date, end: date
+    ) -> list[tuple[date, int]]:
+        symbol = self._extract_symbol(ticker)
+        if not symbol:
+            return []
+
+        days = max((end - start).days + 1, 1)
+        chart = await self.get_index_chart(
+            symbol, period=f"{days}d", response_format="detailed"
+        )
+        if not chart:
+            return []
+
+        entries = chart.get("data") or []
+        result = []
+        for entry in entries:
+            date_str = entry.get("date")
+            value = entry.get("index_value")
+            if not date_str or value is None:
+                continue
+            try:
+                d = date.fromisoformat(date_str)
+            except Exception:
+                continue
+            if start <= d <= end:
+                result.append((d, round(float(value) * 100)))
+
+        return sorted(result)
+
     async def get_current_forex_rates(self) -> Optional[dict]:
         payload = await self._get("/forex/current")
         if not payload or not payload.get("success"):

@@ -23,7 +23,7 @@ def get_scheduler():
 async def init_scheduler():
     global scheduler
 
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone="Europe/London")
 
     if settings.SCHEDULER_ENABLED:
         scheduler.add_job(

@@ -4,6 +4,8 @@ import type {
     SearchAssetsResponse,
     GetPriceHistoryQuery,
     GetPriceHistoryResponse,
+    GetBatchPriceHistoryQuery,
+    GetBatchPriceHistoryResponse,
     ListBenchmarksResponse,
     AddBenchmarkResponse,
     GetFxRatesResponse,
@@ -53,6 +55,17 @@ export class AssetController {
                 },
             },
         );
+        return response.data;
+    }
+
+    async getBatchPriceHistory(
+        params: GetBatchPriceHistoryQuery,
+    ): Promise<GetBatchPriceHistoryResponse> {
+        const response = await this.client.post("/assets/history/batch", {
+            tickers: params.tickers,
+            start_date: params.start_date ?? null,
+            end_date: params.end_date ?? null,
+        });
         return response.data;
     }
 

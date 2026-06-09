@@ -71,6 +71,50 @@ class TiingoAdapter:
 
         return self._client
 
+    async def get_price_history(
+        self, ticker: str, start: date, end: date
+    ) -> list[tuple[date, int]]:
+        client = self._get_client()
+        if client is None:
+            return []
+
+        _, base_ticker = self._parse_exchange_qualified_ticker(ticker)
+        candidates = self._build_symbol_candidates(base_ticker, "USD")
+
+        for symbol in candidates:
+            if not self._can_make_request():
+                return []
+            try:
+                rows = client.get_ticker_price(
+                    symbol,
+                    startDate=start.isoformat(),
+                    endDate=end.isoformat(),
+                    fmt="json",
+                )
+                self._register_usage_bytes(self._estimate_bytes(rows))
+                if not rows:
+                    continue
+
+                result = []
+                for row in rows:
+                    close = row.get("adjClose") or row.get("close")
+                    date_str = str(row.get("date") or "")
+                    if close is None or not date_str:
+                        continue
+                    try:
+                        d = datetime.fromisoformat(
+                            date_str.replace("Z", "+00:00")
+                        ).date()
+                        result.append((d, round(float(close) * 100)))
+                    except Exception:
+                        continue
+                if result:
+                    return sorted(result)
+            except Exception:
+                continue
+
+        return []
+
     async def get_current_price(self, ticker: str) -> tuple[date, int]:
         client = self._get_client()
         if client is None:

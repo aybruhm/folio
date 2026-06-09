@@ -25,7 +25,14 @@ def get_valkey_client() -> valkey.Valkey:
     url = settings.REDIS_URL
     logger.info("Connecting Valkey client to %s", url)
 
-    _client = valkey.Valkey.from_url(url, decode_responses=True)
+    _client = valkey.Valkey.from_url(
+        url,
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5,
+        retry_on_timeout=True,
+        health_check_interval=30,
+    )
     return _client
 
 

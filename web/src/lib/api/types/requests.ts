@@ -75,6 +75,12 @@ export interface GetPriceHistoryQuery {
     end_date?: string | null;
 }
 
+export interface GetBatchPriceHistoryQuery {
+    tickers: string[];
+    start_date?: string | null;
+    end_date?: string | null;
+}
+
 export interface GetHoldingsQuery {
     portfolio_id: string;
     in_currency?: string | null;

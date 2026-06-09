@@ -87,6 +87,10 @@ export interface GetPriceHistoryResponse {
     }>;
 }
 
+export interface GetBatchPriceHistoryResponse {
+    results: GetPriceHistoryResponse[];
+}
+
 export interface ValidateTickerResponse {
     ticker: string;
     provider: "yfinance" | "tiingo" | "ngnmarket" | "tradingview";
