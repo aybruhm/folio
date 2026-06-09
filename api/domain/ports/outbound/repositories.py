@@ -105,6 +105,9 @@ class IAssetRepository(ABC):
     @abstractmethod
     async def search_by_ticker(self, query: str, limit: int = 10) -> List[Asset]: ...
 
+    @abstractmethod
+    async def list_all(self) -> List[Asset]: ...
+
 
 class IGoalRepository(ABC):
     @abstractmethod

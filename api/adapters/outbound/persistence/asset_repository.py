@@ -64,6 +64,11 @@ class AssetRepository(IAssetRepository):
             model.market_data_provider = market_data_provider
             await self.session.flush()
 
+    async def list_all(self) -> List[Asset]:
+        result = await self.session.execute(select(AssetModel))
+        models = result.scalars().all()
+        return [self._to_domain(m) for m in models]
+
     async def search_by_ticker(self, query: str, limit: int = 10) -> List[Asset]:
         search_query = f"%{query}%"
         result = await self.session.execute(

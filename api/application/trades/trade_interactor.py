@@ -61,7 +61,7 @@ class TradeInteractor(ITradeUseCase):
         currency: Currency,
         asset_class: AssetClass | None,
         market_data_provider: str,
-    ) -> Asset:
+    ) -> Asset | None:
         asset = await self.asset_repo.get_by_ticker(ticker)
         if not asset:
             if asset_class == AssetClass.CASH:
@@ -85,11 +85,13 @@ class TradeInteractor(ITradeUseCase):
                     ticker, metadata, market_data_provider=selected_provider
                 )
                 await self.asset_repo.add(asset)
-        elif asset_class != AssetClass.CASH:
+
+        elif asset.asset_class != AssetClass.CASH:
+            effective_provider = market_data_provider or asset.market_data_provider
             metadata = await self._get_asset_metadata(
-                ticker, currency, market_data_provider
+                ticker, currency, effective_provider
             )
-            selected_provider = self._normalize_provider(market_data_provider)
+            selected_provider = self._normalize_provider(effective_provider)
             if metadata and (
                 asset.asset_class.value != metadata.asset_class
                 or asset.currency.value != metadata.currency.value
@@ -102,6 +104,7 @@ class TradeInteractor(ITradeUseCase):
                     selected_provider,
                 )
                 asset = await self.asset_repo.get_by_ticker(ticker)
+
         return asset
 
     async def create_trade(self, request: CreateTradeRequest) -> UUID:
