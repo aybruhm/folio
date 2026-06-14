@@ -11,6 +11,12 @@
     import { api } from "$lib/api/client";
     import { TradeController, PortfolioController } from "$lib/api/controllers";
     import type { CreateTradeRequest, Trade } from "$lib/api/types";
+    import {
+        invalidateAllAnalytics,
+        invalidatePortfolioHoldings,
+        setCachedAnalytics,
+    } from "$lib/cache";
+    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
     import { onMount } from "svelte";
     import { page } from "$app/stores";
 
@@ -93,7 +99,7 @@
     }
 
     $: loadKey = tradeController
-        ? `${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}:${tradeTypeFilter}:${searchTerm}:${currentPage}:${pageSize}`
+        ? `${$cacheRefreshCounter}:${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}:${tradeTypeFilter}:${searchTerm}:${currentPage}:${pageSize}`
         : "";
 
     $: if (loadKey && loadKey !== lastLoadKey) {
@@ -161,6 +167,18 @@
         }
     }
 
+    async function invalidatePortfolioCache(portfolioId: string) {
+        await invalidateAllAnalytics();
+        await invalidatePortfolioHoldings(portfolioId);
+        // Warm 1y analytics in the background so next navigation is instant
+        portfolioController.getPortfolioAnalytics({
+            portfolio_id: portfolioId,
+            timeframe: "1y",
+        }).then((fresh) => {
+            setCachedAnalytics(portfolioId, "1y", fresh);
+        }).catch(() => { /* non-critical */ });
+    }
+
     async function handleCreateTrade(trade: any) {
         tradeFormLoading = true;
         try {
@@ -177,6 +195,7 @@
                 market_data_provider: trade.market_data_provider || "yfinance",
             };
             await tradeController.createTrade(tradeRequest);
+            await invalidatePortfolioCache($currentPortfolio.id);
             await loadTrades();
             showNewModal = false;
         } catch (e) {
@@ -218,6 +237,7 @@
                 market_data_provider: trade.market_data_provider || "yfinance",
             };
             await tradeController.updateTrade(editingTrade.id, tradeRequest);
+            await invalidatePortfolioCache($currentPortfolio.id);
             await loadTrades();
             showEditModal = false;
             editingTrade = null;
@@ -232,6 +252,7 @@
         if (!confirm("Delete this trade? This cannot be undone.")) return;
         try {
             await tradeController.deleteTrade(tradeId);
+            await invalidatePortfolioCache($currentPortfolio.id);
             await loadTrades();
         } catch (e) {
             console.error("Failed to delete trade:", e);
@@ -250,6 +271,7 @@
                 Array.from(selectedTradeIds),
             );
             selectedTradeIds = new Set();
+            await invalidatePortfolioCache($currentPortfolio.id);
             await loadTrades();
             showBulkDeleteModal = false;
         } catch (e) {

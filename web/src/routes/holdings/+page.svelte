@@ -10,6 +10,12 @@
     import { api } from "$lib/api/client";
     import { PortfolioController, TradeController } from "$lib/api/controllers";
     import type { CreateTradeRequest, Holding } from "$lib/api/types";
+    import {
+        getCachedHoldings,
+        setCachedHoldings,
+        invalidatePortfolioHoldings,
+    } from "$lib/cache";
+    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
     import { onMount } from "svelte";
 
     let loading = true;
@@ -23,6 +29,7 @@
 
     let lastLoadKey = "";
     let loadInProgress = false;
+    let lastRefreshCount = 0;
 
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
@@ -39,7 +46,7 @@
     });
 
     $: loadKey = portfolioController
-        ? `${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}`
+        ? `${$cacheRefreshCounter}:${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}`
         : "";
 
     $: if (loadKey && loadKey !== lastLoadKey) {
@@ -49,6 +56,8 @@
 
     async function loadHoldings() {
         if (loadInProgress) return;
+        const isForceRefresh = $cacheRefreshCounter > lastRefreshCount;
+        lastRefreshCount = $cacheRefreshCounter;
         loadInProgress = true;
         try {
             loading = true;
@@ -58,9 +67,28 @@
                 // Load holdings from all portfolios
                 for (const p of $portfolios) {
                     try {
-                        const response = await portfolioController.getHoldings({
-                            portfolio_id: p.id,
-                        });
+                        let response = isForceRefresh
+                            ? null
+                            : await getCachedHoldings(p.id);
+                        if (!response) {
+                            try {
+                                response = await portfolioController.getHoldings({
+                                    portfolio_id: p.id,
+                                });
+                                await setCachedHoldings(p.id, response);
+                            } catch (apiError) {
+                                if (isForceRefresh) {
+                                    response = await getCachedHoldings(p.id);
+                                }
+                                if (!response) {
+                                    console.error(
+                                        `Failed to load holdings for portfolio ${p.id}:`,
+                                        apiError,
+                                    );
+                                    continue;
+                                }
+                            }
+                        }
                         const holdingsData = (response.data || []).map(
                             (h: any) => ({
                                 ticker: h.ticker,
@@ -85,9 +113,22 @@
                 }
             } else {
                 // Load holdings for current portfolio
-                const response = await portfolioController.getHoldings({
-                    portfolio_id: $currentPortfolio.id,
-                });
+                let response = isForceRefresh
+                    ? null
+                    : await getCachedHoldings($currentPortfolio.id);
+                if (!response) {
+                    try {
+                        response = await portfolioController.getHoldings({
+                            portfolio_id: $currentPortfolio.id,
+                        });
+                        await setCachedHoldings($currentPortfolio.id, response);
+                    } catch (apiError) {
+                        if (isForceRefresh) {
+                            response = await getCachedHoldings($currentPortfolio.id);
+                        }
+                        if (!response) throw apiError;
+                    }
+                }
                 allHoldings = (response.data || []).map((h: any) => ({
                     ticker: h.ticker,
                     name: h.name || h.ticker,
@@ -177,6 +218,7 @@
                 market_data_provider: trade.market_data_provider || "yfinance",
             };
             await tradeController.createTrade(tradeRequest);
+            await invalidatePortfolioHoldings($currentPortfolio.id);
             await loadHoldings();
             showNewModal = false;
         } catch (e) {
@@ -206,6 +248,7 @@
                     tradeController.deleteTrade(t.id),
                 ),
             );
+            await invalidatePortfolioHoldings(portfolioId);
             await loadHoldings();
         } catch (e) {
             console.error("Failed to delete holding:", e);
