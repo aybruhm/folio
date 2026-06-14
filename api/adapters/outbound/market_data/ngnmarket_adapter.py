@@ -22,14 +22,19 @@ class NgnMarketAdapter:
         self._enabled = bool(self._base_url and self._api_key)
 
     async def get_asset_metadata(
-        self, ticker: str, currency: str = "NGN"
+        self, ticker: str, currency: str = "NGN", asset_class: str = ""
     ) -> Optional[AssetMetadata]:
-        # NGNMarket currently exposes indices endpoints; use index detail as ETF-like fallback metadata.
         symbol = self._extract_symbol(ticker)
         if not symbol:
             return None
 
-        detail = await self.get_index_detail(symbol)
+        if asset_class == "etf":
+            detail = await self.get_etf_detail(symbol)
+            if not detail:
+                detail = await self.get_index_detail(symbol)
+        else:
+            detail = await self.get_index_detail(symbol)
+
         if not detail:
             return None
 
@@ -44,7 +49,7 @@ class NgnMarketAdapter:
                 sector=None,
                 industry=None,
                 country="NG",
-                isin=None,
+                isin=detail.get("isin"),
             )
         except Exception as e:
             logger.debug(f"NGNMarket metadata mapping failed for {ticker}: {e}")
@@ -179,6 +184,12 @@ class NgnMarketAdapter:
         if not payload or not payload.get("success"):
             return None
         return payload.get("data") or []
+
+    async def get_etf_detail(self, symbol: str) -> Optional[dict]:
+        payload = await self._get(f"/etfs/{symbol.upper()}")
+        if not payload or not payload.get("success"):
+            return None
+        return payload.get("data")
 
     async def get_index_detail(self, symbol: str) -> Optional[dict]:
         payload = await self._get(f"/indices/{symbol.upper()}")

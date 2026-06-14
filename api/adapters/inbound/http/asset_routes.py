@@ -183,6 +183,7 @@ async def validate_ticker(
     ticker: str,
     provider: str = "yfinance",
     currency: str = "USD",
+    asset_class: str = "",
     session: AsyncSession = Depends(get_session),
 ):
     try:
@@ -194,7 +195,7 @@ async def validate_ticker(
             metadata = await adapter.get_asset_metadata(ticker, currency)
         elif selected == "ngnmarket":
             adapter = NgnMarketAdapter()
-            metadata = await adapter.get_asset_metadata(ticker, currency)
+            metadata = await adapter.get_asset_metadata(ticker, currency, asset_class)
         elif selected == "tradingview":
             adapter = TradingviewAdapter()
             metadata = await adapter.get_asset_metadata(ticker, currency)
