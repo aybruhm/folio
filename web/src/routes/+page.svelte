@@ -8,6 +8,14 @@
     import { api } from "$lib/api/client";
     import { PortfolioController, AssetController } from "$lib/api/controllers";
     import type { PortfolioStats } from "$lib/api/types";
+    import {
+        getCachedListAnalytics,
+        setCachedListAnalytics,
+        getCachedBatchPriceHistory,
+        setCachedBatchPriceHistory,
+        buildBatchPriceHistoryKey,
+    } from "$lib/cache";
+    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
     import { onMount } from "svelte";
 
     let loading = true;
@@ -68,20 +76,37 @@
         return 0;
     };
 
+    let lastRefreshCount = 0;
+
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
         assetController = new AssetController(api.getInstance());
-        await loadDashboardData();
+        await loadDashboardData(false);
     });
 
-    async function loadDashboardData() {
+    $: if ($cacheRefreshCounter > lastRefreshCount && portfolioController) {
+        lastRefreshCount = $cacheRefreshCounter;
+        void loadDashboardData(true);
+    }
+
+    async function loadDashboardData(force = false) {
         try {
             loading = true;
-            const analyticsList =
-                await portfolioController.listPortfolioAnalytics({
-                    timeframe: "1y",
-                    in_currency: "USD",
-                });
+            let analyticsList = force ? null : await getCachedListAnalytics("1y", "USD");
+            if (!analyticsList) {
+                try {
+                    analyticsList = await portfolioController.listPortfolioAnalytics({
+                        timeframe: "1y",
+                        in_currency: "USD",
+                    });
+                    await setCachedListAnalytics("1y", "USD", analyticsList);
+                } catch (apiError) {
+                    if (force) {
+                        analyticsList = await getCachedListAnalytics("1y", "USD");
+                    }
+                    if (!analyticsList) throw apiError;
+                }
+            }
 
             const analyticsData = (analyticsList || []).reduce(
                 (acc, item) => {
@@ -185,7 +210,7 @@
                 top_holdings: topHoldingsByWeight,
             };
 
-            await loadPerformanceData(topHoldingsByWeight);
+            await loadPerformanceData(topHoldingsByWeight, force);
         } catch (e) {
             console.error("Failed to load dashboard data:", e);
         } finally {
@@ -195,6 +220,7 @@
 
     async function loadPerformanceData(
         holdings: { ticker: string; name: string; value: number; percent: number }[],
+        force = false,
     ) {
         if (!holdings.length) return;
         performanceLoading = true;
@@ -207,11 +233,24 @@
 
             const holdingByTicker = Object.fromEntries(holdings.map((h) => [h.ticker, h]));
 
-            const batch = await assetController.getBatchPriceHistory({
-                tickers: holdings.map((h) => h.ticker),
-                start_date: startStr,
-                end_date: endStr,
-            });
+            const tickers = holdings.map((h) => h.ticker);
+            const batchKey = buildBatchPriceHistoryKey(tickers, startStr, endStr);
+            let batch = force ? null : await getCachedBatchPriceHistory(batchKey);
+            if (!batch) {
+                try {
+                    batch = await assetController.getBatchPriceHistory({
+                        tickers,
+                        start_date: startStr,
+                        end_date: endStr,
+                    });
+                    await setCachedBatchPriceHistory(batchKey, batch);
+                } catch (apiError) {
+                    if (force) {
+                        batch = await getCachedBatchPriceHistory(batchKey);
+                    }
+                    if (!batch) throw apiError;
+                }
+            }
 
             const results: PerformanceHolding[] = batch.results.map((history) => {
                 const h = holdingByTicker[history.ticker];

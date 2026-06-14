@@ -33,6 +33,29 @@ def _normalize_provider(provider: str) -> str:
 async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date, int]:
     if from_ccy == "USD":
         return {}
+
+    # NGNMarket is the authoritative source for NGN FX rates
+    if from_ccy == "NGN":
+        try:
+            ngn = NgnMarketAdapter()
+            history = await ngn.get_historical_forex_rates(
+                Currency.NGN, Currency.USD, start_date=start, end_date=end
+            )
+            if history:
+                result: dict[date, int] = {}
+                for item in history:
+                    date_str = str(item.get("date", ""))
+                    rate = item.get("rate")
+                    if date_str and rate is not None:
+                        try:
+                            result[date.fromisoformat(date_str)] = round(float(rate) * 100)
+                        except Exception:
+                            pass
+                if result:
+                    return result
+        except Exception:
+            pass
+
     try:
         t = yf.Ticker(f"{from_ccy}USD=X")
         data = t.history(start=start, end=end)
@@ -96,6 +119,10 @@ async def get_price_history_batch(
 
             def _convert(d: date, price: int) -> str:
                 rate = fx_rates.get(d)
+                if not rate and fx_rates:
+                    # Use nearest available rate (handles trading calendar gaps)
+                    nearest = min(fx_rates.keys(), key=lambda k: abs((k - d).days))
+                    rate = fx_rates.get(nearest)
                 if not rate:
                     return str(price / 100)
                 if rate < 0:

@@ -47,8 +47,8 @@ class EnvironSettings(BaseModel):
         os.getenv("YFINANCE_PRICE_HISTORY_CACHE_TTL", "86400")
     )  # 1 day
     MARKET_DATA_CACHE_TTL: int = int(
-        os.getenv("MARKET_DATA_CACHE_TTL", "1800")
-    )  # 30 minutes — cached in Valkey
+        os.getenv("MARKET_DATA_CACHE_TTL", "10800")
+    )  # 3 hours — cached in Valkey
     TIINGO_API_KEY: str = os.getenv("TIINGO_API_KEY", "")
     NGNMARKET_API_BASE_URL: str = os.getenv(
         "NGNMARKET_API_BASE_URL", "https://api.ngnmarket.com/v1"

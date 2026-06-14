@@ -11,6 +11,8 @@
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
     import { formatPercent, formatCurrency } from "$lib/utils/format";
+    import { getCachedAnalytics, setCachedAnalytics } from "$lib/cache";
+    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
     import { onMount } from "svelte";
 
     let loading = true;
@@ -36,6 +38,7 @@
 
     let lastLoadKey = "";
     let loadInProgress = false;
+    let lastRefreshCount = 0;
 
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
@@ -53,6 +56,8 @@
     async function loadAnalytics() {
         if (!$currentPortfolio?.id && $portfolios.length === 0) return;
         if (loadInProgress) return;
+        const isForceRefresh = $cacheRefreshCounter > lastRefreshCount;
+        lastRefreshCount = $cacheRefreshCounter;
         loadInProgress = true;
         try {
             loading = true;
@@ -69,12 +74,31 @@
 
                 for (const p of $portfolios) {
                     try {
-                        const response =
-                            await portfolioController.getPortfolioAnalytics({
-                                portfolio_id: p.id,
-                                timeframe,
-                                in_currency: "USD",
-                            });
+                        let response = isForceRefresh
+                            ? null
+                            : await getCachedAnalytics(p.id, timeframe);
+                        if (!response) {
+                            try {
+                                response =
+                                    await portfolioController.getPortfolioAnalytics({
+                                        portfolio_id: p.id,
+                                        timeframe,
+                                        in_currency: "USD",
+                                    });
+                                await setCachedAnalytics(p.id, timeframe, response);
+                            } catch (apiError) {
+                                if (isForceRefresh) {
+                                    response = await getCachedAnalytics(p.id, timeframe);
+                                }
+                                if (!response) {
+                                    console.error(
+                                        `Failed to load analytics for portfolio ${p.id}:`,
+                                        apiError,
+                                    );
+                                    continue;
+                                }
+                            }
+                        }
 
                         totalTwr += parseFloat(response.twr || "0");
                         totalMwr += parseFloat(response.mwr || "0");
@@ -215,11 +239,23 @@
                 };
             } else {
                 // Load single portfolio analytics
-                const response =
-                    await portfolioController.getPortfolioAnalytics({
-                        portfolio_id: $currentPortfolio.id,
-                        timeframe,
-                    });
+                let response = isForceRefresh
+                    ? null
+                    : await getCachedAnalytics($currentPortfolio.id, timeframe);
+                if (!response) {
+                    try {
+                        response = await portfolioController.getPortfolioAnalytics({
+                            portfolio_id: $currentPortfolio.id,
+                            timeframe,
+                        });
+                        await setCachedAnalytics($currentPortfolio.id, timeframe, response);
+                    } catch (apiError) {
+                        if (isForceRefresh) {
+                            response = await getCachedAnalytics($currentPortfolio.id, timeframe);
+                        }
+                        if (!response) throw apiError;
+                    }
+                }
                 analyticsData = {
                     ...response,
                 };
@@ -236,7 +272,7 @@
         portfolioController &&
         timeframe &&
         ($currentPortfolio?.id || $portfolios.length > 0)
-            ? `${$currentPortfolio?.id || "all"}:${timeframe}:${$portfolios.map((p) => p.id).join(",")}`
+            ? `${$cacheRefreshCounter}:${$currentPortfolio?.id || "all"}:${timeframe}:${$portfolios.map((p) => p.id).join(",")}`
             : "";
 
     $: if (loadKey && loadKey !== lastLoadKey) {

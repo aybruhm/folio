@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { Readable } from 'svelte/store';
+import { invalidateAllAnalytics, invalidateAllHoldings } from '$lib/cache';
 
 export interface SyncQueueItem {
   id: string;
@@ -209,6 +210,8 @@ export async function syncQueuedData(): Promise<void> {
       syncInProgress: false,
       lastSyncTime: Date.now()
     }));
+    await invalidateAllAnalytics();
+    await invalidateAllHoldings();
   } catch (error) {
     console.error('Error during sync:', error);
     offlineStore.update((state) => ({ ...state, syncInProgress: false }));

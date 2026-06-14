@@ -4,6 +4,7 @@
     import Button from "./Button.svelte";
     import { portfolios, currentPortfolio, hideAmounts } from "$lib/stores";
     import { clearAuthToken } from "$lib/stores/offlineAuth";
+    import { triggerCacheRefresh } from "$lib/stores/cacheRefresh";
     import { createEventDispatcher } from "svelte";
 
     const dispatch = createEventDispatcher();
@@ -11,6 +12,15 @@
     export let isDark: boolean;
 
     let showPortfolioMenu = false;
+    let refreshing = false;
+
+    async function handleRefreshCache() {
+        if (refreshing) return;
+        refreshing = true;
+        triggerCacheRefresh();
+        await new Promise((r) => setTimeout(r, 1200));
+        refreshing = false;
+    }
 
     function handleToggleSidebar() {
         dispatch("toggleSidebar");
@@ -120,6 +130,30 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                 {/if}
+            </Button>
+
+            <!-- Refresh cache -->
+            <Button
+                variant="ghost"
+                size="icon"
+                on:click={handleRefreshCache}
+                title="Refresh data"
+                disabled={refreshing}
+                class="text-muted-foreground hover:text-foreground"
+            >
+                <svg
+                    class="h-4 w-4 {refreshing ? 'animate-spin' : ''}"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                </svg>
             </Button>
 
             <!-- Theme toggle -->
