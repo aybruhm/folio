@@ -78,6 +78,10 @@ class NgnMarketAdapter:
             if start <= d <= end:
                 result.append((d, round(float(value) * 100)))
 
+        if result:
+            logger.info("NGNMarket: price history OK for %s — %d data points", ticker, len(result))
+        else:
+            logger.warning("NGNMarket: no price history data for %s (%s → %s)", ticker, start, end)
         return sorted(result)
 
     async def get_current_forex_rates(self) -> Optional[dict]:
@@ -127,9 +131,18 @@ class NgnMarketAdapter:
             rates=rates,
         )
         if rate_float is None:
+            logger.warning(
+                "NGNMarket: could not extract rate for %s/%s from payload (base=%s)",
+                from_currency.value, to_currency.value, base,
+            )
             return None
 
-        return round(rate_float * 100)
+        rate_cents = round(rate_float * 100)
+        logger.info(
+            "NGNMarket: current FX rate OK for %s/%s — %.4f",
+            from_currency.value, to_currency.value, rate_float,
+        )
+        return rate_cents
 
     async def get_fx_rate(
         self, from_currency: Currency, to_currency: Currency, on_date: date
@@ -191,6 +204,7 @@ class NgnMarketAdapter:
         url = f"{self._base_url}{path}"
         headers = {"Authorization": f"Bearer {self._api_key}"}
 
+        logger.debug("NGNMarket: GET %s params=%s", path, params)
         try:
             session = await self._get_shared_session()
             async with session.get(url, params=params, headers=headers) as response:
@@ -202,12 +216,14 @@ class NgnMarketAdapter:
                     return None
 
                 try:
-                    return await response.json()
+                    data = await response.json()
+                    logger.debug("NGNMarket: GET %s → %s OK", path, status_code)
+                    return data
                 except Exception:
                     logger.warning("NGNMarket GET %s returned non-JSON response", path)
                     return None
         except Exception as e:
-            logger.warning(f"NGNMarket GET {path} failed: {e}")
+            logger.warning("NGNMarket: GET %s failed: %s", path, e)
             return None
 
     @classmethod

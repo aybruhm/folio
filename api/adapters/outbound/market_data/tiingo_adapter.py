@@ -84,6 +84,7 @@ class TiingoAdapter:
         for symbol in candidates:
             if not self._can_make_request():
                 return []
+            logger.debug("Tiingo: fetching price history for %s (%s → %s)", symbol, start, end)
             try:
                 rows = client.get_ticker_price(
                     symbol,
@@ -93,6 +94,7 @@ class TiingoAdapter:
                 )
                 self._register_usage_bytes(self._estimate_bytes(rows))
                 if not rows:
+                    logger.debug("Tiingo: no price history rows returned for %s", symbol)
                     continue
 
                 result = []
@@ -109,8 +111,12 @@ class TiingoAdapter:
                     except Exception:
                         continue
                 if result:
+                    logger.info(
+                        "Tiingo: price history OK for %s — %d data points", symbol, len(result)
+                    )
                     return sorted(result)
-            except Exception:
+            except Exception as e:
+                logger.warning("Tiingo: price history failed for %s: %s", symbol, e)
                 continue
 
         return []
@@ -126,17 +132,20 @@ class TiingoAdapter:
             if not self._can_make_request():
                 return (date.today(), 0)
 
+            logger.debug("Tiingo: fetching current price for %s", symbol)
             try:
                 payload = client.get_ticker_price(symbol)
                 self._register_usage_bytes(self._estimate_bytes(payload))
 
                 rows = payload if isinstance(payload, list) else []
                 if not rows:
+                    logger.debug("Tiingo: no current price rows returned for %s", symbol)
                     continue
 
                 row = rows[-1]
                 close = row.get("close") or row.get("adjClose")
                 if close is None:
+                    logger.debug("Tiingo: close price missing in response for %s", symbol)
                     continue
 
                 date_str = str(row.get("date") or "")
@@ -149,8 +158,14 @@ class TiingoAdapter:
                     except Exception:
                         parsed_date = date.today()
 
-                return (parsed_date, round(float(close) * 100))
-            except Exception:
+                price_cents = round(float(close) * 100)
+                logger.info(
+                    "Tiingo: current price OK for %s — %.2f on %s",
+                    symbol, price_cents / 100, parsed_date,
+                )
+                return (parsed_date, price_cents)
+            except Exception as e:
+                logger.warning("Tiingo: current price failed for %s: %s", symbol, e)
                 continue
 
         return (date.today(), 0)
@@ -206,13 +221,18 @@ class TiingoAdapter:
             if not self._can_make_request():
                 return None
 
+            logger.debug("Tiingo: fetching metadata for %s", symbol)
             try:
                 info = client.get_ticker_metadata(symbol)
                 self._register_usage_bytes(self._estimate_bytes(info))
                 if info and info.get("ticker"):
+                    logger.info(
+                        "Tiingo: metadata OK for %s — name=%r exchange=%s",
+                        symbol, info.get("name", ""), info.get("exchangeCode", ""),
+                    )
                     return info
             except Exception as e:
-                logger.debug(f"Tiingo metadata lookup failed for {symbol}: {e}")
+                logger.warning("Tiingo: metadata lookup failed for %s: %s", symbol, e)
 
         return None
 
@@ -250,14 +270,16 @@ class TiingoAdapter:
         if not self._can_make_request():
             return None
 
+        logger.debug("Tiingo: fetching stock ticker catalog")
         try:
             tickers = client.list_stock_tickers()
             self._register_usage_bytes(self._estimate_bytes(tickers))
             self._ticker_catalog_cache = tickers
             self._ticker_catalog_cached_at = now
+            logger.info("Tiingo: ticker catalog fetched — %d entries", len(tickers) if tickers else 0)
             return tickers
         except Exception as e:
-            logger.debug(f"Tiingo ticker-list lookup failed: {e}")
+            logger.warning("Tiingo: ticker catalog fetch failed: %s", e)
             return None
 
     def _can_make_request(self) -> bool:

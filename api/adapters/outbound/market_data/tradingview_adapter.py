@@ -167,8 +167,8 @@ class TradingviewAdapter:
             "range": str(self._DEFAULT_RANGE),
         }
         path = f"/api/price/{symbol}"
+        logger.debug("TradingView: fetching price for %s", symbol)
         raw = await self._get(path, params=params)
-        logger.info(f"TradingView price API response for {symbol}: {raw}")
         if not raw:
             return None
 
@@ -176,15 +176,23 @@ class TradingviewAdapter:
         if not raw.get("success"):
             msg = raw.get("msg", "Unknown error")
             logger.warning(
-                "TradingView price API returned failure for %s: %s", symbol, msg
+                "TradingView: price API returned failure for %s: %s", symbol, msg
             )
             return None
 
         data = raw.get("data")
         if not isinstance(data, dict):
-            logger.warning("TradingView price API missing 'data' for %s", symbol)
+            logger.warning("TradingView: price API missing 'data' for %s", symbol)
             return None
 
+        current = data.get("current") or {}
+        close = current.get("close")
+        logger.info(
+            "TradingView: price OK for %s — close=%s history_len=%d",
+            symbol,
+            close,
+            len(data.get("history") or []),
+        )
         return data
 
     # ------------------------------------------------------------------
@@ -198,13 +206,14 @@ class TradingviewAdapter:
             "x-rapidapi-key": self._api_key,
         }
 
+        logger.debug("TradingView: GET %s params=%s", path, params)
         try:
             session = await self._get_shared_session()
             async with session.get(url, headers=headers, params=params) as response:
                 if response.status >= 400:
                     body = await response.text()
                     logger.warning(
-                        "TradingView error on %s: status=%s body=%s",
+                        "TradingView: GET %s → %s error: %s",
                         path,
                         response.status,
                         body[:300],
@@ -212,12 +221,14 @@ class TradingviewAdapter:
                     return None
 
                 try:
-                    return await response.json()
+                    data = await response.json()
+                    logger.debug("TradingView: GET %s → %s OK", path, response.status)
+                    return data
                 except Exception:
-                    logger.warning("TradingView GET %s returned non-JSON", path)
+                    logger.warning("TradingView: GET %s returned non-JSON", path)
                     return None
         except Exception as e:
-            logger.warning(f"TradingView GET {path} failed: {e}")
+            logger.warning("TradingView: GET %s failed: %s", path, e)
             return None
 
     @classmethod
