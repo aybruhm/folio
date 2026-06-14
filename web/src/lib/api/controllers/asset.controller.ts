@@ -32,12 +32,14 @@ export class AssetController {
             | "ngnmarket"
             | "tradingview" = "yfinance",
         currency: string = "USD",
+        assetClass: string = "",
     ): Promise<ValidateTickerResponse> {
         const response = await this.client.get("/assets/validate", {
             params: {
                 ticker,
                 provider,
                 currency,
+                ...(assetClass && { asset_class: assetClass }),
             },
         });
         return response.data;
