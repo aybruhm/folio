@@ -75,8 +75,8 @@ class FakeNgnMarketAdapter:
         self.metadata = metadata
         self.calls = []
 
-    async def get_asset_metadata(self, ticker, currency):
-        self.calls.append((ticker, currency))
+    async def get_asset_metadata(self, ticker, currency, asset_class=""):
+        self.calls.append((ticker, currency, asset_class))
         return self.metadata
 
 
@@ -99,7 +99,7 @@ def _patch_import_deps(
     monkeypatch.setattr(csv_module, "TiingoAdapter", lambda: tiingo)
     monkeypatch.setattr(csv_module, "NgnMarketAdapter", lambda: ngnmarket)
 
-    interactor = csv_module.CsvImportInteractor(session=object())
+    interactor = csv_module.CsvImportInteractor(session=object())  # type: ignore
     return interactor, trade_repo, asset_repo, yfinance, tiingo, ngnmarket
 
 
@@ -269,7 +269,7 @@ async def test_confirm_import_uses_selected_ngnmarket_provider(monkeypatch):
 
     assert result["imported_count"] == 1
     assert result["rejected_count"] == 0
-    assert ngnmarket.calls == [("NGX:NGX30", "NGN")]
+    assert ngnmarket.calls == [("NGX:NGX30", "NGN", "etf")]
     assert tiingo.calls == []
     assert yfinance.calls == []
     assert trade_repo.added[0].ticker == "NGX:NGX30"
@@ -306,7 +306,7 @@ async def test_confirm_import_uses_row_market_data_provider_over_default(monkeyp
     )
 
     assert result["imported_count"] == 1
-    assert ngnmarket.calls == [("NGX:NGX30", "NGN")]
+    assert ngnmarket.calls == [("NGX:NGX30", "NGN", "etf")]
     assert tiingo.calls == []
     assert yfinance.calls == []
     assert trade_repo.added[0].ticker == "NGX:NGX30"
