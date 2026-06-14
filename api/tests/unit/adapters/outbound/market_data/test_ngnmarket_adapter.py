@@ -46,6 +46,78 @@ async def test_get_asset_metadata_from_index_detail(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_asset_metadata_from_etf_detail(monkeypatch):
+    monkeypatch.setattr(
+        ngn_module.settings,
+        "NGNMARKET_API_BASE_URL",
+        "https://api.ngnmarket.com/v1",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ngn_module.settings,
+        "NGNMARKET_API_KEY",
+        "test-ngn-key",
+        raising=False,
+    )
+
+    adapter = ngn_module.NgnMarketAdapter()
+
+    async def fake_get_etf_detail(symbol: str):
+        assert symbol == "STANBICETF30"
+        return {
+            "symbol": "STANBICETF30",
+            "isin": "NGSTBKETF308",
+            "name": "STANBIC IBTC ETF 30",
+            "current_price": 4175,
+        }
+
+    monkeypatch.setattr(adapter, "get_etf_detail", fake_get_etf_detail)
+
+    metadata = await adapter.get_asset_metadata("NGX:STANBICETF30", "NGN", asset_class="etf")
+
+    assert metadata is not None
+    assert metadata.ticker == "NGX:STANBICETF30"
+    assert metadata.name == "STANBIC IBTC ETF 30"
+    assert metadata.asset_class == "etf"
+    assert metadata.currency == Currency.NGN
+    assert metadata.exchange == "NGX"
+    assert metadata.country == "NG"
+    assert metadata.isin == "NGSTBKETF308"
+
+
+@pytest.mark.asyncio
+async def test_get_asset_metadata_etf_falls_back_to_index(monkeypatch):
+    monkeypatch.setattr(
+        ngn_module.settings,
+        "NGNMARKET_API_BASE_URL",
+        "https://api.ngnmarket.com/v1",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ngn_module.settings,
+        "NGNMARKET_API_KEY",
+        "test-ngn-key",
+        raising=False,
+    )
+
+    adapter = ngn_module.NgnMarketAdapter()
+
+    async def fake_get_etf_detail(symbol: str):
+        return None
+
+    async def fake_get_index_detail(symbol: str):
+        return {"symbol": symbol, "name": "Fallback Index"}
+
+    monkeypatch.setattr(adapter, "get_etf_detail", fake_get_etf_detail)
+    monkeypatch.setattr(adapter, "get_index_detail", fake_get_index_detail)
+
+    metadata = await adapter.get_asset_metadata("NGX:SOMETOKEN", "NGN", asset_class="etf")
+
+    assert metadata is not None
+    assert metadata.name == "Fallback Index"
+
+
+@pytest.mark.asyncio
 async def test_get_current_rate_inverts_when_target_is_base():
     adapter = ngn_module.NgnMarketAdapter()
 

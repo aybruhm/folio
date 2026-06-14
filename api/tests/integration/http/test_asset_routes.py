@@ -49,7 +49,7 @@ class FakeNgnMarketAdapter:
     def __init__(self, metadata=None):
         self.metadata = metadata
 
-    async def get_asset_metadata(self, ticker, currency):
+    async def get_asset_metadata(self, ticker, currency, asset_class=""):
         return self.metadata
 
 

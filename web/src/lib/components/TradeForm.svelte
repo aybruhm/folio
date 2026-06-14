@@ -101,6 +101,7 @@
                 trade.ticker.trim(),
                 trade.market_data_provider || "yfinance",
                 trade.trade_currency || "USD",
+                trade.asset_class || "",
             );
 
             validationResult = result.supported ? "supported" : "unsupported";
