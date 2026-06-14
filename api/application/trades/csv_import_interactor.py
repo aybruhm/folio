@@ -36,7 +36,7 @@ class CsvImportInteractor(ICsvImportUseCase):
             else "yfinance"
         )
 
-    async def _get_asset_metadata(self, ticker: str, currency: Currency, provider: str):
+    async def _get_asset_metadata(self, ticker: str, currency: Currency, provider: str, asset_class: str = ""):
         selected = self._normalize_provider(provider)
 
         if selected == "tiingo":
@@ -46,13 +46,13 @@ class CsvImportInteractor(ICsvImportUseCase):
             metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
+            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value, asset_class)
             if metadata:
                 return metadata
             return await self.yfinance.get_asset_metadata(ticker, currency.value)
 
         if selected == "ngnmarket":
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
+            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value, asset_class)
             if metadata:
                 return metadata
             metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
@@ -70,7 +70,7 @@ class CsvImportInteractor(ICsvImportUseCase):
             metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value)
+            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value, asset_class)
             if metadata:
                 return metadata
             return await self.yfinance.get_asset_metadata(ticker, currency.value)
@@ -177,6 +177,7 @@ class CsvImportInteractor(ICsvImportUseCase):
                                 ticker,
                                 trade_data["currency"],
                                 row_provider,
+                                asset_class_str,
                             )
                             if metadata:
                                 asset = Asset.from_metadata(
@@ -208,6 +209,7 @@ class CsvImportInteractor(ICsvImportUseCase):
                                 ticker,
                                 trade_data["currency"],
                                 row_provider,
+                                asset_class_str,
                             )
                             if metadata and (
                                 asset.asset_class.value != metadata.asset_class
