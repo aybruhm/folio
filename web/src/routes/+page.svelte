@@ -30,11 +30,11 @@
         name: string;
         value: number;
         percent: number;
-        currentPrice: number;
-        dayChange: number;
-        weekAvg: number;
-        monthAvg: number;
-        monthChange: number;
+        currentPrice: number | null;
+        dayChange: number | null;
+        weekAvg: number | null;
+        monthAvg: number | null;
+        monthChange: number | null;
     }
     let stats: PortfolioStats = {
         id: "",
@@ -55,8 +55,18 @@
         })) ?? [];
 
     const monthOrder = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     ];
 
     const getTimeFromLabel = (label: string) => {
@@ -92,17 +102,23 @@
     async function loadDashboardData(force = false) {
         try {
             loading = true;
-            let analyticsList = force ? null : await getCachedListAnalytics("1y", "USD");
+            let analyticsList = force
+                ? null
+                : await getCachedListAnalytics("1y", "USD");
             if (!analyticsList) {
                 try {
-                    analyticsList = await portfolioController.listPortfolioAnalytics({
-                        timeframe: "1y",
-                        in_currency: "USD",
-                    });
+                    analyticsList =
+                        await portfolioController.listPortfolioAnalytics({
+                            timeframe: "1y",
+                            in_currency: "USD",
+                        });
                     await setCachedListAnalytics("1y", "USD", analyticsList);
                 } catch (apiError) {
                     if (force) {
-                        analyticsList = await getCachedListAnalytics("1y", "USD");
+                        analyticsList = await getCachedListAnalytics(
+                            "1y",
+                            "USD",
+                        );
                     }
                     if (!analyticsList) throw apiError;
                 }
@@ -128,8 +144,14 @@
                     current_value: 0,
                     total_gain_loss: 0,
                     allocation: [] as { label: string; value: number }[],
-                    performance_history: [] as { name: string; value: number }[],
-                    contribution_history: [] as { name: string; value: number }[],
+                    performance_history: [] as {
+                        name: string;
+                        value: number;
+                    }[],
+                    contribution_history: [] as {
+                        name: string;
+                        value: number;
+                    }[],
                     top_holdings: [] as {
                         ticker: string;
                         name?: string;
@@ -143,7 +165,8 @@
             for (const item of analyticsData.allocation) {
                 allocationMap.set(
                     item.label,
-                    (allocationMap.get(item.label) || 0) + Number(item.value || 0),
+                    (allocationMap.get(item.label) || 0) +
+                        Number(item.value || 0),
                 );
             }
             const allocation = Array.from(allocationMap.entries()).map(
@@ -154,23 +177,31 @@
             for (const point of analyticsData.performance_history) {
                 performanceMap.set(
                     point.name,
-                    (performanceMap.get(point.name) || 0) + Number(point.value || 0),
+                    (performanceMap.get(point.name) || 0) +
+                        Number(point.value || 0),
                 );
             }
             const performance_history = Array.from(performanceMap.entries())
                 .map(([name, value]) => ({ name, value }))
-                .sort((a, b) => getTimeFromLabel(a.name) - getTimeFromLabel(b.name));
+                .sort(
+                    (a, b) =>
+                        getTimeFromLabel(a.name) - getTimeFromLabel(b.name),
+                );
 
             const contributionMap = new Map<string, number>();
             for (const point of analyticsData.contribution_history) {
                 contributionMap.set(
                     point.name,
-                    (contributionMap.get(point.name) || 0) + Number(point.value || 0),
+                    (contributionMap.get(point.name) || 0) +
+                        Number(point.value || 0),
                 );
             }
             const contribution_history = Array.from(contributionMap.entries())
                 .map(([name, value]) => ({ name, value }))
-                .sort((a, b) => getTimeFromLabel(a.name) - getTimeFromLabel(b.name));
+                .sort(
+                    (a, b) =>
+                        getTimeFromLabel(a.name) - getTimeFromLabel(b.name),
+                );
 
             const topHoldingsByWeightMap = new Map<
                 string,
@@ -184,7 +215,9 @@
                 });
             }
             const totalValue = analyticsData.current_value || 0;
-            const topHoldingsByWeight = Array.from(topHoldingsByWeightMap.entries())
+            const topHoldingsByWeight = Array.from(
+                topHoldingsByWeightMap.entries(),
+            )
                 .map(([ticker, { value, name }]) => ({
                     ticker,
                     name,
@@ -203,7 +236,8 @@
                 current_value: currentValue,
                 cost_basis: costBasis,
                 gain_loss: gainLoss,
-                return_percent: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0,
+                return_percent:
+                    costBasis > 0 ? (gainLoss / costBasis) * 100 : 0,
                 allocation,
                 performance_history,
                 contribution_history,
@@ -219,7 +253,12 @@
     }
 
     async function loadPerformanceData(
-        holdings: { ticker: string; name: string; value: number; percent: number }[],
+        holdings: {
+            ticker: string;
+            name: string;
+            value: number;
+            percent: number;
+        }[],
         force = false,
     ) {
         if (!holdings.length) return;
@@ -231,11 +270,19 @@
             const startStr = start.toISOString().slice(0, 10);
             const endStr = end.toISOString().slice(0, 10);
 
-            const holdingByTicker = Object.fromEntries(holdings.map((h) => [h.ticker, h]));
+            const holdingByTicker = Object.fromEntries(
+                holdings.map((h) => [h.ticker, h]),
+            );
 
             const tickers = holdings.map((h) => h.ticker);
-            const batchKey = buildBatchPriceHistoryKey(tickers, startStr, endStr);
-            let batch = force ? null : await getCachedBatchPriceHistory(batchKey);
+            const batchKey = buildBatchPriceHistoryKey(
+                tickers,
+                startStr,
+                endStr,
+            );
+            let batch = force
+                ? null
+                : await getCachedBatchPriceHistory(batchKey);
             if (!batch) {
                 try {
                     batch = await assetController.getBatchPriceHistory({
@@ -252,56 +299,62 @@
                 }
             }
 
-            const results: PerformanceHolding[] = batch.results.map((history) => {
-                const h = holdingByTicker[history.ticker];
-                const prices = (history.data || [])
-                    .map((d) => Number(d.close))
-                    .filter((p) => p > 0 && Number.isFinite(p));
+            const results: PerformanceHolding[] = batch.results.map(
+                (history) => {
+                    const h = holdingByTicker[history.ticker];
+                    const prices = (history.data || [])
+                        .map((d) => Number(d.close))
+                        .filter((p) => p > 0 && Number.isFinite(p));
 
-                if (prices.length < 2) {
-                    const fallback = prices[prices.length - 1] || 0;
+                    if (prices.length < 2) {
+                        const fallback = prices[prices.length - 1] || null;
+                        return {
+                            ticker: history.ticker,
+                            name: h?.name ?? history.ticker,
+                            value: h?.value ?? 0,
+                            percent: h?.percent ?? 0,
+                            currentPrice: fallback,
+                            dayChange: null,
+                            weekAvg: fallback,
+                            monthAvg: fallback,
+                            monthChange: null,
+                        };
+                    }
+
+                    const currentPrice = prices[prices.length - 1];
+                    const prevPrice = prices[prices.length - 2];
+                    const dayChange =
+                        prevPrice > 0
+                            ? ((currentPrice - prevPrice) / prevPrice) * 100
+                            : 0;
+
+                    const weekPrices = prices.slice(-7);
+                    const weekAvg =
+                        weekPrices.reduce((a, b) => a + b, 0) /
+                        weekPrices.length;
+
+                    const monthAvg =
+                        prices.reduce((a, b) => a + b, 0) / prices.length;
+
+                    const oldestPrice = prices[0];
+                    const monthChange =
+                        oldestPrice > 0
+                            ? ((currentPrice - oldestPrice) / oldestPrice) * 100
+                            : 0;
+
                     return {
                         ticker: history.ticker,
                         name: h?.name ?? history.ticker,
                         value: h?.value ?? 0,
                         percent: h?.percent ?? 0,
-                        currentPrice: fallback,
-                        dayChange: 0,
-                        weekAvg: fallback,
-                        monthAvg: fallback,
-                        monthChange: 0,
+                        currentPrice,
+                        dayChange,
+                        weekAvg,
+                        monthAvg,
+                        monthChange,
                     };
-                }
-
-                const currentPrice = prices[prices.length - 1];
-                const prevPrice = prices[prices.length - 2];
-                const dayChange =
-                    prevPrice > 0 ? ((currentPrice - prevPrice) / prevPrice) * 100 : 0;
-
-                const weekPrices = prices.slice(-7);
-                const weekAvg =
-                    weekPrices.reduce((a, b) => a + b, 0) / weekPrices.length;
-
-                const monthAvg = prices.reduce((a, b) => a + b, 0) / prices.length;
-
-                const oldestPrice = prices[0];
-                const monthChange =
-                    oldestPrice > 0
-                        ? ((currentPrice - oldestPrice) / oldestPrice) * 100
-                        : 0;
-
-                return {
-                    ticker: history.ticker,
-                    name: h?.name ?? history.ticker,
-                    value: h?.value ?? 0,
-                    percent: h?.percent ?? 0,
-                    currentPrice,
-                    dayChange,
-                    weekAvg,
-                    monthAvg,
-                    monthChange,
-                };
-            });
+                },
+            );
 
             performanceHoldings = results;
         } finally {
@@ -326,8 +379,14 @@
     <div class="mx-auto max-w-7xl space-y-6">
         <!-- Header -->
         <div class="animate-in space-y-1">
-            <p class="text-xs font-medium uppercase tracking-widest text-muted-foreground">{today}</p>
-            <h1 class="font-serif text-3xl md:text-4xl text-foreground leading-tight">
+            <p
+                class="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+            >
+                {today}
+            </p>
+            <h1
+                class="font-serif text-3xl md:text-4xl text-foreground leading-tight"
+            >
                 Dashboard
             </h1>
         </div>
@@ -368,57 +427,109 @@
             </Card>
         {:else}
             <!-- Stat Cards -->
-            <div class="animate-in animate-in-delay-1 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+            <div
+                class="animate-in animate-in-delay-1 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
+            >
                 <!-- Total Value -->
-                <div class="rounded-xl border border-border bg-card p-4 md:p-5 shadow-sm transition-shadow hover:shadow-md">
-                    <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Total Value</p>
-                    <div class="font-serif text-2xl sm:text-3xl md:text-4xl text-foreground leading-none break-all">
-                        <Amount value={formatCurrency(stats.current_value, "USD")} />
+                <div
+                    class="rounded-xl border border-border bg-card p-4 md:p-5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                    <p
+                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
+                    >
+                        Total Value
+                    </p>
+                    <div
+                        class="font-serif text-2xl sm:text-3xl md:text-4xl text-foreground leading-none break-all"
+                    >
+                        <Amount
+                            value={formatCurrency(stats.current_value, "USD")}
+                        />
                     </div>
-                    <p class="mt-2 text-xs text-muted-foreground">Current portfolio value</p>
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        Current portfolio value
+                    </p>
                 </div>
 
                 <!-- Cost Basis -->
-                <div class="rounded-xl border border-border bg-card p-4 md:p-5 shadow-sm transition-shadow hover:shadow-md">
-                    <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Cost Basis</p>
-                    <div class="font-serif text-2xl sm:text-3xl md:text-4xl text-foreground leading-none break-all">
-                        <Amount value={formatCurrency(stats.cost_basis, "USD")} />
+                <div
+                    class="rounded-xl border border-border bg-card p-4 md:p-5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                    <p
+                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
+                    >
+                        Cost Basis
+                    </p>
+                    <div
+                        class="font-serif text-2xl sm:text-3xl md:text-4xl text-foreground leading-none break-all"
+                    >
+                        <Amount
+                            value={formatCurrency(stats.cost_basis, "USD")}
+                        />
                     </div>
-                    <p class="mt-2 text-xs text-muted-foreground">Total amount invested</p>
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        Total amount invested
+                    </p>
                 </div>
 
                 <!-- Gain / Loss -->
-                <div class="rounded-xl border shadow-sm transition-shadow hover:shadow-md p-4 md:p-5
+                <div
+                    class="rounded-xl border shadow-sm transition-shadow hover:shadow-md p-4 md:p-5
                     {isPositive
                         ? 'border-[#34D399]/20 bg-[#34D399]/5'
-                        : 'border-[#F87171]/20 bg-[#F87171]/5'}">
-                    <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Gain / Loss</p>
-                    <div class="font-serif text-2xl sm:text-3xl md:text-4xl leading-none break-all"
+                        : 'border-[#F87171]/20 bg-[#F87171]/5'}"
+                >
+                    <p
+                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
+                    >
+                        Gain / Loss
+                    </p>
+                    <div
+                        class="font-serif text-2xl sm:text-3xl md:text-4xl leading-none break-all"
                         class:text-positive={isPositive}
-                        class:text-negative={!isPositive}>
-                        <Amount value={formatCurrency(stats.gain_loss, "USD")} />
+                        class:text-negative={!isPositive}
+                    >
+                        <Amount
+                            value={formatCurrency(stats.gain_loss, "USD")}
+                        />
                     </div>
-                    <p class="mt-2 text-xs text-muted-foreground">Unrealized P&L</p>
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        Unrealized P&L
+                    </p>
                 </div>
 
                 <!-- Return -->
-                <div class="rounded-xl border shadow-sm transition-shadow hover:shadow-md p-4 md:p-5
+                <div
+                    class="rounded-xl border shadow-sm transition-shadow hover:shadow-md p-4 md:p-5
                     {isPositive
                         ? 'border-[#34D399]/20 bg-[#34D399]/5'
-                        : 'border-[#F87171]/20 bg-[#F87171]/5'}">
-                    <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Total Return</p>
-                    <div class="font-serif text-2xl sm:text-3xl md:text-4xl leading-none"
+                        : 'border-[#F87171]/20 bg-[#F87171]/5'}"
+                >
+                    <p
+                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
+                    >
+                        Total Return
+                    </p>
+                    <div
+                        class="font-serif text-2xl sm:text-3xl md:text-4xl leading-none"
                         class:text-positive={isPositive}
-                        class:text-negative={!isPositive}>
+                        class:text-negative={!isPositive}
+                    >
                         <Amount value={formatPercent(stats.return_percent)} />
                     </div>
-                    <p class="mt-2 text-xs text-muted-foreground">Return on investment</p>
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        Return on investment
+                    </p>
                 </div>
             </div>
 
             <!-- Performance Chart -->
             <div class="animate-in animate-in-delay-2">
-                <Card title="Performance" subtitle="Portfolio value over time" className="md:px-4">
+                <Card
+                    title="Performance"
+                    subtitle="Portfolio value over time"
+                    className="md:px-4"
+                >
                     <LineChart
                         data={stats.performance_history}
                         title=""
@@ -430,7 +541,11 @@
 
             <!-- Contribution History Chart -->
             <div class="animate-in animate-in-delay-2">
-                <Card title="Contribution History" subtitle="Net contributions over time" className="md:px-4">
+                <Card
+                    title="Contribution History"
+                    subtitle="Net contributions over time"
+                    className="md:px-4"
+                >
                     <LineChart
                         data={stats.contribution_history}
                         title=""
@@ -441,19 +556,27 @@
             </div>
 
             <!-- Allocation + Top Holdings Donuts -->
-            <div class="animate-in animate-in-delay-3 grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+            <div
+                class="animate-in animate-in-delay-3 grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2"
+            >
                 <Card title="Allocation" subtitle="Asset class breakdown">
                     <DonutChart data={stats.allocation} title="" />
                 </Card>
 
-                <Card title="Top Positions by Weight" subtitle="10 largest positions by weight">
+                <Card
+                    title="Top Positions by Weight"
+                    subtitle="10 largest positions by weight"
+                >
                     <DonutChart data={topHoldingsChart} title="" />
                 </Card>
             </div>
 
             <!-- Top Holdings Performance -->
             <div class="animate-in animate-in-delay-4">
-                <Card title="Top Holdings Performance" subtitle="10 largest positions — price, averages & change">
+                <Card
+                    title="Top Holdings Performance"
+                    subtitle="10 largest positions — current value, price, averages & change"
+                >
                     {#if performanceLoading}
                         <div class="space-y-3">
                             {#each Array(10) as _}
@@ -471,69 +594,200 @@
                             <table class="w-full text-sm">
                                 <thead class="border-b border-border">
                                     <tr>
-                                        <th class="h-9 px-3 text-left align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <th
+                                            class="h-9 px-3 text-left align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
                                             Ticker
                                         </th>
-                                        <th class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <th
+                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
                                             Price
                                         </th>
-                                        <th class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">
+                                        <th
+                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
+                                            Value
+                                        </th>
+                                        <th
+                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
                                             Day
                                         </th>
-                                        <th class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">
+                                        <th
+                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
                                             7D Avg
                                         </th>
-                                        <th class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hidden sm:table-cell">
+                                        <th
+                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
                                             30D Avg
                                         </th>
-                                        <th class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <th
+                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        >
                                             30D Chg
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody class="[&_tr:last-child]:border-0">
                                     {#each performanceHoldings as h}
-                                        <tr class="relative border-b border-border/60 hover:bg-muted/30 transition-colors">
+                                        <tr
+                                            class="relative border-b border-border/60 hover:bg-muted/30 transition-colors"
+                                        >
                                             <td class="px-3 py-3 align-middle">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="inline-block h-1 w-1 rounded-full flex-shrink-0
-                                                        {h.monthChange >= 0 ? 'bg-[#34D399]' : 'bg-[#F87171]'}">
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <span
+                                                        class="inline-block h-1 w-1 rounded-full flex-shrink-0
+                                                        {h.monthChange != null
+                                                            ? h.monthChange >= 0
+                                                                ? 'bg-[#34D399]'
+                                                                : 'bg-[#F87171]'
+                                                            : 'bg-muted-foreground'}"
+                                                    >
                                                     </span>
                                                     <div>
-                                                        <span class="font-semibold text-foreground font-mono text-xs tracking-wide">
+                                                        <span
+                                                            class="font-semibold text-foreground font-mono text-xs tracking-wide"
+                                                        >
                                                             {h.ticker}
                                                         </span>
                                                         {#if h.name && h.name !== h.ticker}
-                                                            <span class="block text-xs text-muted-foreground leading-tight">
+                                                            <span
+                                                                class="block text-xs text-muted-foreground leading-tight"
+                                                            >
                                                                 {h.name}
                                                             </span>
                                                         {/if}
-                                                        <span class="block text-xs text-muted-foreground">
-                                                            <Amount value={formatPercent(h.percent)} /> of portfolio
+                                                        <span
+                                                            class="block text-xs text-muted-foreground"
+                                                        >
+                                                            <Amount
+                                                                value={formatPercent(
+                                                                    h.percent,
+                                                                )}
+                                                            /> of portfolio
                                                         </span>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td class="px-3 py-3 align-middle text-right font-mono text-xs">
-                                                <Amount value={formatCurrency(h.currentPrice, "USD")} />
+                                            <td
+                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
+                                            >
+                                                {#if h.currentPrice != null}
+                                                    <Amount
+                                                        value={formatCurrency(
+                                                            h.currentPrice,
+                                                            "USD",
+                                                        )}
+                                                    />
+                                                {:else}
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >—</span
+                                                    >
+                                                {/if}
                                             </td>
-                                            <td class="px-3 py-3 align-middle text-right font-mono text-xs hidden sm:table-cell">
-                                                <span class:text-positive={h.dayChange >= 0} class:text-negative={h.dayChange < 0}>
-                                                    <Amount value={formatPercent(h.dayChange)} />
-                                                </span>
+                                            <td
+                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
+                                            >
+                                                {#if h.value > 0}
+                                                    <Amount
+                                                        value={formatCurrency(
+                                                            h.value,
+                                                            "USD",
+                                                        )}
+                                                    />
+                                                {:else}
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >—</span
+                                                    >
+                                                {/if}
                                             </td>
-                                            <td class="px-3 py-3 align-middle text-right font-mono text-xs hidden sm:table-cell">
-                                                <Amount value={formatCurrency(h.weekAvg, "USD")} />
+                                            <td
+                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
+                                            >
+                                                {#if h.dayChange != null}
+                                                    <span
+                                                        class:text-positive={h.dayChange >=
+                                                            0}
+                                                        class:text-negative={h.dayChange <
+                                                            0}
+                                                    >
+                                                        <Amount
+                                                            value={formatPercent(
+                                                                h.dayChange,
+                                                            )}
+                                                        />
+                                                    </span>
+                                                {:else}
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >—</span
+                                                    >
+                                                {/if}
                                             </td>
-                                            <td class="px-3 py-3 align-middle text-right font-mono text-xs hidden sm:table-cell">
-                                                <Amount value={formatCurrency(h.monthAvg, "USD")} />
+                                            <td
+                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
+                                            >
+                                                {#if h.weekAvg != null}
+                                                    <Amount
+                                                        value={formatCurrency(
+                                                            h.weekAvg,
+                                                            "USD",
+                                                        )}
+                                                    />
+                                                {:else}
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >—</span
+                                                    >
+                                                {/if}
                                             </td>
-                                            <td class="px-3 py-3 align-middle text-right">
-                                                <span class="font-semibold font-mono text-xs"
-                                                    class:text-positive={h.monthChange >= 0}
-                                                    class:text-negative={h.monthChange < 0}>
-                                                    <Amount value={formatPercent(h.monthChange)} />
-                                                </span>
+                                            <td
+                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
+                                            >
+                                                {#if h.monthAvg != null}
+                                                    <Amount
+                                                        value={formatCurrency(
+                                                            h.monthAvg,
+                                                            "USD",
+                                                        )}
+                                                    />
+                                                {:else}
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >—</span
+                                                    >
+                                                {/if}
+                                            </td>
+                                            <td
+                                                class="px-3 py-3 align-middle text-right"
+                                            >
+                                                {#if h.monthChange != null}
+                                                    <span
+                                                        class="font-semibold font-mono text-xs"
+                                                        class:text-positive={h.monthChange >=
+                                                            0}
+                                                        class:text-negative={h.monthChange <
+                                                            0}
+                                                    >
+                                                        <Amount
+                                                            value={formatPercent(
+                                                                h.monthChange,
+                                                            )}
+                                                        />
+                                                    </span>
+                                                {:else}
+                                                    <span
+                                                        class="text-muted-foreground"
+                                                        >—</span
+                                                    >
+                                                {/if}
                                             </td>
                                         </tr>
                                     {/each}
@@ -541,7 +795,9 @@
                             </table>
                         </div>
                     {:else}
-                        <p class="text-sm text-muted-foreground py-8 text-center">
+                        <p
+                            class="text-sm text-muted-foreground py-8 text-center"
+                        >
                             No holdings data available.
                         </p>
                     {/if}
@@ -559,8 +815,18 @@
             class="h-10 w-10 rounded-full bg-card border border-border text-foreground flex items-center justify-center hover:bg-muted transition-all shadow-lg"
             title="New Trade"
         >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                />
             </svg>
         </a>
         <a
@@ -568,9 +834,24 @@
             class="h-10 w-10 rounded-full bg-card border border-border text-foreground flex items-center justify-center hover:bg-muted transition-all shadow-lg"
             title="Manage Portfolios"
         >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
             </svg>
         </a>
         <a
@@ -578,19 +859,41 @@
             class="h-10 w-10 rounded-full bg-card border border-border text-foreground flex items-center justify-center hover:bg-muted transition-all shadow-lg"
             title="View Analytics"
         >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            <svg
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
             </svg>
         </a>
     {/if}
 
     <button
         on:click={() => (fabOpen = !fabOpen)}
-        class="h-11 w-11 rounded-full bg-accent text-accent-foreground flex items-center justify-center hover:bg-accent/90 transition-all shadow-lg shadow-accent/25 {fabOpen ? 'rotate-45' : ''}"
+        class="h-11 w-11 rounded-full bg-accent text-accent-foreground flex items-center justify-center hover:bg-accent/90 transition-all shadow-lg shadow-accent/25 {fabOpen
+            ? 'rotate-45'
+            : ''}"
         title="Actions"
     >
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        <svg
+            class="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+            />
         </svg>
     </button>
 </div>

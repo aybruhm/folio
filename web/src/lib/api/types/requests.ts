@@ -15,6 +15,7 @@ export type MarketDataProvider =
     | "yfinance"
     | "tiingo"
     | "ngnmarket"
+    | "ngxpulse"
     | "tradingview";
 
 export interface CreateTradeRequest {
