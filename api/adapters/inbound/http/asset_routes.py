@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
@@ -25,7 +26,7 @@ def _normalize_provider(provider: str) -> str:
     normalized = (provider or "yfinance").strip().lower()
     return (
         normalized
-        if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
+        if normalized in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
         else "yfinance"
     )
 
@@ -48,7 +49,9 @@ async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date,
                     rate = item.get("rate")
                     if date_str and rate is not None:
                         try:
-                            result[date.fromisoformat(date_str)] = round(float(rate) * 100)
+                            result[date.fromisoformat(date_str)] = round(
+                                float(rate) * 100
+                            )
                         except Exception:
                             pass
                 if result:
@@ -60,14 +63,20 @@ async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date,
         t = yf.Ticker(f"{from_ccy}USD=X")
         data = t.history(start=start, end=end)
         if not data.empty:
-            return {idx.date(): round(float(row["Close"]) * 100) for idx, row in data.iterrows()}
+            return {
+                idx.date(): round(float(row["Close"]) * 100)
+                for idx, row in data.iterrows()
+            }
     except Exception:
         pass
     try:
         t = yf.Ticker(f"USD{from_ccy}=X")
         data = t.history(start=start, end=end)
         if not data.empty:
-            return {idx.date(): -round(float(row["Close"]) * 100) for idx, row in data.iterrows()}
+            return {
+                idx.date(): -round(float(row["Close"]) * 100)
+                for idx, row in data.iterrows()
+            }
     except Exception:
         pass
     return {}
@@ -96,6 +105,7 @@ async def get_price_history_batch(
     tiingo = TiingoAdapter()
     tradingview = TradingviewAdapter()
     ngnmarket = NgnMarketAdapter()
+    ngxpulse = NgxPulseAdapter()
 
     def _pick_adapter(ticker: str):
         provider = _normalize_provider(provider_map.get(ticker.upper(), "yfinance"))
@@ -105,6 +115,8 @@ async def get_price_history_batch(
             return tiingo
         if provider == "ngnmarket":
             return ngnmarket
+        if provider == "ngxpulse":
+            return ngxpulse
         return yfinance
 
     async def _fetch(ticker: str):
@@ -196,6 +208,9 @@ async def validate_ticker(
         elif selected == "ngnmarket":
             adapter = NgnMarketAdapter()
             metadata = await adapter.get_asset_metadata(ticker, currency, asset_class)
+        elif selected == "ngxpulse":
+            adapter = NgxPulseAdapter()
+            metadata = await adapter.get_asset_metadata(ticker, currency, asset_class)
         elif selected == "tradingview":
             adapter = TradingviewAdapter()
             metadata = await adapter.get_asset_metadata(ticker, currency)
@@ -236,6 +251,8 @@ async def get_price_history(
             adapter = TiingoAdapter()
         elif provider == "ngnmarket":
             adapter = NgnMarketAdapter()
+        elif provider == "ngxpulse":
+            adapter = NgxPulseAdapter()
         else:
             adapter = YFinanceAdapter()
 

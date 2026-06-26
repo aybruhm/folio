@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
@@ -30,6 +31,7 @@ class TradeInteractor(ITradeUseCase):
         self.yfinance = YFinanceAdapter()
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        self.ngxpulse = NgxPulseAdapter()
         self.tradingview = TradingviewAdapter()
 
     @staticmethod
@@ -37,7 +39,8 @@ class TradeInteractor(ITradeUseCase):
         normalized = (provider or "yfinance").strip().lower()
         return (
             normalized
-            if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
+            if normalized
+            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
             else "yfinance"
         )
 
@@ -52,6 +55,9 @@ class TradeInteractor(ITradeUseCase):
 
         if selected == "tradingview":
             return await self.tradingview.get_asset_metadata(ticker, currency.value)
+
+        if selected == "ngxpulse":
+            return await self.ngxpulse.get_asset_metadata(ticker, currency.value)
 
         return await self.yfinance.get_asset_metadata(ticker, currency.value)
 

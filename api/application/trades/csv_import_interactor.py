@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
@@ -25,6 +26,7 @@ class CsvImportInteractor(ICsvImportUseCase):
         self.yfinance = YFinanceAdapter()
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        self.ngxpulse = NgxPulseAdapter()
         self.tradingview = TradingviewAdapter()
 
     @staticmethod
@@ -32,11 +34,14 @@ class CsvImportInteractor(ICsvImportUseCase):
         normalized = (provider or "yfinance").strip().lower()
         return (
             normalized
-            if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
+            if normalized
+            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
             else "yfinance"
         )
 
-    async def _get_asset_metadata(self, ticker: str, currency: Currency, provider: str, asset_class: str = ""):
+    async def _get_asset_metadata(
+        self, ticker: str, currency: Currency, provider: str, asset_class: str = ""
+    ):
         selected = self._normalize_provider(provider)
 
         if selected == "tiingo":
@@ -46,13 +51,17 @@ class CsvImportInteractor(ICsvImportUseCase):
             metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value, asset_class)
+            metadata = await self.ngnmarket.get_asset_metadata(
+                ticker, currency.value, asset_class
+            )
             if metadata:
                 return metadata
             return await self.yfinance.get_asset_metadata(ticker, currency.value)
 
         if selected == "ngnmarket":
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value, asset_class)
+            metadata = await self.ngnmarket.get_asset_metadata(
+                ticker, currency.value, asset_class
+            )
             if metadata:
                 return metadata
             metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
@@ -70,7 +79,23 @@ class CsvImportInteractor(ICsvImportUseCase):
             metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(ticker, currency.value, asset_class)
+            metadata = await self.ngnmarket.get_asset_metadata(
+                ticker, currency.value, asset_class
+            )
+            if metadata:
+                return metadata
+            return await self.yfinance.get_asset_metadata(ticker, currency.value)
+
+        if selected == "ngxpulse":
+            metadata = await self.ngxpulse.get_asset_metadata(
+                ticker, currency.value, asset_class
+            )
+            if metadata:
+                return metadata
+            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
+            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
             if metadata:
                 return metadata
             return await self.yfinance.get_asset_metadata(ticker, currency.value)
