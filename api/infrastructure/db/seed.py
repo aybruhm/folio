@@ -19,7 +19,7 @@ from infrastructure.db.models import (
 from infrastructure.db.session import async_session
 
 _SEED_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
-_SEED_USER_EMAIL = "demo@folio.local"
+_SEED_USER_EMAIL = "demo@example.com"
 
 log = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ def _price_on(prices: dict[date, int], d: date) -> int:
 
 def _build_trades(
     portfolio_id,
-    asset_map: dict[str, uuid4],
+    asset_map: dict[str, UUID],
     price_map: dict[str, dict[date, int]],
 ) -> list[dict]:
 
@@ -340,23 +340,32 @@ async def seed() -> None:
 
             log.info("Seeding demo data…")
 
-            # Ensure seed user exists
-            existing_user = await session.execute(
-                select(UserModel).where(UserModel.id == _SEED_USER_ID)
-            )
-            if not existing_user.scalar_one_or_none():
-                import bcrypt
+            # Ensure seed user exists (may have been pre-created by a migration
+            # with a placeholder password and is_active=False).  Upsert handles
+            # both create and overwrite in a single statement.
+            import bcrypt
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-                hashed = bcrypt.hashpw(b"demo1234", bcrypt.gensalt()).decode("utf-8")
-                session.add(
-                    UserModel(
-                        id=_SEED_USER_ID,
+            hashed = bcrypt.hashpw(b"demo1234", bcrypt.gensalt()).decode("utf-8")
+            stmt = (
+                pg_insert(UserModel)
+                .values(
+                    id=_SEED_USER_ID,
+                    email=_SEED_USER_EMAIL,
+                    hashed_password=hashed,
+                    is_active=True,
+                )
+                .on_conflict_do_update(
+                    index_elements=["id"],
+                    set_=dict(
                         email=_SEED_USER_EMAIL,
                         hashed_password=hashed,
                         is_active=True,
-                    )
+                    ),
                 )
-                await session.flush()
+            )
+            await session.execute(stmt)
+            await session.flush()
 
             # Portfolio
             portfolio_id = uuid4()
@@ -374,7 +383,7 @@ async def seed() -> None:
             rng = random.Random(_RNG_SEED)
             weekdays = _weekdays(_START, _END)
             price_map: dict[str, dict[date, int]] = {}
-            asset_map: dict[str, uuid4] = {}
+            asset_map: dict[str, UUID] = {}
 
             for a in _ASSETS:
                 asset_id = uuid4()

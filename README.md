@@ -31,7 +31,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 
 ## Preview
 
-[folio-demo.webm](https://github.com/user-attachments/assets/bb43d330-5571-4a6c-aeb7-e9ac58a1e26a)
+[folio-demo.webm](https://github.com/user-attachments/assets/59817665-1af4-4d10-b0fa-cb92d40d8e04)
 
 ## Stack
 
@@ -39,6 +39,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 |----------|-----------------------------------|
 | Frontend | SvelteKit, TypeScript, Tailwind, shadcn-svelte, bits-ui |
 | Backend  | FastAPI, SQLAlchemy (async)       |
+| Cache    | Valkey (Redis-compatible)         |
 | Database | PostgreSQL                        |
 | Data     | yfinance, tiingo, ngnmarket, tradingview       |
 | Infra    | Docker, Docker Compose            |
@@ -63,7 +64,7 @@ If you just want to run Folio locally for personal use, pull the pre-built image
 make prod-setup
 ```
 
-Open `api/.env.prod` and `web/.env.local` and fill in your values (database credentials, API URL, `SECRET_KEY`, etc.), then:
+Open `api/.env.prod` and `web/.env.prod` and fill in your values. The provided examples already include the correct Docker service hostnames for the database (`db`) and cache (`cache`) — you only need to set `SECRET_KEY` and any API keys you plan to use. A local PostgreSQL database and Valkey cache are bundled in the stack. You can override database credentials via the Compose environment variables (`DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`). Then:
 
 ```bash
 make prod-pull
@@ -82,8 +83,8 @@ Once running:
 | Service  | URL                        |
 |----------|----------------------------|
 | Frontend | http://localhost:3000      |
-| API      | http://localhost:8000      |
-| API Docs | http://localhost:8000/docs |
+| API      | http://localhost:8010      |
+| API Docs | http://localhost:8010/docs |
 
 ### Running for Development
 
