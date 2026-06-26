@@ -15,13 +15,34 @@ services:
             - ./infra/scripts/ensure-db-entrypoint.sh:/ensure-db-entrypoint.sh:ro
         entrypoint: ["/ensure-db-entrypoint.sh"]
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-folio}"]
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U ${DB_USER:-folio} -d ${DB_NAME:-folio_prod}",
+                ]
             interval: 10s
             timeout: 5s
             retries: 5
             start_period: 10s
         networks:
             - folio-prod-network
+
+    cache:
+        image: valkey/valkey:9.0.4
+        container_name: folio-prod-cache
+        restart: unless-stopped
+        command: redis-server --save 60 1 --loglevel warning
+        volumes:
+            - folio_prod_cache_data:/var/lib/redis/data
+        networks:
+            - folio-prod-network
+        expose:
+            - "6379"
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
 
     api:
         image: ghcr.io/aybruhm/folio-api:latest
@@ -32,6 +53,8 @@ services:
             - "${API_PORT:-8010}:8000"
         depends_on:
             db:
+                condition: service_healthy
+            cache:
                 condition: service_healthy
         command: python -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
         networks:
@@ -80,4 +103,6 @@ networks:
 
 volumes:
     postgres_prod_data:
+        driver: local
+    folio_prod_cache_data:
         driver: local

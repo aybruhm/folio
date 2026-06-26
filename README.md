@@ -63,7 +63,7 @@ If you just want to run Folio locally for personal use, pull the pre-built image
 make prod-setup
 ```
 
-Open `api/.env.prod` and `web/.env.local` and fill in your values (database credentials, API URL, `SECRET_KEY`, etc.), then:
+Open `api/.env.prod` and `web/.env.prod` and fill in your values. The provided examples already include the correct Docker service hostnames for the database (`db`) and cache (`cache`) — you only need to set `SECRET_KEY` and any API keys you plan to use. A local PostgreSQL database and Valkey cache are bundled in the stack. You can override database credentials via the Compose environment variables (`DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`). Then:
 
 ```bash
 make prod-pull
