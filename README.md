@@ -31,7 +31,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 
 ## Preview
 
-[folio-demo.webm](https://github.com/user-attachments/assets/bb43d330-5571-4a6c-aeb7-e9ac58a1e26a)
+[folio-demo.webm](https://github.com/user-attachments/assets/59817665-1af4-4d10-b0fa-cb92d40d8e04)
 
 ## Stack
 
@@ -39,6 +39,7 @@ A self-hosted investment tracking platform for managing portfolios, analyzing pe
 |----------|-----------------------------------|
 | Frontend | SvelteKit, TypeScript, Tailwind, shadcn-svelte, bits-ui |
 | Backend  | FastAPI, SQLAlchemy (async)       |
+| Cache    | Valkey (Redis-compatible)         |
 | Database | PostgreSQL                        |
 | Data     | yfinance, tiingo, ngnmarket, tradingview       |
 | Infra    | Docker, Docker Compose            |
@@ -82,8 +83,8 @@ Once running:
 | Service  | URL                        |
 |----------|----------------------------|
 | Frontend | http://localhost:3000      |
-| API      | http://localhost:8000      |
-| API Docs | http://localhost:8000/docs |
+| API      | http://localhost:8010      |
+| API Docs | http://localhost:8010/docs |
 
 ### Running for Development
 
