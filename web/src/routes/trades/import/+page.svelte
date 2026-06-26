@@ -47,7 +47,7 @@
             key: "market_data_provider",
             label: "Market Data Provider",
             required: false,
-            hint: "yfinance, tiingo, ngnmarket, tradingview",
+            hint: "yfinance, tiingo, ngnmarket, ngxpulse, tradingview",
         },
         { key: "fees", label: "Fees", required: false, hint: "" },
         { key: "notes", label: "Notes", required: false, hint: "" },

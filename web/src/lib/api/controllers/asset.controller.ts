@@ -13,7 +13,7 @@ import type {
 } from "../types";
 
 export class AssetController {
-    constructor(private client: AxiosInstance) {}
+    constructor(private client: AxiosInstance) { }
 
     async searchAssets(query: string): Promise<SearchAssetsResponse> {
         const response = await this.client.get("/assets/search", {
@@ -30,6 +30,7 @@ export class AssetController {
             | "yfinance"
             | "tiingo"
             | "ngnmarket"
+            | "ngxpulse"
             | "tradingview" = "yfinance",
         currency: string = "USD",
         assetClass: string = "",

@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.price_cache import PriceCache
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
@@ -35,6 +36,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         self.yfinance = YFinanceAdapter()
         self.tiingo = TiingoAdapter()
         self.ngnmarket = NgnMarketAdapter()
+        self.ngxpulse = NgxPulseAdapter()
         self.tradingview = TradingviewAdapter()
         self.base_currency = portfolio_base_currency
 
@@ -43,7 +45,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         normalized = (provider or "yfinance").strip().lower()
         return (
             normalized
-            if normalized in {"yfinance", "tiingo", "ngnmarket", "tradingview"}
+            if normalized
+            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
             else "yfinance"
         )
 
@@ -61,6 +64,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 if price is not None:
                     return (date.today(), round(float(price) * 100))
             return (date.today(), 0)
+
+        if selected == "ngxpulse":
+            return await self.ngxpulse.get_current_price(symbol)
 
         if selected == "tradingview":
             return await self.tradingview.get_current_price(symbol)

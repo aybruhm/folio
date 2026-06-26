@@ -23,6 +23,7 @@
             | "yfinance"
             | "tiingo"
             | "ngnmarket"
+            | "ngxpulse"
             | "tradingview";
     } = {
         ticker: "",
@@ -48,6 +49,7 @@
         { label: "Yahoo Finance", value: "yfinance" },
         { label: "Tiingo", value: "tiingo" },
         { label: "NGNMarket", value: "ngnmarket" },
+        { label: "NGXPulse", value: "ngxpulse" },
         { label: "TradingView", value: "tradingview" },
     ];
 
