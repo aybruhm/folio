@@ -131,10 +131,53 @@ async function verifyToken(
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
-    // Short-circuit: API routes are handled by the FastAPI backend with
-    // their own auth. The hook must not redirect these requests to /login.
+    // Proxy /api/* requests to the FastAPI backend.
+    //
+    // In dev mode, Vite's proxy (vite.config.js) forwards /api to the backend.
+    // In production (node build/index.js), the Vite proxy does not exist — the
+    // SvelteKit server must forward these requests itself.  Calling resolve(event)
+    // here would have SvelteKit look for a matching route under src/routes/api/,
+    // which does not exist, causing a 404.
     if (event.url.pathname.startsWith("/api/")) {
-        return resolve(event);
+        const apiResponse = await fetch(
+            `${API_BASE}${event.url.pathname}${event.url.search}`,
+            {
+                method: event.request.method,
+                headers: event.request.headers,
+                body:
+                    event.request.method !== "GET" &&
+                        event.request.method !== "HEAD"
+                        ? await event.request.text()
+                        : undefined,
+                redirect: "manual",
+            },
+        );
+
+        // Forward any Set-Cookie headers (access_token, refresh_token, etc.)
+        // so the browser receives auth cookies from the API.
+        for (const cookieStr of apiResponse.headers.getSetCookie()) {
+            const match = cookieStr.match(/^([^=]+)=([^;]*)/);
+            if (!match) continue;
+            const [, name, value] = match;
+            const attrs: CookieAttributes = { path: "/" };
+            if (cookieStr.includes("HttpOnly")) attrs.httpOnly = true;
+            if (cookieStr.includes("Secure")) attrs.secure = true;
+            const pm = cookieStr.match(/Path=([^;]+)/i);
+            if (pm) attrs.path = pm[1].trim();
+            const sm = cookieStr.match(/SameSite=(\w+)/i);
+            if (sm)
+                attrs.sameSite =
+                    sm[1].toLowerCase() as CookieAttributes["sameSite"];
+            const mm = cookieStr.match(/Max-Age=(\d+)/i);
+            if (mm) attrs.maxAge = parseInt(mm[1], 10);
+            event.cookies.set(name, value, attrs);
+        }
+
+        return new Response(apiResponse.body, {
+            status: apiResponse.status,
+            statusText: apiResponse.statusText,
+            headers: apiResponse.headers,
+        });
     }
 
     let token = event.cookies.get("access_token");
