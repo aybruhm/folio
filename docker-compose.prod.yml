@@ -1,22 +1,39 @@
 services:
+    db:
+        image: postgres:16-alpine
+        container_name: folio-prod-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${DB_USER:-folio}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-folio_dev_password}
+            POSTGRES_DB: ${DB_NAME:-folio_prod}
+            PGDATA: /var/lib/postgresql/data/pgdata
+        ports:
+            - "${DB_PORT:-5433}:5432"
+        volumes:
+            - postgres_prod_data:/var/lib/postgresql/data
+            - ./infra/scripts/ensure-db-entrypoint.sh:/ensure-db-entrypoint.sh:ro
+        entrypoint: ["/ensure-db-entrypoint.sh"]
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-folio}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        networks:
+            - folio-prod-network
+
     api:
         image: ghcr.io/aybruhm/folio-api:latest
         container_name: folio-ghcr-api
         restart: unless-stopped
         env_file: ./api/.env.prod
-        environment:
-            DATABASE_URL: ${DATABASE_URL}
         ports:
-            - "${API_PORT:-8000}:8000"
+            - "${API_PORT:-8010}:8000"
         depends_on:
             db:
                 condition: service_healthy
-        command: >
-            python -m alembic upgrade head &&
-            python -m uvicorn main:app
-            --host 0.0.0.0
-            --port ${API_PORT:-8000}
-            --workers 2
+        command: python -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
         networks:
             - folio-prod-network
         healthcheck:
@@ -41,7 +58,7 @@ services:
         image: ghcr.io/aybruhm/folio-web:latest
         container_name: folio-ghcr-web
         restart: unless-stopped
-        env_file: ./web/.env.local
+        env_file: ./web/.env.prod
         ports:
             - "${WEB_PORT:-3000}:3000"
         depends_on:
@@ -60,3 +77,7 @@ networks:
     folio-prod-network:
         name: folio-prod-network
         driver: bridge
+
+volumes:
+    postgres_prod_data:
+        driver: local
