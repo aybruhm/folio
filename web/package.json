@@ -1,6 +1,6 @@
 {
     "name": "folio-web",
-    "version": "1.22.3",
+    "version": "1.23.0",
     "type": "module",
     "scripts": {
         "dev": "svelte-kit sync && vite",
