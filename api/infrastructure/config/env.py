@@ -41,7 +41,7 @@ class EnvironSettings(BaseModel):
     # Leave empty for same-origin or reverse-proxy setups.
     COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "")
 
-    # Market data
+    # Market cache data
     YFINANCE_CACHE_TTL: int = int(os.getenv("YFINANCE_CACHE_TTL", "3600"))  # 1 hour
     YFINANCE_PRICE_HISTORY_CACHE_TTL: int = int(
         os.getenv("YFINANCE_PRICE_HISTORY_CACHE_TTL", "86400")
@@ -49,6 +49,8 @@ class EnvironSettings(BaseModel):
     MARKET_DATA_CACHE_TTL: int = int(
         os.getenv("MARKET_DATA_CACHE_TTL", "10800")
     )  # 3 hours — cached in Valkey
+
+    # Market data
     TIINGO_API_KEY: str = os.getenv("TIINGO_API_KEY", "")
     NGNMARKET_API_BASE_URL: str = os.getenv(
         "NGNMARKET_API_BASE_URL", "https://api.ngnmarket.com/v1"
