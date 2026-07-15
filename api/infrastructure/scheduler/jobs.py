@@ -29,7 +29,7 @@ async def init_scheduler():
         scheduler.add_job(
             warm_cache_prices_job,
             "interval",
-            minutes=45,
+            minutes=settings.MARKET_DATA_WARM_JOB_TTL,
             id="warm_cache_prices",
             name="Warm Valkey cache with current prices",
             replace_existing=True,
@@ -38,7 +38,7 @@ async def init_scheduler():
         scheduler.add_job(
             warm_cache_fx_job,
             "interval",
-            minutes=45,
+            minutes=settings.MARKET_DATA_WARM_JOB_TTL,
             id="warm_cache_fx",
             name="Warm Valkey cache with current FX rates",
             replace_existing=True,

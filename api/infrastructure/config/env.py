@@ -49,6 +49,7 @@ class EnvironSettings(BaseModel):
     MARKET_DATA_CACHE_TTL: int = int(
         os.getenv("MARKET_DATA_CACHE_TTL", "10800")
     )  # 3 hours — cached in Valkey
+    MARKET_DATA_WARM_JOB_TTL: int = int(os.getenv("MARKET_DATA_WARM_JOB_TTL", "43200")) # 12 hours
 
     # Market data
     TIINGO_API_KEY: str = os.getenv("TIINGO_API_KEY", "")
