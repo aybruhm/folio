@@ -218,8 +218,8 @@
         <Input
             label="Quantity"
             type="number"
-            step="0.0001"
-            placeholder="0.0001"
+            step="0.000001"
+            placeholder="0.000001"
             bind:value={trade.quantity}
             required
             error={errors.quantity}
@@ -246,8 +246,8 @@
         <Input
             label="Fees"
             type="number"
-            step="0.01"
-            placeholder="0.00"
+            step="0.0001"
+            placeholder="0.0000"
             bind:value={trade.fees}
         />
     </div>
