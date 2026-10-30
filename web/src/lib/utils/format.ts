@@ -79,16 +79,22 @@ export function formatDate(date: Date | string, format: string = 'en-US'): strin
   }).format(d)
 }
 
+// e.g. "Tue, Feb 2026. 09:30"
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
-  return new Intl.DateTimeFormat('en-GB', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(d)
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(d)
+      .map((p) => [p.type, p.value])
+  )
+  return `${parts.weekday}, ${parts.month} ${parts.year}. ${parts.hour}:${parts.minute}`
 }
 
 export function parseDate(dateStr: string, format: string = 'YYYY-MM-DD'): Date {
