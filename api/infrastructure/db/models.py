@@ -78,6 +78,7 @@ class PortfolioModel(Base):
     updated_at = Column(
         DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
     )
+    archived_at = Column(DateTime, nullable=True)
 
     user = relationship("UserModel", back_populates="portfolios")
     trades = relationship(

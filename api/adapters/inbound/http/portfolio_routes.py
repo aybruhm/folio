@@ -115,11 +115,12 @@ async def _build_portfolio_analytics(
 
 @router.get("/", response_model=List[dict])
 async def list_portfolios(
+    include_archived: bool = False,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     interactor = PortfolioInteractor(session)
-    return await interactor.list_portfolios(current_user.id)
+    return await interactor.list_portfolios(current_user.id, include_archived)
 
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -144,12 +145,15 @@ async def create_portfolio(
 async def list_portfolio_analytics(
     timeframe: str = "1y",
     in_currency: Optional[str] = None,
+    include_archived: bool = False,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     try:
         portfolio_interactor = PortfolioInteractor(session)
-        portfolios = await portfolio_interactor.list_portfolios(current_user.id)
+        portfolios = await portfolio_interactor.list_portfolios(
+            current_user.id, include_archived
+        )
         if not portfolios:
             return []
 
@@ -279,6 +283,47 @@ async def delete_portfolio(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def _set_archived(
+    portfolio_id: UUID, archived: bool, current_user: User, session: AsyncSession
+) -> dict:
+    try:
+        interactor = PortfolioInteractor(session)
+        portfolio = await interactor.get_portfolio(portfolio_id)
+        _check_ownership(portfolio, current_user)
+
+        await interactor.set_archived(portfolio_id, archived)
+        await session.commit()
+
+        return await interactor.get_portfolio(portfolio_id)
+    except HTTPException:
+        await session.rollback()
+        raise
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{portfolio_id}/archive")
+async def archive_portfolio(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await _set_archived(portfolio_id, True, current_user, session)
+
+
+@router.post("/{portfolio_id}/unarchive")
+async def unarchive_portfolio(
+    portfolio_id: UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await _set_archived(portfolio_id, False, current_user, session)
 
 
 @router.get("/{portfolio_id}/analytics")

@@ -34,30 +34,13 @@ class PortfolioInteractor(IPortfolioUseCase):
         if not portfolio:
             raise ValueError(f"Portfolio {portfolio_id} not found")
 
-        return {
-            "id": str(portfolio.id),
-            "user_id": str(portfolio.user_id),
-            "name": portfolio.name,
-            "base_currency": portfolio.base_currency.value,
-            "description": portfolio.description,
-            "created_at": portfolio.created_at.isoformat(),
-            "updated_at": portfolio.updated_at.isoformat(),
-        }
+        return self._to_dict(portfolio)
 
-    async def list_portfolios(self, user_id: UUID) -> List[dict]:
-        portfolios = await self.repository.list_by_user(user_id)
-        return [
-            {
-                "id": str(p.id),
-                "user_id": str(p.user_id),
-                "name": p.name,
-                "base_currency": p.base_currency.value,
-                "description": p.description,
-                "created_at": p.created_at.isoformat(),
-                "updated_at": p.updated_at.isoformat(),
-            }
-            for p in portfolios
-        ]
+    async def list_portfolios(
+        self, user_id: UUID, include_archived: bool = False
+    ) -> List[dict]:
+        portfolios = await self.repository.list_by_user(user_id, include_archived)
+        return [self._to_dict(p) for p in portfolios]
 
     async def update_portfolio(
         self,
@@ -83,3 +66,32 @@ class PortfolioInteractor(IPortfolioUseCase):
             raise ValueError(f"Portfolio {portfolio_id} not found")
 
         await self.repository.delete(portfolio_id)
+
+    async def set_archived(self, portfolio_id: UUID, archived: bool) -> None:
+        portfolio = await self.repository.get_by_id(portfolio_id)
+        if not portfolio:
+            raise ValueError(f"Portfolio {portfolio_id} not found")
+
+        # Re-archiving keeps the original timestamp.
+        if archived and portfolio.archived_at is None:
+            portfolio.archived_at = datetime.now()
+        elif not archived:
+            portfolio.archived_at = None
+
+        portfolio.updated_at = datetime.now()
+        await self.repository.update(portfolio)
+
+    @staticmethod
+    def _to_dict(portfolio: Portfolio) -> dict:
+        return {
+            "id": str(portfolio.id),
+            "user_id": str(portfolio.user_id),
+            "name": portfolio.name,
+            "base_currency": portfolio.base_currency.value,
+            "description": portfolio.description,
+            "created_at": portfolio.created_at.isoformat(),
+            "updated_at": portfolio.updated_at.isoformat(),
+            "archived_at": (
+                portfolio.archived_at.isoformat() if portfolio.archived_at else None
+            ),
+        }

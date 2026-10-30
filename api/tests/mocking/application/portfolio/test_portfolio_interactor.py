@@ -23,8 +23,12 @@ class FakePortfolioRepository:
     async def get_by_id(self, portfolio_id):
         return self.portfolios.get(portfolio_id)
 
-    async def list_by_user(self, user_id):
-        return [p for p in self.portfolios.values() if p.user_id == user_id]
+    async def list_by_user(self, user_id, include_archived=False):
+        return [
+            p
+            for p in self.portfolios.values()
+            if p.user_id == user_id and (include_archived or p.archived_at is None)
+        ]
 
     async def update(self, portfolio: Portfolio) -> None:
         self.portfolios[portfolio.id] = portfolio
@@ -86,6 +90,7 @@ async def test_get_portfolio_returns_serialized_data(monkeypatch):
         "description": "Dividend-focused",
         "created_at": "2024-01-01T10:00:00",
         "updated_at": "2024-01-02T10:00:00",
+        "archived_at": None,
     }
 
 
@@ -164,3 +169,63 @@ async def test_delete_portfolio_removes_record(monkeypatch):
 
     assert portfolio.id not in repo.portfolios
     assert repo.deleted == [portfolio.id]
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_list_portfolios_hides_archived_by_default(monkeypatch):
+    repo = _portfolio_repo(monkeypatch)
+    interactor = portfolio_module.PortfolioInteractor(session=object())
+    user_id = uuid4()
+    for name, archived_at in [("Active", None), ("Old", datetime(2025, 1, 1))]:
+        portfolio = Portfolio(
+            id=uuid4(),
+            user_id=user_id,
+            name=name,
+            base_currency=Currency.USD,
+            archived_at=archived_at,
+        )
+        repo.portfolios[portfolio.id] = portfolio
+
+    default = await interactor.list_portfolios(user_id)
+    everything = await interactor.list_portfolios(user_id, include_archived=True)
+
+    assert [p["name"] for p in default] == ["Active"]
+    assert sorted(p["name"] for p in everything) == ["Active", "Old"]
+    archived = next(p for p in everything if p["name"] == "Old")
+    assert archived["archived_at"] == "2025-01-01T00:00:00"
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_set_archived_archives_and_restores(monkeypatch):
+    repo = _portfolio_repo(monkeypatch)
+    interactor = portfolio_module.PortfolioInteractor(session=object())
+    portfolio = Portfolio(
+        id=uuid4(),
+        user_id=uuid4(),
+        name="Legacy",
+        base_currency=Currency.USD,
+    )
+    repo.portfolios[portfolio.id] = portfolio
+
+    await interactor.set_archived(portfolio.id, True)
+    first_archived_at = repo.portfolios[portfolio.id].archived_at
+    assert repo.portfolios[portfolio.id].is_archived
+
+    await interactor.set_archived(portfolio.id, True)
+    assert repo.portfolios[portfolio.id].archived_at == first_archived_at
+
+    await interactor.set_archived(portfolio.id, False)
+    assert repo.portfolios[portfolio.id].archived_at is None
+    assert not repo.portfolios[portfolio.id].is_archived
+
+
+@pytest.mark.asyncio
+@pytest.mark.grumpy_path
+async def test_set_archived_raises_when_missing(monkeypatch):
+    _portfolio_repo(monkeypatch)
+    interactor = portfolio_module.PortfolioInteractor(session=object())
+
+    with pytest.raises(ValueError, match="Portfolio"):
+        await interactor.set_archived(uuid4(), True)

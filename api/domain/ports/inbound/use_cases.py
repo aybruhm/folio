@@ -51,7 +51,9 @@ class IPortfolioUseCase(ABC):
     async def get_portfolio(self, portfolio_id: UUID) -> dict: ...
 
     @abstractmethod
-    async def list_portfolios(self, user_id: UUID) -> List[dict]: ...
+    async def list_portfolios(
+        self, user_id: UUID, include_archived: bool = False
+    ) -> List[dict]: ...
 
     @abstractmethod
     async def update_portfolio(
@@ -63,6 +65,9 @@ class IPortfolioUseCase(ABC):
 
     @abstractmethod
     async def delete_portfolio(self, portfolio_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def set_archived(self, portfolio_id: UUID, archived: bool) -> None: ...
 
 
 class ITradeUseCase(ABC):
