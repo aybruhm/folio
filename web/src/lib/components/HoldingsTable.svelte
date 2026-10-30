@@ -3,7 +3,7 @@
     import Amount from "./Amount.svelte";
     import {
         formatCurrency,
-        formatNumber,
+        formatQuantity,
         formatPercent,
     } from "$lib/utils/format";
     import { createEventDispatcher } from "svelte";
@@ -12,7 +12,6 @@
 
     export let holdings: any[] = [];
     export let loading = false;
-    export let onSelectHolding: (ticker: string) => void = () => {};
 
     const columns = [
         { key: "ticker", label: "Ticker", sortable: true },
@@ -87,27 +86,20 @@
                             class="border-b border-border hover:bg-muted/50 transition-colors"
                         >
                             <td class="p-4 align-middle">
-                                <button
-                                    on:click={() => onSelectHolding(row.ticker)}
-                                    class="text-left"
-                                >
+                                <span class="font-medium text-foreground">
+                                    {row.ticker}
+                                </span>
+                                {#if row.name && row.name !== row.ticker}
                                     <span
-                                        class="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+                                        class="block text-xs text-muted-foreground"
                                     >
-                                        {row.ticker}
+                                        {row.name}
                                     </span>
-                                    {#if row.name && row.name !== row.ticker}
-                                        <span
-                                            class="block text-xs text-muted-foreground"
-                                        >
-                                            {row.name}
-                                        </span>
-                                    {/if}
-                                </button>
+                                {/if}
                             </td>
                             <td class="p-4 align-middle"
                                 ><Amount
-                                    value={formatNumber(row.quantity)}
+                                    value={formatQuantity(row.quantity)}
                                 /></td
                             >
                             <td class="p-4 align-middle"
