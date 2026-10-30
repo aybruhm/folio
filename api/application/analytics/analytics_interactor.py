@@ -24,7 +24,7 @@ from domain.ports.outbound.repositories import (
     ITradeRepository,
 )
 from domain.services.performance import AllocationService, PerformanceService
-from domain.value_objects.money import Currency
+from domain.value_objects.money import QUANTITY_SCALE, Currency
 
 
 class AnalyticsInteractor(IAnalyticsUseCase):
@@ -229,7 +229,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     0  # sum of all deposits (buys), never reduced by sells
                 )
                 for trade in holding_data["trades"]:
-                    trade_value_int = (trade.quantity * trade.price) // 10000
+                    trade_value_int = (trade.quantity * trade.price) // QUANTITY_SCALE
                     converted = await self._convert_amount(
                         trade_value_int,
                         trade.trade_currency.value,
@@ -248,18 +248,20 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 market_value_int = cash_balance_int
                 current_price_int = 100  # $1.00 equivalent
                 total_return_int = 0
-                quantity_int = cash_balance_int * 100  # at $1, quantity×10000
+                quantity_int = (
+                    cash_balance_int * QUANTITY_SCALE // 100
+                )  # at $1, quantity = balance
             else:
                 # FIFO lots — costs converted to base currency per trade
                 lots: list[
                     dict
-                ] = []  # [{"qty": int(×10000), "cost": int(×100 in base ccy)}]
+                ] = []  # [{"qty": int(×QUANTITY_SCALE), "cost": int(×100 in base ccy)}]
                 total_invested_int = 0  # sum of all buy costs, never reduced by sells
                 for trade in holding_data["trades"]:
                     if trade.trade_type.value == "buy":
                         trade_cost_in_trade_ccy = (
                             trade.quantity * trade.price
-                        ) // 10000 + trade.fees
+                        ) // QUANTITY_SCALE + trade.fees
                         trade_cost_in_base = await self._convert_amount(
                             trade_cost_in_trade_ccy,
                             trade.trade_currency.value,
@@ -305,7 +307,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 )
 
                 # Market value = qty × price (in base currency)
-                market_value_int = (quantity_int * current_price_int) // 10000
+                market_value_int = (quantity_int * current_price_int) // QUANTITY_SCALE
                 total_return_int = market_value_int - cost_basis_int
 
             result.append(
@@ -313,7 +315,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     "asset_id": str(holding_data["asset_id"]),
                     "ticker": ticker,
                     "name": asset.name if asset else ticker,
-                    "quantity": quantity_int / 10000,
+                    "quantity": quantity_int / QUANTITY_SCALE,
                     "current_price": current_price_int / 100,
                     "market_value": market_value_int / 100,
                     "cost_basis": cost_basis_int / 100,
@@ -359,7 +361,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     else t.trade_date
                 )
                 # Trade value in trade currency (×100 int)
-                trade_value_int = (t.quantity * t.price) // 10000 + t.fees
+                trade_value_int = (t.quantity * t.price) // QUANTITY_SCALE + t.fees
                 # Convert to base currency
                 converted = await self._convert_amount(
                     trade_value_int,
@@ -563,7 +565,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                             break
                         if t.ticker != ticker:
                             continue
-                        trade_value_int = (t.quantity * t.price) // 10000
+                        trade_value_int = (t.quantity * t.price) // QUANTITY_SCALE
                         converted = await self._convert_amount(
                             trade_value_int,
                             t.trade_currency.value,
@@ -590,7 +592,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                     price_int = int(fallback_current_price.get(ticker, 0))
 
                 # Value in asset currency (×100 int), then convert to base
-                value_in_asset_ccy = (qty_int * price_int) // 10000
+                value_in_asset_ccy = (qty_int * price_int) // QUANTITY_SCALE
                 converted = await self._convert_amount(
                     value_in_asset_ccy,
                     asset_ccy.value,
@@ -632,7 +634,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             )
             key = t_date.strftime("%b %Y")
             # Trade value in trade currency (×100 int)
-            trade_value_int = (t.quantity * t.price) // 10000
+            trade_value_int = (t.quantity * t.price) // QUANTITY_SCALE
             # Convert to base currency
             converted = await self._convert_amount(
                 trade_value_int,

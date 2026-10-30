@@ -20,7 +20,7 @@ class CreateTradeRequest:
     ticker: str
     trade_type: TradeType
     trade_date: datetime
-    quantity: int  # ×10000
+    quantity: int  # ×QUANTITY_SCALE
     price: int  # ×100
     trade_currency: Currency
     fees: int = 0  # ×100

@@ -227,7 +227,7 @@ async def test_get_holdings_uses_cash_valuation_and_price_fallback(monkeypatch):
             ticker="CASH",
             trade_type=TradeType.BUY,
             trade_date=datetime(2024, 1, 1, 9, 30),
-            quantity=1000,
+            quantity=10_000_000,
             price=100,
             trade_currency=Currency.USD,
         ),
@@ -238,7 +238,7 @@ async def test_get_holdings_uses_cash_valuation_and_price_fallback(monkeypatch):
             ticker="AAPL",
             trade_type=TradeType.BUY,
             trade_date=datetime(2024, 1, 2, 9, 30),
-            quantity=1000,
+            quantity=10_000_000,
             price=18520,
             trade_currency=Currency.USD,
         ),
@@ -320,7 +320,7 @@ async def test_get_holdings_cash_roundtrip_results_in_no_remaining_position(
             ticker="RCASH.CST",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 10, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=658235,
             trade_currency=Currency.USD,
         ),
@@ -331,7 +331,7 @@ async def test_get_holdings_cash_roundtrip_results_in_no_remaining_position(
             ticker="RCASH.CST",
             trade_type=TradeType.SELL,
             trade_date=datetime(2025, 2, 10, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=658235,
             trade_currency=Currency.USD,
         ),
@@ -369,7 +369,7 @@ async def test_calculate_performance_cash_roundtrip_is_neutral(monkeypatch):
             ticker="RCASH.CST",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 10, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=658235,
             trade_currency=Currency.USD,
         ),
@@ -380,7 +380,7 @@ async def test_calculate_performance_cash_roundtrip_is_neutral(monkeypatch):
             ticker="RCASH.CST",
             trade_type=TradeType.SELL,
             trade_date=datetime(2025, 2, 10, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=658235,
             trade_currency=Currency.USD,
         ),
@@ -421,7 +421,7 @@ async def test_get_performance_history_uses_trade_price_fallback_when_history_mi
             ticker="AAPL",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 4, 10, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=18520,
             trade_currency=Currency.USD,
         )
@@ -467,7 +467,7 @@ async def test_get_performance_history_cash_uses_net_amount_not_unit_count(monke
             ticker="RCASH.CST",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 4, 9, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=414,
             trade_currency=Currency.USD,
         ),
@@ -478,7 +478,7 @@ async def test_get_performance_history_cash_uses_net_amount_not_unit_count(monke
             ticker="RCASH.CST",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 4, 29, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=73081,
             trade_currency=Currency.USD,
         ),
@@ -522,7 +522,7 @@ async def test_get_holdings_uses_fifo_cost_basis_for_remaining_position(monkeypa
             ticker="BTC-USD",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 1, 9, 30),
-            quantity=1000,
+            quantity=10_000_000,
             price=8000000,
             trade_currency=Currency.USD,
         ),
@@ -533,7 +533,7 @@ async def test_get_holdings_uses_fifo_cost_basis_for_remaining_position(monkeypa
             ticker="BTC-USD",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 2, 9, 30),
-            quantity=1000,
+            quantity=10_000_000,
             price=9000000,
             trade_currency=Currency.USD,
         ),
@@ -544,7 +544,7 @@ async def test_get_holdings_uses_fifo_cost_basis_for_remaining_position(monkeypa
             ticker="BTC-USD",
             trade_type=TradeType.SELL,
             trade_date=datetime(2025, 1, 3, 9, 30),
-            quantity=1000,
+            quantity=10_000_000,
             price=9500000,
             trade_currency=Currency.USD,
         ),
@@ -596,7 +596,7 @@ async def test_get_holdings_uses_trade_market_data_provider_for_price_source(
             ticker="BRK.B",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 1, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=50000,
             trade_currency=Currency.USD,
             market_data_provider="tiingo",
@@ -642,7 +642,7 @@ async def test_get_holdings_uses_tradingview_provider_for_price_source(
             ticker="BTC/USD",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 3, 1, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=6500000,
             trade_currency=Currency.USD,
             market_data_provider="tradingview",
@@ -689,7 +689,7 @@ async def test_resolve_price_cascades_through_fallback_providers(monkeypatch):
             ticker="AAPL",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 3, 1, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=19000,
             trade_currency=Currency.USD,
             market_data_provider="yfinance",
@@ -743,7 +743,7 @@ async def test_get_holdings_converts_foreign_currency_to_base_currency(monkeypat
             ticker="NGX:STANBICETF30",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 3, 1, 9, 30),
-            quantity=10000,  # 1.0 units
+            quantity=100_000_000,  # 1.0 units
             price=284145,  # 2841.45 NGN per unit
             trade_currency=Currency.NGN,
             market_data_provider="ngnmarket",
@@ -799,7 +799,7 @@ async def test_get_holdings_converts_with_direct_rate_when_nonzero(monkeypatch):
             ticker="AAPL",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 3, 1, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=19000,  # $190.00
             trade_currency=Currency.USD,
         )
@@ -852,7 +852,7 @@ async def test_get_holdings_skips_fx_conversion_when_currencies_match(monkeypatc
             ticker="AAPL",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 3, 1, 9, 30),
-            quantity=10000,
+            quantity=100_000_000,
             price=19000,
             trade_currency=Currency.USD,
         )
@@ -901,7 +901,7 @@ async def test_get_holdings_multi_currency_btc_trades(monkeypatch):
             ticker="BTC-USD",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 1, 9, 30),
-            quantity=1000,  # 0.1 BTC
+            quantity=10_000_000,  # 0.1 BTC
             price=8000000,  # $80,000.00 per BTC
             trade_currency=Currency.USD,
         ),
@@ -912,7 +912,7 @@ async def test_get_holdings_multi_currency_btc_trades(monkeypatch):
             ticker="BTC-USD",
             trade_type=TradeType.BUY,
             trade_date=datetime(2025, 1, 2, 9, 30),
-            quantity=1000,  # 0.1 BTC
+            quantity=10_000_000,  # 0.1 BTC
             price=6000000,  # £60,000.00 per BTC
             trade_currency=Currency.GBP,
         ),
@@ -956,3 +956,60 @@ async def test_get_holdings_multi_currency_btc_trades(monkeypatch):
 
     # FX calls: only GBPUSD=X (USDUSD=X is skipped since same currency)
     assert _FakeYFinanceTicker._calls == ["GBPUSD=X"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.edge_case
+async def test_get_holdings_keeps_eight_quantity_decimals(monkeypatch):
+    """A 1-satoshi sell from 0.12345678 BTC leaves 0.12345677 BTC."""
+    portfolio = Portfolio(
+        id=uuid4(), user_id=uuid4(), name="Sats", base_currency=Currency.USD
+    )
+    asset = Asset(
+        id=uuid4(),
+        ticker="BTC-USD",
+        name="Bitcoin",
+        asset_class=AssetClass.CRYPTO,
+        currency=Currency.USD,
+    )
+    trades = [
+        Trade(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            asset_id=asset.id,
+            ticker="BTC-USD",
+            trade_type=TradeType.BUY,
+            trade_date=datetime(2025, 1, 1, 9, 30),
+            quantity=12_345_678,  # 0.12345678 BTC
+            price=8000000,  # $80,000.00 per BTC
+            trade_currency=Currency.USD,
+        ),
+        Trade(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            asset_id=asset.id,
+            ticker="BTC-USD",
+            trade_type=TradeType.SELL,
+            trade_date=datetime(2025, 1, 2, 9, 30),
+            quantity=1,  # 0.00000001 BTC
+            price=8000000,
+            trade_currency=Currency.USD,
+        ),
+    ]
+
+    interactor, *_ = _patch_analytics_deps(
+        monkeypatch,
+        trades=trades,
+        assets={asset.id: asset},
+        history={asset.id: []},
+        yfinance_price=8500000,  # $85,000.00
+        ngnmarket_chart=False,
+        tradingview_price=0,
+    )
+
+    holdings = await interactor.get_holdings(portfolio.id)
+
+    assert len(holdings) == 1
+    assert holdings[0]["quantity"] == 0.12345677
+    # 0.12345677 × $85,000 = $10,493.82545 → floored to cents
+    assert holdings[0]["market_value"] == 10493.82

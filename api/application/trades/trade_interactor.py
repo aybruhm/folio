@@ -20,7 +20,7 @@ from domain.ports.outbound.repositories import (
     IPortfolioRepository,
     ITradeRepository,
 )
-from domain.value_objects.money import AssetClass, Currency, TradeType
+from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 
 class TradeInteractor(ITradeUseCase):
@@ -246,7 +246,7 @@ class TradeInteractor(ITradeUseCase):
             "asset_class": asset_class,
             "trade_type": trade.trade_type.value,
             "trade_date": trade.trade_date.isoformat(),
-            "quantity": trade.quantity / 10000,
+            "quantity": trade.quantity / QUANTITY_SCALE,
             "price": trade.price / 100,
             "trade_currency": trade.trade_currency.value,
             "fees": trade.fees / 100,

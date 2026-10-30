@@ -3,6 +3,9 @@ from datetime import date
 from enum import Enum
 from typing import Optional
 
+# Trade quantities are stored as integers at this scale (8 decimal places).
+QUANTITY_SCALE = 100_000_000
+
 
 class Currency(str, Enum):
     # Americas
