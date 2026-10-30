@@ -38,6 +38,37 @@ export function formatNumber(
   }).format(num)
 }
 
+// Trade quantities carry up to 8 decimal places (QUANTITY_SCALE in the API).
+export const QUANTITY_DECIMALS = 8
+
+export function formatQuantity(
+  value: string | number,
+  minDecimals: number = 2,
+  locale: string = 'en-US'
+): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: minDecimals,
+    maximumFractionDigits: QUANTITY_DECIMALS
+  }).format(num)
+}
+
+// Truncates instead of rounding so a shortened quantity never overstates it.
+export function formatQuantityShort(
+  value: string | number,
+  decimals: number = 2,
+  locale: string = 'en-US'
+): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    roundingMode: 'trunc'
+  }).format(num)
+}
+
 export function formatDate(date: Date | string, format: string = 'en-US'): string {
   const d = typeof date === 'string' ? new Date(date) : date
 

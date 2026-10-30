@@ -576,7 +576,7 @@
                                             <td class="px-3 py-2"
                                                 >{row.quantity != null
                                                     ? Number(row.quantity) /
-                                                      10000
+                                                      100_000_000
                                                     : ""}</td
                                             >
                                             <td class="px-3 py-2"
