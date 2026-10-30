@@ -158,6 +158,7 @@ db-seed:
 	@echo "Seeding database with sample data..."
 	@docker compose exec api python -m infrastructure.db.seed
 	@echo "✓ Database seeded"
+	@printf '\nLogin using demo credentials:\n- Username: demo@example.com\n- Password: demo1234\n'
 
 # API Operations
 api-shell:
