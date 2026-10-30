@@ -63,12 +63,10 @@ class TradeRepository(ITradeRepository):
         if end_date:
             query = query.where(func.date(TradeModel.trade_date) <= end_date)
 
+        # count() over the filtered subquery; counting TradeModel.id here would
+        # pull the trades table into FROM again and cross-join it.
         count_result = await self.session.execute(
-            select(func.count(TradeModel.id)).where(
-                TradeModel.portfolio_id == portfolio_id
-            )
-            if not any([ticker, trade_type, start_date, end_date])
-            else select(func.count(TradeModel.id)).select_from(query.subquery())
+            select(func.count()).select_from(query.subquery())
         )
         total = count_result.scalar()
 
