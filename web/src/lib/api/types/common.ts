@@ -28,6 +28,7 @@ export interface Portfolio extends BaseEntity {
     name: string;
     base_currency: Currency;
     description?: string;
+    archived_at?: string | null;
 }
 
 export interface PortfolioStats {

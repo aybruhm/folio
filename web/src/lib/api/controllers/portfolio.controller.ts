@@ -18,8 +18,11 @@ import type {
 export class PortfolioController {
     constructor(private client: AxiosInstance) {}
 
-    async listPortfolios(): Promise<Portfolio[]> {
-        const response = await this.client.get<Portfolio[]>("/portfolios/");
+    // Archived portfolios are left out unless includeArchived is true.
+    async listPortfolios(includeArchived = false): Promise<Portfolio[]> {
+        const response = await this.client.get<Portfolio[]>("/portfolios/", {
+            params: includeArchived ? { include_archived: true } : undefined,
+        });
         return response.data as Portfolio[];
     }
 
@@ -51,6 +54,20 @@ export class PortfolioController {
 
     async deletePortfolio(portfolioId: string): Promise<void> {
         await this.client.delete(`/portfolios/${portfolioId}`);
+    }
+
+    async archivePortfolio(portfolioId: string): Promise<Portfolio> {
+        const response = await this.client.post(
+            `/portfolios/${portfolioId}/archive`,
+        );
+        return response.data;
+    }
+
+    async unarchivePortfolio(portfolioId: string): Promise<Portfolio> {
+        const response = await this.client.post(
+            `/portfolios/${portfolioId}/unarchive`,
+        );
+        return response.data;
     }
 
     async getHoldings(params: GetHoldingsQuery): Promise<GetHoldingsResponse> {
@@ -86,6 +103,7 @@ export class PortfolioController {
             params: {
                 timeframe: params.timeframe || "1y",
                 ...(params.in_currency && { in_currency: params.in_currency }),
+                ...(params.include_archived && { include_archived: true }),
             },
         });
         return response.data;

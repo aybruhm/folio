@@ -6,10 +6,19 @@
     import PortfolioForm from "$lib/components/PortfolioForm.svelte";
     import Input from "$lib/components/Input.svelte";
     import Amount from "$lib/components/Amount.svelte";
-    import { portfolios } from "$lib/stores";
+    import Badge from "$lib/components/Badge.svelte";
+    import {
+        currentPortfolio,
+        portfolios,
+        selectInitialPortfolio,
+    } from "$lib/stores";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
-    import type { CreatePortfolioRequest, UpdatePortfolioRequest } from "$lib/api/types";
+    import type {
+        CreatePortfolioRequest,
+        Portfolio,
+        UpdatePortfolioRequest,
+    } from "$lib/api/types";
     import { onMount } from "svelte";
     import { formatCurrency } from "$lib/utils/format";
 
@@ -21,6 +30,16 @@
     let editingPortfolio: { id: string; name: string; description: string } | null = null;
     let editSaving = false;
 
+    // $portfolios (shared with the switcher and other pages) only holds active
+    // portfolios; archived ones are kept locally and shown on request.
+    let archivedPortfolios: Portfolio[] = [];
+    let showArchived = false;
+    let archivingId: string | null = null;
+
+    $: visiblePortfolios = showArchived
+        ? [...$portfolios, ...archivedPortfolios]
+        : $portfolios;
+
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
         await loadPortfolios();
@@ -29,13 +48,23 @@
     async function loadPortfolios() {
         try {
             loading = true;
-            const data = await portfolioController.listPortfolios();
-            portfolios.set(data || []);
+            const data = (await portfolioController.listPortfolios(true)) || [];
+            const active = data.filter((p) => !p.archived_at);
+            archivedPortfolios = data.filter((p) => p.archived_at);
+            portfolios.set(active as any);
+            // Drop the selection if the selected portfolio was just archived.
+            if (
+                $currentPortfolio?.id &&
+                !active.some((p) => p.id === $currentPortfolio.id)
+            ) {
+                selectInitialPortfolio(active as any);
+            }
 
             try {
                 const analyticsList =
                     await portfolioController.listPortfolioAnalytics({
                         timeframe: "1y",
+                        include_archived: showArchived,
                     });
                 portfolioStats = (analyticsList || []).reduce(
                     (acc: Record<string, any>, item: any) => {
@@ -91,6 +120,31 @@
         }
     }
 
+    async function handleSetArchived(id: string, archived: boolean) {
+        archivingId = id;
+        try {
+            if (archived) {
+                await portfolioController.archivePortfolio(id);
+            } else {
+                await portfolioController.unarchivePortfolio(id);
+            }
+            await loadPortfolios();
+        } catch (e) {
+            console.error(
+                `Failed to ${archived ? "archive" : "unarchive"} portfolio:`,
+                e,
+            );
+        } finally {
+            archivingId = null;
+        }
+    }
+
+    async function toggleShowArchived() {
+        showArchived = !showArchived;
+        // Archived stats are only fetched when they are shown.
+        if (showArchived) await loadPortfolios();
+    }
+
     async function handleDeletePortfolio(id: string) {
         if (!confirm("Are you sure you want to delete this portfolio?")) return;
 
@@ -115,12 +169,19 @@
                 <h1 class="font-serif text-3xl md:text-4xl text-foreground">Portfolios</h1>
                 <p class="text-xs md:text-sm text-muted-foreground">Manage your investment portfolios</p>
             </div>
-            <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
-                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                New Portfolio
-            </Button>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                {#if archivedPortfolios.length > 0}
+                    <Button variant="ghost" size="sm" on:click={toggleShowArchived} class="w-full sm:w-auto">
+                        {showArchived ? "Hide" : "Show"} archived ({archivedPortfolios.length})
+                    </Button>
+                {/if}
+                <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
+                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    New Portfolio
+                </Button>
+            </div>
         </div>
 
         {#if loading}
@@ -146,7 +207,18 @@
                     </table>
                 </div>
             </Card>
-        {:else if $portfolios.length === 0}
+        {:else if visiblePortfolios.length === 0 && archivedPortfolios.length > 0}
+            <Card>
+                <div class="flex flex-col items-center justify-center py-16 text-center">
+                    <p class="font-medium text-foreground mb-1">All portfolios are archived</p>
+                    <p class="text-sm text-muted-foreground mb-6">Show archived portfolios to view or restore them, or create a new one.</p>
+                    <div class="flex gap-2">
+                        <Button variant="outline" on:click={toggleShowArchived}>Show archived</Button>
+                        <Button variant="default" on:click={() => (showNewModal = true)}>New Portfolio</Button>
+                    </div>
+                </div>
+            </Card>
+        {:else if visiblePortfolios.length === 0}
             <Card>
                 <div class="flex flex-col items-center justify-center py-16 text-center">
                     <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
@@ -177,11 +249,19 @@
                             </tr>
                         </thead>
                         <tbody class="[&_tr:last-child]:border-0">
-                            {#each $portfolios as portfolio}
+                            {#each visiblePortfolios as portfolio (portfolio.id)}
                                 {@const stats = portfolioStats[portfolio.id]}
-                                <tr class="border-b border-border/60 hover:bg-muted/30 transition-colors">
+                                <tr
+                                    class="border-b border-border/60 hover:bg-muted/30 transition-colors"
+                                    class:opacity-60={portfolio.archived_at}
+                                >
                                     <td class="px-3 py-3 align-middle">
                                         <span class="font-medium text-foreground">{portfolio.name}</span>
+                                        {#if portfolio.archived_at}
+                                            <span class="ml-2 inline-block align-middle">
+                                                <Badge variant="secondary">Archived</Badge>
+                                            </span>
+                                        {/if}
                                     </td>
                                     <td class="px-3 py-3 align-middle">
                                         <span class="font-mono text-xs text-muted-foreground">{portfolio.base_currency}</span>
@@ -222,6 +302,14 @@
                                         <div class="flex items-center justify-end gap-2">
                                             <Button variant="outline" size="sm" href="/portfolios/{portfolio.id}">View</Button>
                                             <Button variant="outline" size="sm" on:click={() => openEditModal(portfolio)}>Edit</Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={archivingId === portfolio.id}
+                                                on:click={() => handleSetArchived(portfolio.id, !portfolio.archived_at)}
+                                            >
+                                                {portfolio.archived_at ? "Unarchive" : "Archive"}
+                                            </Button>
                                             <Button variant="destructive" size="sm" on:click={() => handleDeletePortfolio(portfolio.id)}>Delete</Button>
                                         </div>
                                     </td>
