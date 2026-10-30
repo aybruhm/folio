@@ -171,6 +171,27 @@ async def test_confirm_import_creates_cash_asset_and_trade(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.edge_case
+async def test_confirm_import_keeps_eight_quantity_decimals(monkeypatch):
+    interactor, trade_repo, *_ = _patch_import_deps(monkeypatch)
+    csv_bytes = (
+        b"Ticker,Type,Date,Quantity,Price,Currency,Asset Class\n"
+        b"CASH,buy,2024-01-01,0.12345678,1.00,USD,cash\n"
+    )
+
+    result = await interactor.confirm_import(
+        csv_bytes,
+        "trades.csv",
+        {},
+        "%Y-%m-%d",
+        uuid4(),
+    )
+
+    assert result["imported_count"] == 1
+    assert trade_repo.added[0].quantity == 12_345_678
+
+
+@pytest.mark.asyncio
 @pytest.mark.happy_path
 async def test_confirm_import_updates_existing_asset_market_data_provider(monkeypatch):
     existing_asset = Asset(

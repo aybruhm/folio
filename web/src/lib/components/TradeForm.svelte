@@ -218,8 +218,8 @@
         <Input
             label="Quantity"
             type="number"
-            step="0.000001"
-            placeholder="0.000001"
+            step="0.00000001"
+            placeholder="0.00000001"
             bind:value={trade.quantity}
             required
             error={errors.quantity}

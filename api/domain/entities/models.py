@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 from domain.value_objects.money import (
+    QUANTITY_SCALE,
     AssetClass,
     AssetMetadata,
     Currency,
@@ -27,11 +27,11 @@ class Asset:
     name: str
     asset_class: AssetClass
     currency: Currency
-    exchange: Optional[str] = None
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    country: Optional[str] = None
-    isin: Optional[str] = None
+    exchange: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    country: str | None = None
+    isin: str | None = None
     market_data_provider: str = "yfinance"
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -66,18 +66,18 @@ class Trade:
     ticker: str
     trade_type: TradeType
     trade_date: datetime
-    quantity: int  # ×10000 scale (e.g. 1.0000 BTC → 10000)
+    quantity: int  # ×QUANTITY_SCALE (e.g. 1.00000000 BTC → 100_000_000)
     price: int  # ×100 scale (e.g. $185.20 → 18520)
     trade_currency: Currency
     fees: int = 0  # ×100 scale
-    notes: Optional[str] = None
+    notes: str | None = None
     source: str = "manual"
-    import_batch_id: Optional[UUID] = None
+    import_batch_id: UUID | None = None
     market_data_provider: str = "yfinance"
     created_at: datetime = field(default_factory=datetime.now)
 
     def total_cost(self) -> int:
-        return (self.quantity * self.price) // 10000 + self.fees
+        return (self.quantity * self.price) // QUANTITY_SCALE + self.fees
 
 
 @dataclass(frozen=True)
@@ -109,13 +109,16 @@ class Portfolio:
     user_id: UUID
     name: str
     base_currency: Currency
-    description: Optional[str] = None
+    description: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
+    archived_at: datetime | None = None
 
-    def update(
-        self, name: Optional[str] = None, description: Optional[str] = None
-    ) -> None:
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
+
+    def update(self, name: str | None = None, description: str | None = None) -> None:
         if name:
             self.name = name
         if description is not None:

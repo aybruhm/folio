@@ -1,6 +1,7 @@
 import csv
 import io
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -16,7 +17,7 @@ from adapters.outbound.persistence.trade_repository import TradeRepository
 from domain.entities.models import Trade
 from domain.ports.inbound.use_cases import ICsvImportUseCase
 from domain.ports.outbound.repositories import IAssetRepository, ITradeRepository
-from domain.value_objects.money import AssetClass, Currency, TradeType
+from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 
 class CsvImportInteractor(ICsvImportUseCase):
@@ -321,7 +322,8 @@ class CsvImportInteractor(ICsvImportUseCase):
 
         try:
             quantity = round(
-                float(row.get(mapping.get("quantity", "Quantity"), "0")) * 10000
+                Decimal(row.get(mapping.get("quantity", "Quantity"), "0").strip())
+                * QUANTITY_SCALE
             )
             if quantity < 0:
                 raise ValueError("Quantity cannot be negative")

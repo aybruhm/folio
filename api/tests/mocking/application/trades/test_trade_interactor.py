@@ -224,7 +224,7 @@ async def test_create_trade_creates_cash_asset_without_yfinance(monkeypatch):
         ticker="CASH",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 1, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=100,
         trade_currency=Currency.USD,
         asset_class=AssetClass.CASH,
@@ -270,7 +270,7 @@ async def test_create_trade_fetches_metadata_and_adds_asset_when_missing(monkeyp
         ticker="AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 2, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=18520,
         trade_currency=Currency.USD,
     )
@@ -301,7 +301,7 @@ async def test_create_trade_raises_when_portfolio_missing(monkeypatch):
         ticker="AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 2, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=18520,
         trade_currency=Currency.USD,
     )
@@ -355,7 +355,7 @@ async def test_create_trade_updates_existing_asset_classification_when_metadata_
         ticker="AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 3, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=20000,
         trade_currency=Currency.EUR,
     )
@@ -385,7 +385,7 @@ async def test_get_trade_serializes_model(monkeypatch):
         ticker="AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 4, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=18520,
         trade_currency=Currency.USD,
         fees=495,
@@ -440,7 +440,7 @@ async def test_list_trades_filters_by_ticker_type_and_dates(monkeypatch):
             ticker="AAPL",
             trade_type=TradeType.BUY,
             trade_date=datetime(2024, 1, 5, 9, 30),
-            quantity=100000,
+            quantity=1_000_000_000,
             price=18520,
             trade_currency=Currency.USD,
         ),
@@ -451,7 +451,7 @@ async def test_list_trades_filters_by_ticker_type_and_dates(monkeypatch):
             ticker="MSFT",
             trade_type=TradeType.SELL,
             trade_date=datetime(2024, 2, 5, 9, 30),
-            quantity=50000,
+            quantity=500_000_000,
             price=37400,
             trade_currency=Currency.USD,
         ),
@@ -492,7 +492,7 @@ async def test_update_trade_updates_fields(monkeypatch):
         ticker="AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 4, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=18520,
         trade_currency=Currency.USD,
     )
@@ -525,7 +525,7 @@ async def test_update_trade_updates_fields(monkeypatch):
         ticker="AAPL",
         trade_type=TradeType.SELL,
         trade_date=datetime(2024, 1, 6, 9, 30),
-        quantity=75000,
+        quantity=750_000_000,
         price=19000,
         trade_currency=Currency.EUR,
         fees=250,
@@ -535,7 +535,7 @@ async def test_update_trade_updates_fields(monkeypatch):
 
     updated = trade_repo.trades[trade.id]
     assert updated.trade_type == TradeType.SELL
-    assert updated.quantity == 75000
+    assert updated.quantity == 750_000_000
     assert updated.price == 19000
     assert updated.trade_currency == Currency.EUR
     assert asset_repo.updated[0].asset_class == AssetClass.ETF
@@ -567,7 +567,7 @@ async def test_delete_trade_removes_trade(monkeypatch):
         ticker="AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 4, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=18520,
         trade_currency=Currency.USD,
     )
@@ -615,7 +615,7 @@ async def test_create_trade_uses_ngnmarket_provider_when_selected(monkeypatch):
         ticker="NGX:NGX30",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 7, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=20000,
         trade_currency=Currency.NGN,
         market_data_provider="ngnmarket",
@@ -667,7 +667,7 @@ async def test_create_trade_uses_tradingview_provider_when_selected(monkeypatch)
         ticker="NASDAQ:AAPL",
         trade_type=TradeType.BUY,
         trade_date=datetime(2024, 1, 8, 9, 30),
-        quantity=100000,
+        quantity=1_000_000_000,
         price=18520,
         trade_currency=Currency.USD,
         market_data_provider="tradingview",

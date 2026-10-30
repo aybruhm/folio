@@ -105,6 +105,7 @@ export interface GetAllocationQuery {
 export interface ListPortfolioAnalyticsQuery {
     timeframe?: string;
     in_currency?: string;
+    include_archived?: boolean;
 }
 
 export interface AddBenchmarkQuery {

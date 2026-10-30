@@ -4,6 +4,7 @@
     import Button from "$lib/components/Button.svelte";
     import HoldingsTable from "$lib/components/HoldingsTable.svelte";
     import Amount from "$lib/components/Amount.svelte";
+    import Badge from "$lib/components/Badge.svelte";
     import { api } from "$lib/api/client";
     import { PortfolioController } from "$lib/api/controllers";
     import { currentPortfolio, baseCurrency } from "$lib/stores";
@@ -99,9 +100,14 @@
                         >
                             {portfolio.name}
                         </h1>
-                        <p class="text-xs md:text-sm text-muted-foreground">
+                        <div
+                            class="flex items-center gap-2 text-xs md:text-sm text-muted-foreground"
+                        >
                             {portfolio.base_currency}
-                        </p>
+                            {#if portfolio.archived_at}
+                                <Badge variant="secondary">Archived</Badge>
+                            {/if}
+                        </div>
                     </div>
                 {/if}
             </div>

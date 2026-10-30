@@ -234,14 +234,46 @@ def test_trade_crud_routes(
 
     assert response.status_code == expected_status
     if method == "post":
-        assert interactor.last_create.quantity == 100000
+        assert interactor.last_create.quantity == 1_000_000_000
         assert interactor.last_create.trade_currency == Currency.USD
     if method == "put":
-        assert interactor.last_update[1].quantity == 75000
+        assert interactor.last_update[1].quantity == 750_000_000
         assert interactor.last_update[1].trade_type == TradeType.SELL
         assert interactor.last_update[1].asset_class is None
     if method == "get" and path.endswith("{id}"):
         assert response.json()["ticker"] == "AAPL"
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+@pytest.mark.parametrize(
+    "quantity,expected",
+    [
+        (0.12345678, 12_345_678),
+        ("0.00000001", 1),
+        (1234.5, 123_450_000_000),
+    ],
+)
+def test_create_trade_keeps_eight_quantity_decimals(
+    authed_client, monkeypatch, quantity, expected
+):
+    interactor = FakeTradeInteractor()
+    _patch_trade_interactor(monkeypatch, interactor)
+    response = authed_client.post(
+        "/api/v1/trades/",
+        json={
+            "portfolio_id": str(uuid4()),
+            "ticker": "BTC-USD",
+            "trade_type": "buy",
+            "trade_date": "2024-01-01T09:30:00",
+            "quantity": quantity,
+            "price": 65000.0,
+            "trade_currency": "USD",
+        },
+    )
+
+    assert response.status_code == 201
+    assert interactor.last_create.quantity == expected
 
 
 @pytest.mark.integration

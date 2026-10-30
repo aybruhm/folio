@@ -13,7 +13,7 @@ from application.trades.csv_import_interactor import CsvImportInteractor
 from application.trades.trade_interactor import TradeInteractor
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
-from domain.value_objects.money import AssetClass, Currency, TradeType
+from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 from infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/trades", tags=["trades"])
@@ -43,7 +43,7 @@ def _body_to_request(body: TradeBody) -> CreateTradeRequest:
         ticker=body.ticker,
         trade_type=TradeType(body.trade_type),
         trade_date=body.trade_date,
-        quantity=round(body.quantity * 10000),
+        quantity=round(body.quantity * QUANTITY_SCALE),
         price=round(body.price * 100),
         trade_currency=Currency(body.trade_currency),
         fees=round(body.fees * 100),

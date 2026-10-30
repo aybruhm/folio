@@ -64,8 +64,9 @@ def test_asset_from_metadata_stores_explicit_market_data_provider():
 @pytest.mark.parametrize(
     "quantity,price,fees,expected",
     [
-        (100000, 18520, 495, 185695),
-        (25000, 10000, 0, 25000),
+        (1_000_000_000, 18520, 495, 185695),
+        (250_000_000, 10000, 0, 25000),
+        (12_345_678, 6_500_000, 0, 802_469),
     ],
 )
 @pytest.mark.happy_path

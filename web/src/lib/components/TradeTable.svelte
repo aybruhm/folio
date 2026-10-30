@@ -1,10 +1,13 @@
 <script lang="ts">
     import Badge from "./Badge.svelte";
     import Amount from "./Amount.svelte";
+    import Tooltip from "./Tooltip.svelte";
+    import { hideAmounts } from "$lib/stores";
     import {
         formatCurrency,
         formatDateTime,
-        formatNumber,
+        formatQuantity,
+        formatQuantityShort,
     } from "$lib/utils/format";
     import { createEventDispatcher } from "svelte";
 
@@ -154,11 +157,19 @@
                                     {row.trade_type.toUpperCase()}
                                 </Badge>
                             </td>
-                            <td class="p-4 align-middle"
-                                ><Amount
-                                    value={formatNumber(row.quantity, 4)}
-                                /></td
-                            >
+                            <td class="p-4 align-middle">
+                                <Tooltip
+                                    text={$hideAmounts
+                                        ? ""
+                                        : formatQuantity(row.quantity)}
+                                >
+                                    <Amount
+                                        value={formatQuantityShort(
+                                            row.quantity,
+                                        )}
+                                    />
+                                </Tooltip>
+                            </td>
                             <td class="p-4 align-middle"
                                 ><Amount
                                     value={formatCurrency(

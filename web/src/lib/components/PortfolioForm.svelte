@@ -59,12 +59,20 @@
         error={errors.name}
     />
 
-    <Select
-        label="Base Currency"
-        bind:value={portfolio.base_currency}
-        options={currencies}
-        required
-    />
+    <div class="space-y-2">
+        <Select
+            label="Base Currency"
+            bind:value={portfolio.base_currency}
+            options={currencies}
+            required
+        />
+        <p
+            class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+            role="note"
+        >
+            The base currency can't be changed after the portfolio is created.
+        </p>
+    </div>
 
     <Input
         label="Description"

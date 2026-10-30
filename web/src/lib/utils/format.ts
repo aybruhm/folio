@@ -38,6 +38,37 @@ export function formatNumber(
   }).format(num)
 }
 
+// Trade quantities carry up to 8 decimal places (QUANTITY_SCALE in the API).
+export const QUANTITY_DECIMALS = 8
+
+export function formatQuantity(
+  value: string | number,
+  minDecimals: number = 2,
+  locale: string = 'en-US'
+): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: minDecimals,
+    maximumFractionDigits: QUANTITY_DECIMALS
+  }).format(num)
+}
+
+// Truncates instead of rounding so a shortened quantity never overstates it.
+export function formatQuantityShort(
+  value: string | number,
+  decimals: number = 2,
+  locale: string = 'en-US'
+): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    roundingMode: 'trunc'
+  }).format(num)
+}
+
 export function formatDate(date: Date | string, format: string = 'en-US'): string {
   const d = typeof date === 'string' ? new Date(date) : date
 
@@ -48,16 +79,22 @@ export function formatDate(date: Date | string, format: string = 'en-US'): strin
   }).format(d)
 }
 
+// e.g. "Tue, Feb 2026. 09:30"
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
-  return new Intl.DateTimeFormat('en-GB', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(d)
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    })
+      .formatToParts(d)
+      .map((p) => [p.type, p.value])
+  )
+  return `${parts.weekday}, ${parts.month} ${parts.year}. ${parts.hour}:${parts.minute}`
 }
 
 export function parseDate(dateStr: string, format: string = 'YYYY-MM-DD'): Date {

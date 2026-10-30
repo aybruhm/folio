@@ -14,8 +14,11 @@ class FakePortfolioInteractor:
         self.last_create = None
         self.last_update = None
         self.deleted = []
+        self.last_list_include_archived = None
+        self.archived_calls = []
 
-    async def list_portfolios(self, user_id):
+    async def list_portfolios(self, user_id, include_archived=False):
+        self.last_list_include_archived = include_archived
         return [
             {
                 "id": str(self.portfolio_id),
@@ -60,6 +63,11 @@ class FakePortfolioInteractor:
         if self.mode == "delete-error":
             raise RuntimeError("delete failed")
         self.deleted.append(portfolio_id)
+
+    async def set_archived(self, portfolio_id, archived):
+        if self.mode == "archive-error":
+            raise RuntimeError("archive failed")
+        self.archived_calls.append((portfolio_id, archived))
 
     async def get_portfolio_analytics(self, portfolio_id, timeframe="1y"):
         return {
@@ -382,3 +390,56 @@ def test_portfolio_analytics_subroutes_generic_exception_paths(
         f"/api/v1/portfolios/{interactor.portfolio_id}/allocation"
     )
     assert allocation.status_code == 400
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+@pytest.mark.parametrize(
+    "params,expected",
+    [(None, False), ({"include_archived": "true"}, True)],
+)
+def test_list_portfolios_passes_include_archived(
+    authed_client, monkeypatch, fake_user, params, expected
+):
+    interactor = FakePortfolioInteractor(fake_user.id)
+    _patch_portfolio_interactor(monkeypatch, interactor)
+    response = authed_client.get("/api/v1/portfolios/", params=params)
+
+    assert response.status_code == 200
+    assert interactor.last_list_include_archived is expected
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+@pytest.mark.parametrize("action,archived", [("archive", True), ("unarchive", False)])
+def test_archive_routes_toggle_archived(
+    authed_client, monkeypatch, fake_user, action, archived
+):
+    interactor = FakePortfolioInteractor(fake_user.id)
+    _patch_portfolio_interactor(monkeypatch, interactor)
+    response = authed_client.post(
+        f"/api/v1/portfolios/{interactor.portfolio_id}/{action}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Core"
+    assert interactor.archived_calls == [(interactor.portfolio_id, archived)]
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+@pytest.mark.parametrize(
+    "mode,expected_status",
+    [("missing", 404), ("wrong-owner", 403), ("archive-error", 400)],
+)
+def test_archive_route_error_paths(
+    authed_client, monkeypatch, fake_user, mode, expected_status
+):
+    interactor = FakePortfolioInteractor(fake_user.id, mode=mode)
+    _patch_portfolio_interactor(monkeypatch, interactor)
+    response = authed_client.post(
+        f"/api/v1/portfolios/{interactor.portfolio_id}/archive"
+    )
+
+    assert response.status_code == expected_status
+    assert interactor.archived_calls == []

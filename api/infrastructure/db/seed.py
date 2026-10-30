@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 
+from domain.value_objects.money import QUANTITY_SCALE
 from infrastructure.db.models import (
     AssetModel,
     GoalModel,
@@ -209,7 +210,7 @@ def _build_trades(
                 ticker=ticker,
                 trade_type=ttype,
                 trade_date=datetime(d.year, d.month, d.day, 9, 30),
-                quantity=round(qty * 10000),
+                quantity=round(qty * QUANTITY_SCALE),
                 price=price,
                 trade_currency="USD",
                 fees=round(fee_dollars * 100),
@@ -236,7 +237,7 @@ def _build_trades(
                 ticker=ticker,
                 trade_type="buy",
                 trade_date=datetime(d.year, d.month, d.day, 9, 30),
-                quantity=round(amount_dollars * 10000),
+                quantity=round(amount_dollars * QUANTITY_SCALE),
                 price=100,  # $1.00 × 100
                 trade_currency="USD",
                 fees=0,
