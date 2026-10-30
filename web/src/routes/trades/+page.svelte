@@ -6,6 +6,7 @@
     import Modal from "$lib/components/Modal.svelte";
     import TradeForm from "$lib/components/TradeForm.svelte";
     import Select from "$lib/components/Select.svelte";
+    import Input from "$lib/components/Input.svelte";
     import SearchPagination from "$lib/components/SearchPagination.svelte";
     import { currentPortfolio, portfolios } from "$lib/stores";
     import { api } from "$lib/api/client";
@@ -28,6 +29,9 @@
     let editingTrade: any = null;
     let tradeTypeFilter = "all";
     let searchTerm = "";
+    // Inclusive trade-date range as YYYY-MM-DD; empty means unbounded.
+    let startDate = "";
+    let endDate = "";
     let currentPage = 1;
     let pageSize = 25;
     let totalTrades = 0;
@@ -49,6 +53,8 @@
     let loadInProgress = false;
     let lastSearchTerm = "";
     let lastTradeTypeFilter = tradeTypeFilter;
+    let lastStartDate = startDate;
+    let lastEndDate = endDate;
     let lastPageSize = pageSize;
     let lastPage = currentPage;
     let lastPortfolioKey = "";
@@ -72,12 +78,27 @@
 
     $: if (
         searchTerm !== lastSearchTerm ||
-        tradeTypeFilter !== lastTradeTypeFilter
+        tradeTypeFilter !== lastTradeTypeFilter ||
+        startDate !== lastStartDate ||
+        endDate !== lastEndDate
     ) {
         lastSearchTerm = searchTerm;
         lastTradeTypeFilter = tradeTypeFilter;
+        lastStartDate = startDate;
+        lastEndDate = endDate;
         currentPage = 1;
     }
+
+    $: dateRangeError =
+        startDate && endDate && startDate > endDate
+            ? "End date must be on or after the start date"
+            : "";
+
+    $: hasActiveFilters =
+        Boolean(searchTerm) ||
+        tradeTypeFilter !== "all" ||
+        Boolean(startDate) ||
+        Boolean(endDate);
 
     $: if (pageSize !== lastPageSize) {
         lastPageSize = pageSize;
@@ -99,7 +120,7 @@
     }
 
     $: loadKey = tradeController
-        ? `${$cacheRefreshCounter}:${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}:${tradeTypeFilter}:${searchTerm}:${currentPage}:${pageSize}`
+        ? `${$cacheRefreshCounter}:${$currentPortfolio?.id || "all"}:${$portfolios.map((p) => p.id).join(",")}:${tradeTypeFilter}:${searchTerm}:${startDate}:${endDate}:${currentPage}:${pageSize}`
         : "";
 
     $: if (loadKey && loadKey !== lastLoadKey) {
@@ -127,6 +148,8 @@
                                 tradeTypeFilter === "all"
                                     ? undefined
                                     : tradeTypeFilter,
+                            start_date: startDate || undefined,
+                            end_date: endDate || undefined,
                         });
                         allTrades = [
                             ...allTrades,
@@ -155,6 +178,8 @@
                     ticker: searchTerm ? searchTerm : undefined,
                     trade_type:
                         tradeTypeFilter === "all" ? undefined : tradeTypeFilter,
+                    start_date: startDate || undefined,
+                    end_date: endDate || undefined,
                 });
                 trades = (response.data as Trade[]) || [];
                 serverTotalTrades = response.total || 0;
@@ -393,6 +418,29 @@
                             options={tradeTypeOptions}
                         />
                     </div>
+                    <div class="min-w-[150px]">
+                        <Input label="From" type="date" bind:value={startDate} />
+                    </div>
+                    <div class="min-w-[150px]">
+                        <Input
+                            label="To"
+                            type="date"
+                            bind:value={endDate}
+                            error={dateRangeError}
+                        />
+                    </div>
+                    {#if startDate || endDate}
+                        <Button
+                            variant="ghost"
+                            class="h-10"
+                            on:click={() => {
+                                startDate = "";
+                                endDate = "";
+                            }}
+                        >
+                            Clear dates
+                        </Button>
+                    {/if}
                 </svelte:fragment>
             </SearchPagination>
         </Card>
@@ -428,9 +476,9 @@
             >
                 <div class="py-8 text-center">
                     <p class="mb-4 text-muted-foreground">
-                        {tradeTypeFilter === "all"
-                            ? "You don't have any trades yet."
-                            : `No ${tradeTypeFilter} trades found.`}
+                        {hasActiveFilters
+                            ? "No trades match the current filters."
+                            : "You don't have any trades yet."}
                     </p>
                     <Button
                         variant="default"
