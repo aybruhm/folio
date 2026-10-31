@@ -1,37 +1,74 @@
 import asyncio
 from collections.abc import Coroutine
-from typing import List, Optional
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import get_current_user
+from adapters.outbound.market_data.yfinance_closes import last_close, valid_closes
 from application.analytics.analytics_interactor import AnalyticsInteractor
+from application.analytics.summary import (
+    convert_analytics,
+    make_factor_lookup,
+    merge_analytics,
+    scale_analytics,
+)
+from application.analytics.timeframe import timeframe_start
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreatePortfolioRequest
+from domain.services.performance import PerformanceInputs, PerformanceService
 from domain.value_objects.money import Currency
 from infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
-async def _fetch_fx_rate(from_ccy: str, to_ccy: str) -> int:
-    """Return the ×100 FX rate for *from_ccy* → *to_ccy* using yfinance."""
+async def _fetch_fx_factor(from_ccy: str, to_ccy: str) -> float:
+    """Multiplier converting *from_ccy* amounts to *to_ccy*, or 0.0 if unknown.
+
+    A plain float, not a ×100 int: rates like NGN→USD (~0.0007) round to 0
+    at ×100. Falls back to inverting the reverse pair.
+    """
     if from_ccy == to_ccy:
-        return 100
+        return 1.0
     import yfinance as yf
 
-    ticker = f"{from_ccy}{to_ccy}=X"
-    try:
-        t = yf.Ticker(ticker)
-        data = t.history(period="1d")
-        if data.empty:
-            return 0
-        return round(float(data["Close"].iloc[-1]) * 100)
-    except Exception:
-        return 0
+    def latest_close(ticker: str) -> float:
+        try:
+            return last_close(yf.Ticker(ticker).history(period="1d")) or 0.0
+        except Exception:
+            return 0.0
+
+    direct = latest_close(f"{from_ccy}{to_ccy}=X")
+    if direct > 0:
+        return direct
+    inverse = latest_close(f"{to_ccy}{from_ccy}=X")
+    return 1 / inverse if inverse > 0 else 0.0
+
+
+async def _fetch_fx_factor_history(
+    from_ccy: str, to_ccy: str, start: date, end: date
+) -> list[tuple[date, float]]:
+    """Daily *from_ccy* → *to_ccy* factors, like `_fetch_fx_factor`; empty if
+    neither pair has data."""
+    if from_ccy == to_ccy:
+        return []
+    import yfinance as yf
+
+    def closes(ticker: str) -> list[tuple[date, float]]:
+        try:
+            data = yf.Ticker(ticker).history(start=start, end=end + timedelta(days=1))
+            return [(idx.date(), float(c)) for idx, c in valid_closes(data).items()]
+        except Exception:
+            return []
+
+    direct = closes(f"{from_ccy}{to_ccy}=X")
+    if direct:
+        return direct
+    return [(d, 1 / c) for d, c in closes(f"{to_ccy}{from_ccy}=X")]
 
 
 def _check_ownership(portfolio: dict, current_user: User) -> None:
@@ -47,15 +84,38 @@ async def _build_portfolio_analytics(
     timeframe: str,
     base_currency: Currency = Currency.USD,
 ) -> dict:
+    analytics, _ = await _portfolio_analytics_with_inputs(
+        session, portfolio_id, timeframe, base_currency
+    )
+    return analytics
+
+
+async def _portfolio_analytics_with_inputs(
+    session: AsyncSession,
+    portfolio_id: UUID,
+    timeframe: str,
+    base_currency: Currency = Currency.USD,
+) -> tuple[dict, PerformanceInputs | None]:
+    """Analytics for one portfolio, plus the TWR/MWR inputs for merging.
+
+    TWR, MWR, performance history and contributions cover *timeframe*;
+    holdings and allocation are current.
+    """
     interactor = AnalyticsInteractor(session, base_currency)
+    start_date = timeframe_start(timeframe)
 
     holdings = await interactor.get_holdings(portfolio_id, base_currency)
-    performance = await interactor.calculate_performance(portfolio_id)
+    performance_inputs = await interactor.get_performance_inputs(
+        portfolio_id, start_date
+    )
+    performance = PerformanceService.summarize(performance_inputs)
     allocation_raw = await interactor.get_allocation(portfolio_id)
     performance_history = await interactor.get_performance_history(
         portfolio_id, timeframe
     )
-    contribution_history = await interactor.get_contribution_history(portfolio_id)
+    contribution_history = await interactor.get_contribution_history(
+        portfolio_id, start_date
+    )
     sector_breakdown = await interactor.get_sector_breakdown(portfolio_id)
 
     current_value = sum(float(h["market_value"]) for h in holdings)
@@ -110,10 +170,10 @@ async def _build_portfolio_analytics(
         "contribution_history": contribution_history,
         "sector_breakdown": sector_breakdown,
         "timeframe": timeframe,
-    }
+    }, performance_inputs
 
 
-@router.get("/", response_model=List[dict])
+@router.get("/", response_model=list[dict])
 async def list_portfolios(
     include_archived: bool = False,
     current_user: User = Depends(get_current_user),
@@ -141,10 +201,10 @@ async def create_portfolio(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/analytics", response_model=List[dict])
+@router.get("/analytics", response_model=list[dict])
 async def list_portfolio_analytics(
     timeframe: str = "1y",
-    in_currency: Optional[str] = None,
+    in_currency: str | None = None,
     include_archived: bool = False,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -174,44 +234,63 @@ async def list_portfolio_analytics(
             for i, item in enumerate(analytics):
                 portfolio_ccy = Currency(portfolios[i].get("base_currency", "USD"))
                 if portfolio_ccy != display_ccy:
-                    rate = await _fetch_fx_rate(portfolio_ccy.value, display_ccy.value)
-                    if rate and rate != 100:
-                        item["total_invested"] = round(
-                            float(item["total_invested"]) * rate / 100, 2
-                        )
-                        item["current_value"] = round(
-                            float(item["current_value"]) * rate / 100, 2
-                        )
-                        item["total_gain_loss"] = round(
-                            float(item["total_gain_loss"]) * rate / 100, 2
-                        )
-                        # Convert holdings values
-                        for h in item.get("holdings", []):
-                            h["current_price"] = round(
-                                float(h["current_price"]) * rate / 100, 2
-                            )
-                            h["market_value"] = round(
-                                float(h["market_value"]) * rate / 100, 2
-                            )
-                            h["cost_basis"] = round(
-                                float(h["cost_basis"]) * rate / 100, 2
-                            )
-                            h["total_return"] = round(
-                                float(h["total_return"]) * rate / 100, 2
-                            )
-                        # Convert performance/contribution history
-                        for pt in item.get("performance_history", []):
-                            pt["value"] = round(float(pt["value"]) * rate / 100, 2)
-                        for pt in item.get("contribution_history", []):
-                            pt["value"] = round(float(pt["value"]) * rate / 100, 2)
-                        # Convert allocation and top_holdings
-                        for a in item.get("allocation", []):
-                            a["value"] = round(float(a["value"]) * rate / 100, 2)
-                        for th in item.get("top_holdings", []):
-                            th["value"] = round(float(th["value"]) * rate / 100, 2)
-                        for sb in item.get("sector_breakdown", []):
-                            sb["value"] = round(float(sb["value"]) * rate / 100, 2)
+                    factor = await _fetch_fx_factor(
+                        portfolio_ccy.value, display_ccy.value
+                    )
+                    if factor and factor != 1:
+                        scale_analytics(item, factor)
         return list(analytics)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/analytics/summary")
+async def get_analytics_summary(
+    timeframe: str = "1y",
+    in_currency: str = "USD",
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """All active portfolios merged into one analytics view in *in_currency*.
+
+    Portfolios whose FX rate can't be fetched are left out rather than mixed
+    in unconverted; their ids are listed in `excluded_portfolio_ids`.
+    """
+    try:
+        display_ccy = Currency(in_currency)
+        portfolios = await PortfolioInteractor(session).list_portfolios(current_user.id)
+
+        items: list[tuple[dict, PerformanceInputs | None]] = []
+        excluded: list[str] = []
+        # Sequential: the portfolios share one AsyncSession.
+        for portfolio in portfolios:
+            base_ccy = Currency(portfolio.get("base_currency", "USD"))
+            analytics, inputs = await _portfolio_analytics_with_inputs(
+                session, UUID(portfolio["id"]), timeframe, base_ccy
+            )
+            if base_ccy != display_ccy:
+                factor = await _fetch_fx_factor(base_ccy.value, display_ccy.value)
+                if not factor:
+                    excluded.append(portfolio["id"])
+                    continue
+                # Past values at their own date's rate; falls back to today's
+                # rate when no history is available.
+                factor_on = None
+                if inputs:
+                    factor_on = make_factor_lookup(
+                        await _fetch_fx_factor_history(
+                            base_ccy.value,
+                            display_ccy.value,
+                            inputs.start_date - timedelta(days=7),
+                            date.today(),
+                        )
+                    )
+                inputs = convert_analytics(analytics, inputs, factor, factor_on)
+            items.append((analytics, inputs))
+
+        summary = merge_analytics(items, display_ccy.value, timeframe)
+        summary["excluded_portfolio_ids"] = excluded
+        return summary
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -236,8 +315,8 @@ async def get_portfolio(
 @router.put("/{portfolio_id}")
 async def update_portfolio(
     portfolio_id: UUID,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
+    name: str | None = None,
+    description: str | None = None,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -350,7 +429,7 @@ async def get_portfolio_analytics(
 @router.get("/{portfolio_id}/holdings")
 async def get_holdings(
     portfolio_id: UUID,
-    in_currency: Optional[str] = None,
+    in_currency: str | None = None,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
