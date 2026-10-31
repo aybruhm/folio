@@ -1,4 +1,5 @@
 import logging
+import warnings
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -15,6 +16,16 @@ from adapters.inbound.http import (
 from infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
+
+# yfinance still passes inplace=True to pandas, which pandas 3.1 deprecates and
+# warns about on every fetch. Silence it for yfinance only, so deprecations in
+# our own code still show.
+try:
+    from pandas.errors import Pandas4Warning
+
+    warnings.filterwarnings("ignore", category=Pandas4Warning, module=r"yfinance\b")
+except ImportError:  # pandas < 3.1 has no Pandas4Warning
+    pass
 
 
 @asynccontextmanager
