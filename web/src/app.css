@@ -85,14 +85,6 @@
 }
 
 @layer utilities {
-    .text-positive {
-        color: #34D399;
-    }
-
-    .text-negative {
-        color: #F87171;
-    }
-
     .font-serif {
         font-family: 'Instrument Serif', Georgia, serif;
     }

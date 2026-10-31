@@ -1,8 +1,8 @@
 <script lang="ts">
-    import Input from "$lib/components/Input.svelte";
-    import Select from "$lib/components/Select.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import { cn } from "$lib/utils/cn";
+    import Input from "#lib/components/Input.svelte";
+    import Select from "#lib/components/Select.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import { cn } from "#lib/utils/cn.js";
 
     export let search = "";
     export let searchLabel = "Search";

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from '$lib/utils/cn'
+  import { cn } from '#lib/utils/cn.js'
 
   export let title: string = ''
   export let subtitle: string = ''
@@ -8,7 +8,7 @@
 </script>
 
 <div class={cn(
-  'rounded-xl border bg-card p-3 sm:p-4 md:p-6 transition-shadow hover:shadow-lg',
+  'rounded-xl border bg-card p-3 sm:p-4 md:p-6',
   variant === 'stat' ? 'border-border/60' : 'border-border shadow-sm',
   className
 )}>

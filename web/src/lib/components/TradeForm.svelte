@@ -3,10 +3,10 @@
     import Select from "./Select.svelte";
     import Button from "./Button.svelte";
     import { createEventDispatcher } from "svelte";
-    import { CURRENCIES } from "$lib/constants/currencies";
-    import { formatCurrency } from "$lib/utils/format";
-    import { api } from "$lib/api/client";
-    import { AssetController } from "$lib/api/controllers";
+    import { CURRENCIES } from "#lib/constants/currencies.js";
+    import { formatCurrency } from "#lib/utils/format.js";
+    import { api } from "#lib/api/client.js";
+    import { AssetController } from "#lib/api/controllers/index.js";
 
     const dispatch = createEventDispatcher();
 

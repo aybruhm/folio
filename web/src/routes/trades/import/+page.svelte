@@ -1,16 +1,16 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import Card from "$lib/components/Card.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import Select from "$lib/components/Select.svelte";
-    import Input from "$lib/components/Input.svelte";
-    import { currentPortfolio } from "$lib/stores";
-    import { api } from "$lib/api/client";
-    import { TradeController } from "$lib/api/controllers";
+    import Card from "#lib/components/Card.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import Select from "#lib/components/Select.svelte";
+    import Input from "#lib/components/Input.svelte";
+    import { currentPortfolio } from "#lib/stores/index.js";
+    import { api } from "#lib/api/client.js";
+    import { TradeController } from "#lib/api/controllers/index.js";
     import type {
         ValidateCsvResponse,
         ConfirmImportResponse,
-    } from "$lib/api/types";
+    } from "#lib/api/types/index.js";
 
     // ── wizard state ──────────────────────────────────────────────
     let step: 1 | 2 | 3 = 1;

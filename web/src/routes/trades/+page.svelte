@@ -1,25 +1,25 @@
 <script lang="ts">
-    import Card from "$lib/components/Card.svelte";
-    import Skeleton from "$lib/components/Skeleton.svelte";
-    import TradeTable from "$lib/components/TradeTable.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import Modal from "$lib/components/Modal.svelte";
-    import TradeForm from "$lib/components/TradeForm.svelte";
-    import Select from "$lib/components/Select.svelte";
-    import Input from "$lib/components/Input.svelte";
-    import SearchPagination from "$lib/components/SearchPagination.svelte";
-    import { currentPortfolio, portfolios } from "$lib/stores";
-    import { api } from "$lib/api/client";
-    import { TradeController, PortfolioController } from "$lib/api/controllers";
-    import type { CreateTradeRequest, Trade } from "$lib/api/types";
+    import Card from "#lib/components/Card.svelte";
+    import Skeleton from "#lib/components/Skeleton.svelte";
+    import TradeTable from "#lib/components/TradeTable.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import Modal from "#lib/components/Modal.svelte";
+    import TradeForm from "#lib/components/TradeForm.svelte";
+    import Select from "#lib/components/Select.svelte";
+    import Input from "#lib/components/Input.svelte";
+    import SearchPagination from "#lib/components/SearchPagination.svelte";
+    import { currentPortfolio, portfolios } from "#lib/stores/index.js";
+    import { api } from "#lib/api/client.js";
+    import { TradeController, PortfolioController } from "#lib/api/controllers/index.js";
+    import type { CreateTradeRequest, Trade } from "#lib/api/types/index.js";
     import {
         invalidateAllAnalytics,
         invalidatePortfolioHoldings,
         setCachedAnalytics,
-    } from "$lib/cache";
-    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
+    } from "#lib/cache/index.js";
+    import { cacheRefreshCounter } from "#lib/stores/cacheRefresh.js";
     import { onMount } from "svelte";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
 
     let loading = true;
     let trades: Trade[] = [];
@@ -40,6 +40,9 @@
     let portfolioController: PortfolioController;
     let selectedTradeIds = new Set<string>();
     let tradeFormLoading = false;
+    // ?new=true opens the new-trade modal once a portfolio is selected; the
+    // selection may still be loading on a fresh page load.
+    let pendingNewTrade = false;
 
     const tradeTypeOptions = [
         { label: "All Types", value: "all" },
@@ -71,8 +74,13 @@
                 console.error("Failed to load portfolios:", e);
             }
         }
-        if ($page.url.searchParams.get("new") === "true") showNewModal = true;
+        pendingNewTrade = page.url.searchParams.get("new") === "true";
     });
+
+    $: if (pendingNewTrade && $currentPortfolio?.id) {
+        pendingNewTrade = false;
+        showNewModal = true;
+    }
 
     $: isAggregated = !$currentPortfolio?.id;
 
@@ -89,16 +97,8 @@
         currentPage = 1;
     }
 
-    $: dateRangeError =
-        startDate && endDate && startDate > endDate
-            ? "End date must be on or after the start date"
-            : "";
-
-    $: hasActiveFilters =
-        Boolean(searchTerm) ||
-        tradeTypeFilter !== "all" ||
-        Boolean(startDate) ||
-        Boolean(endDate);
+    $: dateRangeError = startDate && endDate && startDate > endDate ? "End date must be on or after the start date" : "";
+    $: hasActiveFilters = Boolean(searchTerm) || tradeTypeFilter !== "all" || Boolean(startDate) || Boolean(endDate);
 
     $: if (pageSize !== lastPageSize) {
         lastPageSize = pageSize;
@@ -151,15 +151,10 @@
                             start_date: startDate || undefined,
                             end_date: endDate || undefined,
                         });
-                        allTrades = [
-                            ...allTrades,
-                            ...((response.data as Trade[]) || []),
-                        ];
-                    } catch (e) {
-                        console.error(
-                            `Failed to load trades for portfolio ${p.id}:`,
-                            e,
-                        );
+
+                        allTrades = [...allTrades, ...response.data as Trade[] || []];
+                    } catch(e) {
+                        console.error(`Failed to load trades for portfolio ${p.id}:`, e);
                     }
                 }
                 allTrades.sort((a, b) => {
@@ -181,7 +176,7 @@
                     start_date: startDate || undefined,
                     end_date: endDate || undefined,
                 });
-                trades = (response.data as Trade[]) || [];
+                trades = response.data as Trade[] || [];
                 serverTotalTrades = response.total || 0;
             }
         } catch (e) {
@@ -308,14 +303,11 @@
         ? trades.filter((t) => {
               const matchesType =
                   tradeTypeFilter === "all" || t.trade_type === tradeTypeFilter;
-              const normalizedSearch = searchTerm.trim().toLowerCase();
-              const matchesSearch =
-                  !normalizedSearch ||
-                  String(t.ticker).toLowerCase().includes(normalizedSearch) ||
-                  (t.name &&
-                      String(t.name).toLowerCase().includes(normalizedSearch));
-              return matchesType && matchesSearch;
-          })
+            const normalizedSearch = searchTerm.trim().toLowerCase();
+            const matchesSearch = !normalizedSearch || String(t.ticker).toLowerCase().includes(normalizedSearch) || t.name && String(t.name).toLowerCase().includes(normalizedSearch);
+
+            return matchesType && matchesSearch;
+        })
         : trades;
 
     $: totalTrades = isAggregated ? filteredTrades.length : serverTotalTrades;
@@ -328,9 +320,7 @@
         : trades;
 </script>
 
-<svelte:head>
-    <title>Trades — Folio</title>
-</svelte:head>
+<svelte:head><title>Trades — Folio</title></svelte:head>
 
 <div class="min-h-screen p-4 md:p-6">
     <div class="mx-auto max-w-6xl space-y-6">
@@ -370,16 +360,14 @@
                             stroke-linejoin="round"
                             stroke-width="2"
                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                        />
+                        ></path>
                     </svg>
                     Import CSV
                 </Button>
                 <Button
                     variant="default"
-                    on:click={() => (showNewModal = true)}
-                    class="flex-1 sm:flex-none {!$currentPortfolio?.id
-                        ? 'opacity-50 cursor-not-allowed'
-                        : ''}"
+                    on:click={() => showNewModal = true}
+                    class="flex-1 sm:flex-none {!$currentPortfolio?.id ? 'opacity-50 cursor-not-allowed' : ''}"
                     disabled={!$currentPortfolio?.id}
                 >
                     <svg
@@ -393,7 +381,7 @@
                             stroke-linejoin="round"
                             stroke-width="2"
                             d="M12 4v16m8-8H4"
-                        />
+                        ></path>
                     </svg>
                     New Trade
                 </Button>
@@ -418,9 +406,9 @@
                             options={tradeTypeOptions}
                         />
                     </div>
-                    <div class="min-w-[150px]">
-                        <Input label="From" type="date" bind:value={startDate} />
-                    </div>
+
+                    <div class="min-w-[150px]"><Input label="From" type="date" bind:value={startDate} /></div>
+
                     <div class="min-w-[150px]">
                         <Input
                             label="To"
@@ -482,10 +470,8 @@
                     </p>
                     <Button
                         variant="default"
-                        on:click={() => (showNewModal = true)}
-                    >
-                        Create First Trade
-                    </Button>
+                        on:click={() => showNewModal = true}
+                    >Create First Trade</Button>
                 </div>
             </Card>
         {:else}
@@ -502,7 +488,7 @@
                         </span>
                         <Button
                             variant="destructive"
-                            on:click={() => (showBulkDeleteModal = true)}
+                            on:click={() => showBulkDeleteModal = true}
                             class="text-sm"
                         >
                             Delete Selected
@@ -526,7 +512,7 @@
 <Modal
     open={showNewModal}
     title="Create Trade"
-    onClose={() => (showNewModal = false)}
+    onClose={() => showNewModal = false}
 >
     <TradeForm
         isLoading={tradeFormLoading}
@@ -543,9 +529,10 @@
         }}
     />
     <svelte:fragment slot="footer">
-        <Button variant="outline" on:click={() => (showNewModal = false)}>
-            Cancel
-        </Button>
+        <Button
+            variant="outline"
+            on:click={() => showNewModal = false}
+        >Cancel</Button>
     </svelte:fragment>
 </Modal>
 
@@ -582,7 +569,7 @@
 <Modal
     open={showBulkDeleteModal}
     title="Delete Selected Trades"
-    onClose={() => (showBulkDeleteModal = false)}
+    onClose={() => showBulkDeleteModal = false}
 >
     <div class="space-y-4">
         <p class="text-muted-foreground">
@@ -595,14 +582,9 @@
     <svelte:fragment slot="footer">
         <Button
             variant="outline"
-            on:click={() => (showBulkDeleteModal = false)}
-        >
-            Cancel
-        </Button>
-        <Button variant="destructive" on:click={handleBulkDelete}>
-            Delete {selectedTradeIds.size} Trade{selectedTradeIds.size !== 1
-                ? "s"
-                : ""}
-        </Button>
+            on:click={() => showBulkDeleteModal = false}
+        >Cancel</Button>
+
+        <Button variant="destructive" on:click={handleBulkDelete}>Delete {selectedTradeIds.size} Trade{selectedTradeIds.size !== 1 ? "s" : ""}</Button>
     </svelte:fragment>
 </Modal>

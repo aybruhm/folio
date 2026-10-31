@@ -1,31 +1,36 @@
 <script lang="ts">
     import "../app.css";
-    import Navigation from "$lib/components/Navigation.svelte";
-    import Sidebar from "$lib/components/Sidebar.svelte";
-    import PWAInstall from "$lib/components/PWAInstall.svelte";
-    import OfflineStatus from "$lib/components/OfflineStatus.svelte";
+    import Navigation from "#lib/components/Navigation.svelte";
+    import Sidebar from "#lib/components/Sidebar.svelte";
+    import PWAInstall from "#lib/components/PWAInstall.svelte";
+    import OfflineStatus from "#lib/components/OfflineStatus.svelte";
     import { onMount } from "svelte";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import {
         portfolios,
         selectInitialPortfolio,
         type Portfolio,
-    } from "$lib/stores";
-    import { initializeAuthStore } from "$lib/stores/offlineAuth";
-    import { syncQueuedData } from "$lib/stores/offline";
-    import { api } from "$lib/api/client";
-    import { PortfolioController } from "$lib/api/controllers";
+    } from "#lib/stores/index.js";
+    import { initializeAuthStore } from "#lib/stores/offlineAuth.js";
+    import { syncQueuedData } from "#lib/stores/offline.js";
+    import { api } from "#lib/api/client.js";
+    import { PortfolioController } from "#lib/api/controllers/index.js";
 
     let isDark = true;
     let sidebarOpen = false;
     let portfolioController: PortfolioController;
 
-    $: isAuthRoute =
-        $page.url.pathname.startsWith("/login") ||
-        $page.url.pathname.startsWith("/register");
+    // A function, not a `$:` statement: `page` is an import, so a legacy
+    // reactive statement would be computed once and never follow navigation.
+    function isAuthRoute() {
+        return (
+            page.url.pathname.startsWith("/login") ||
+            page.url.pathname.startsWith("/register")
+        );
+    }
 
     onMount(async () => {
-        if (!isAuthRoute) {
+        if (!isAuthRoute()) {
             initializeAuthStore();
             if (navigator.onLine && "serviceWorker" in navigator) {
                 syncQueuedData();
@@ -41,7 +46,7 @@
         applyTheme();
 
         portfolioController = new PortfolioController(api.getInstance());
-        if (!isAuthRoute) {
+        if (!isAuthRoute()) {
             await refreshSession();
             await loadPortfolios();
         }
@@ -90,8 +95,9 @@
     }
 </script>
 
-{#if isAuthRoute}
-    <slot />
+
+{#if isAuthRoute()}
+    <slot></slot>
 {:else}
     <div class="flex h-screen flex-col text-foreground">
         <Navigation
@@ -104,9 +110,8 @@
 
         <div class="flex flex-1 overflow-hidden">
             <Sidebar open={sidebarOpen} onClose={() => (sidebarOpen = false)} />
-            <main class="flex-1 overflow-auto">
-                <slot />
-            </main>
+
+            <main class="flex-1 overflow-auto"><slot></slot></main>
         </div>
     </div>
 {/if}

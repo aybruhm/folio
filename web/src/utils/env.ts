@@ -1,4 +1,10 @@
-import { env } from "$env/dynamic/public";
+import {
+    PUBLIC_API_BASE_URL,
+    PUBLIC_MARKET_DATA_CACHE_TTL,
+    PUBLIC_PRICE_HISTORY_CACHE_TTL,
+    PUBLIC_YFINANCE_CACHE_TTL,
+    PUBLIC_FX_RATES_CACHE_TTL
+} from "$app/env/public";
 
 class EnvUtils {
     private static instance: EnvUtils;
@@ -11,13 +17,13 @@ class EnvUtils {
     };
 
     private constructor() {
-        const rawBaseUrl = env.PUBLIC_API_BASE_URL?.trim();
+        const rawBaseUrl = PUBLIC_API_BASE_URL?.trim();
         this.env = {
             API_BASE_URL: rawBaseUrl || "/api/v1/",
-            MARKET_DATA_CACHE_TTL: parseInt(env.PUBLIC_MARKET_DATA_CACHE_TTL || "10800"),
-            PRICE_HISTORY_CACHE_TTL: parseInt(env.PUBLIC_PRICE_HISTORY_CACHE_TTL || "86400"),
-            YFINANCE_CACHE_TTL: parseInt(env.PUBLIC_YFINANCE_CACHE_TTL || "3600"),
-            FX_RATES_CACHE_TTL: parseInt(env.PUBLIC_FX_RATES_CACHE_TTL || "10800"),
+            MARKET_DATA_CACHE_TTL: parseInt(PUBLIC_MARKET_DATA_CACHE_TTL || "10800"),
+            PRICE_HISTORY_CACHE_TTL: parseInt(PUBLIC_PRICE_HISTORY_CACHE_TTL || "86400"),
+            YFINANCE_CACHE_TTL: parseInt(PUBLIC_YFINANCE_CACHE_TTL || "3600"),
+            FX_RATES_CACHE_TTL: parseInt(PUBLIC_FX_RATES_CACHE_TTL || "10800")
         };
     }
 

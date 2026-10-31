@@ -1,6 +1,6 @@
-import { env } from "$env/dynamic/private";
-import type { Handle } from "@sveltejs/kit";
+import type { Handle } from "@sveltejs/kit/hooks";
 import { redirect } from "@sveltejs/kit";
+import { PRIVATE_API_URL, SECRET_KEY } from "$app/env/private";
 import { jwtVerify } from "jose";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
@@ -10,7 +10,7 @@ const PUBLIC_ROUTES = ["/login", "/register"];
  * In Docker Compose the api service is reachable at http://api:8000.
  * Set PRIVATE_API_URL=http://localhost:8000 for local dev outside Docker.
  */
-const API_BASE = env.PRIVATE_API_URL ?? "http://api:8000";
+const API_BASE = PRIVATE_API_URL || "http://api:8000";
 const API_REFRESH_PATH = `${API_BASE}/api/v1/auth/refresh`;
 
 interface CookieAttributes {
@@ -103,19 +103,16 @@ async function tryRefreshToken(
 /**
  * Verify a JWT access token and extract the user payload.
  */
-async function verifyToken(
-    token: string,
-): Promise<{ id: string; email: string } | null> {
-    if (!env.SECRET_KEY) {
+async function verifyToken(token: string): Promise<{ id: string; email: string } | null> {
+    if (!SECRET_KEY) {
         console.warn("[hooks] SECRET_KEY is not set — cannot verify JWTs");
         return null;
     }
 
     try {
-        const secret = new TextEncoder().encode(env.SECRET_KEY);
-        const { payload } = await jwtVerify(token, secret, {
-            algorithms: ["HS256"],
-        });
+        const secret = new TextEncoder().encode(SECRET_KEY);
+        const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
+
         if (payload.sub && payload.email) {
             return {
                 id: payload.sub,

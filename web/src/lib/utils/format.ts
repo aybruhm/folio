@@ -15,6 +15,22 @@ export function formatCurrency(
   }).format(num)
 }
 
+// e.g. "$1.39M", for tight spaces; pair it with the exact amount in a tooltip.
+export function formatCompactCurrency(
+  amount: string | number,
+  currency: string = 'USD',
+  locale: string = 'en-US'
+): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 2
+  }).format(num)
+}
+
 export function formatPercent(
   value: string | number,
   decimals: number = 2,

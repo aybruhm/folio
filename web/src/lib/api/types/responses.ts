@@ -62,6 +62,15 @@ export interface GetPortfolioAnalyticsResponse {
 
 export type ListPortfolioAnalyticsResponse = GetPortfolioAnalyticsResponse[];
 
+// All active portfolios merged server-side, converted to `currency`.
+export interface AnalyticsSummaryResponse
+    extends Omit<GetPortfolioAnalyticsResponse, "portfolio_id"> {
+    currency: string;
+    portfolio_count: number;
+    // Left out because their FX rate was unavailable.
+    excluded_portfolio_ids: string[];
+}
+
 export interface GetPerformanceResponse {
     twr: string;
     mwr: string;

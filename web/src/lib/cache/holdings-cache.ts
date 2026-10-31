@@ -1,6 +1,6 @@
-import { idbGet, idbSet, idbInvalidate, idbClearStore } from '$lib/stores/idb';
+import { idbGet, idbSet, idbInvalidate, idbClearStore } from '#lib/stores/idb.js';
 import { CACHE_TTL } from './ttl';
-import type { GetHoldingsResponse } from '$lib/api/types';
+import type { GetHoldingsResponse } from '#lib/api/types/index.js';
 
 export async function getCachedHoldings(portfolioId: string): Promise<GetHoldingsResponse | null> {
   return idbGet<GetHoldingsResponse>('holdings', portfolioId);

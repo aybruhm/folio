@@ -1,4 +1,4 @@
-import { envUtils } from '@/utils/env';
+import { envUtils } from '#utils/env.js';
 
 export const CACHE_TTL = {
   get MARKET_DATA() { return envUtils.getMarketDataCacheTtl(); },

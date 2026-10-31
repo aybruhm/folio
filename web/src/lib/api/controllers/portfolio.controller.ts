@@ -13,6 +13,8 @@ import type {
     GetAllocationResponse,
     ListPortfolioAnalyticsQuery,
     ListPortfolioAnalyticsResponse,
+    AnalyticsSummaryQuery,
+    AnalyticsSummaryResponse,
 } from "../types";
 
 export class PortfolioController {
@@ -104,6 +106,18 @@ export class PortfolioController {
                 timeframe: params.timeframe || "1y",
                 ...(params.in_currency && { in_currency: params.in_currency }),
                 ...(params.include_archived && { include_archived: true }),
+            },
+        });
+        return response.data;
+    }
+
+    async getAnalyticsSummary(
+        params: AnalyticsSummaryQuery = {},
+    ): Promise<AnalyticsSummaryResponse> {
+        const response = await this.client.get(`/portfolios/analytics/summary`, {
+            params: {
+                timeframe: params.timeframe || "1y",
+                in_currency: params.in_currency || "USD",
             },
         });
         return response.data;

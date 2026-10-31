@@ -1,26 +1,28 @@
 <script lang="ts">
-    import Card from "$lib/components/Card.svelte";
-    import Skeleton from "$lib/components/Skeleton.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import Modal from "$lib/components/Modal.svelte";
-    import PortfolioForm from "$lib/components/PortfolioForm.svelte";
-    import Input from "$lib/components/Input.svelte";
-    import Amount from "$lib/components/Amount.svelte";
-    import Badge from "$lib/components/Badge.svelte";
+    import Card from "#lib/components/Card.svelte";
+    import Skeleton from "#lib/components/Skeleton.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import Modal from "#lib/components/Modal.svelte";
+    import PortfolioForm from "#lib/components/PortfolioForm.svelte";
+    import Input from "#lib/components/Input.svelte";
+    import Amount from "#lib/components/Amount.svelte";
+    import Badge from "#lib/components/Badge.svelte";
     import {
         currentPortfolio,
         portfolios,
         selectInitialPortfolio,
-    } from "$lib/stores";
-    import { api } from "$lib/api/client";
-    import { PortfolioController } from "$lib/api/controllers";
+    } from "#lib/stores/index.js";
+    import { api } from "#lib/api/client.js";
+    import { PortfolioController } from "#lib/api/controllers/index.js";
     import type {
         CreatePortfolioRequest,
         Portfolio,
         UpdatePortfolioRequest,
-    } from "$lib/api/types";
+    } from "#lib/api/types/index.js";
     import { onMount } from "svelte";
-    import { formatCurrency } from "$lib/utils/format";
+    import { page } from "$app/state";
+    import { formatCurrency } from "#lib/utils/format.js";
+    import { invalidateAllAnalytics } from "#lib/cache/index.js";
 
     let loading = true;
     let showNewModal = false;
@@ -42,13 +44,14 @@
 
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
+        if (page.url.searchParams.get("new") === "true") showNewModal = true;
         await loadPortfolios();
     });
 
     async function loadPortfolios() {
         try {
             loading = true;
-            const data = (await portfolioController.listPortfolios(true)) || [];
+            const data = await portfolioController.listPortfolios(true) || [];
             const active = data.filter((p) => !p.archived_at);
             archivedPortfolios = data.filter((p) => p.archived_at);
             portfolios.set(active as any);
@@ -63,7 +66,7 @@
             try {
                 const analyticsList =
                     await portfolioController.listPortfolioAnalytics({
-                        timeframe: "1y",
+                        timeframe: "all",
                         include_archived: showArchived,
                     });
                 portfolioStats = (analyticsList || []).reduce(
@@ -128,6 +131,8 @@
             } else {
                 await portfolioController.unarchivePortfolio(id);
             }
+            // Cached aggregate views (dashboard, analytics) include this portfolio.
+            await invalidateAllAnalytics();
             await loadPortfolios();
         } catch (e) {
             console.error(
@@ -150,6 +155,7 @@
 
         try {
             await portfolioController.deletePortfolio(id);
+            await invalidateAllAnalytics();
             await loadPortfolios();
         } catch (e) {
             console.error("Failed to delete portfolio:", e);
@@ -157,9 +163,7 @@
     }
 </script>
 
-<svelte:head>
-    <title>Portfolios — Folio</title>
-</svelte:head>
+<svelte:head><title>Portfolios — Folio</title></svelte:head>
 
 <div class="min-h-screen p-4 md:p-6">
     <div class="mx-auto max-w-6xl space-y-6">
@@ -175,9 +179,24 @@
                         {showArchived ? "Hide" : "Show"} archived ({archivedPortfolios.length})
                     </Button>
                 {/if}
-                <Button variant="default" on:click={() => (showNewModal = true)} class="w-full sm:w-auto">
-                    <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+
+                <Button
+                    variant="default"
+                    on:click={() => showNewModal = true}
+                    class="w-full sm:w-auto"
+                >
+                    <svg
+                        class="mr-2 h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 4v16m8-8H4"
+                        ></path>
                     </svg>
                     New Portfolio
                 </Button>
@@ -214,23 +233,43 @@
                     <p class="text-sm text-muted-foreground mb-6">Show archived portfolios to view or restore them, or create a new one.</p>
                     <div class="flex gap-2">
                         <Button variant="outline" on:click={toggleShowArchived}>Show archived</Button>
-                        <Button variant="default" on:click={() => (showNewModal = true)}>New Portfolio</Button>
+
+                        <Button
+                            variant="default"
+                            on:click={() => showNewModal = true}
+                        >New Portfolio</Button>
                     </div>
                 </div>
             </Card>
         {:else if visiblePortfolios.length === 0}
             <Card>
-                <div class="flex flex-col items-center justify-center py-16 text-center">
-                    <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                        <svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                <div
+                    class="flex flex-col items-center justify-center py-16 text-center"
+                >
+                    <div
+                        class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted"
+                    >
+                        <svg
+                            class="h-6 w-6 text-muted-foreground"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="1.75"
+                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                            ></path>
                         </svg>
                     </div>
                     <p class="font-medium text-foreground mb-1">No portfolios yet</p>
                     <p class="text-sm text-muted-foreground mb-6">Create your first portfolio to start tracking your investments.</p>
-                    <Button variant="default" on:click={() => (showNewModal = true)}>
-                        Create First Portfolio
-                    </Button>
+
+                    <Button
+                        variant="default"
+                        on:click={() => showNewModal = true}
+                    >Create First Portfolio</Button>
                 </div>
             </Card>
         {:else}
@@ -300,8 +339,18 @@
                                     </td>
                                     <td class="px-3 py-3 align-middle">
                                         <div class="flex items-center justify-end gap-2">
-                                            <Button variant="outline" size="sm" href="/portfolios/{portfolio.id}">View</Button>
-                                            <Button variant="outline" size="sm" on:click={() => openEditModal(portfolio)}>Edit</Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                href="/portfolios/{portfolio.id}"
+                                            >View</Button>
+
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                on:click={() => openEditModal(portfolio)}
+                                            >Edit</Button>
+
                                             <Button
                                                 variant="outline"
                                                 size="sm"
@@ -324,18 +373,31 @@
 </div>
 
 <!-- Create modal -->
-<Modal open={showNewModal} title="Create Portfolio" onClose={() => (showNewModal = false)}>
+
+<Modal
+    open={showNewModal}
+    title="Create Portfolio"
+    onClose={() => showNewModal = false}
+>
     <PortfolioForm
         onSubmit={handleCreatePortfolio}
         portfolio={{ name: "", base_currency: "USD", description: "" }}
     />
     <svelte:fragment slot="footer">
-        <Button variant="outline" on:click={() => (showNewModal = false)}>Cancel</Button>
+        <Button
+            variant="outline"
+            on:click={() => showNewModal = false}
+        >Cancel</Button>
     </svelte:fragment>
 </Modal>
 
 <!-- Edit modal -->
-<Modal open={!!editingPortfolio} title="Edit Portfolio" onClose={() => (editingPortfolio = null)}>
+
+<Modal
+    open={!!editingPortfolio}
+    title="Edit Portfolio"
+    onClose={() => editingPortfolio = null}
+>
     {#if editingPortfolio}
         <form on:submit|preventDefault={handleUpdatePortfolio} class="space-y-4">
             <Input
@@ -352,9 +414,15 @@
         </form>
     {/if}
     <svelte:fragment slot="footer">
-        <Button variant="outline" on:click={() => (editingPortfolio = null)}>Cancel</Button>
-        <Button variant="default" disabled={editSaving} on:click={handleUpdatePortfolio}>
-            {editSaving ? "Saving…" : "Save Changes"}
-        </Button>
+        <Button
+            variant="outline"
+            on:click={() => editingPortfolio = null}
+        >Cancel</Button>
+
+        <Button
+            variant="default"
+            disabled={editSaving}
+            on:click={handleUpdatePortfolio}
+        >{editSaving ? "Saving…" : "Save Changes"}</Button>
     </svelte:fragment>
 </Modal>

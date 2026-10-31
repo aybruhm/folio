@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { offlineStore } from '$lib/stores/offline';
+  import { offlineStore } from '#lib/stores/offline.js';
 
   interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;

@@ -1,16 +1,16 @@
 <script lang="ts">
-    import Card from "$lib/components/Card.svelte";
-    import Skeleton from "$lib/components/Skeleton.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import HoldingsTable from "$lib/components/HoldingsTable.svelte";
-    import Amount from "$lib/components/Amount.svelte";
-    import Badge from "$lib/components/Badge.svelte";
-    import { api } from "$lib/api/client";
-    import { PortfolioController } from "$lib/api/controllers";
-    import { currentPortfolio, baseCurrency } from "$lib/stores";
-    import { page } from "$app/stores";
+    import Card from "#lib/components/Card.svelte";
+    import Skeleton from "#lib/components/Skeleton.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import HoldingsTable from "#lib/components/HoldingsTable.svelte";
+    import Amount from "#lib/components/Amount.svelte";
+    import Badge from "#lib/components/Badge.svelte";
+    import { api } from "#lib/api/client.js";
+    import { PortfolioController } from "#lib/api/controllers/index.js";
+    import { currentPortfolio, baseCurrency } from "#lib/stores/index.js";
+    import { page } from '$app/state';
     import { onMount } from "svelte";
-    import { formatCurrency, formatPercent } from "$lib/utils/format";
+    import { formatCurrency, formatPercent } from "#lib/utils/format.js";
 
     let loading = true;
     let portfolio: any = null;
@@ -18,7 +18,8 @@
     let analytics: any = null;
     let portfolioController: PortfolioController;
 
-    const portfolioId = $page.params.id;
+    // The [id] route always provides this param.
+    const portfolioId = page.params.id as string;
 
     onMount(async () => {
         portfolioController = new PortfolioController(api.getInstance());
@@ -30,7 +31,7 @@
             loading = true;
             const [portfolioData, holdingsData, analyticsData] =
                 await Promise.all([
-                    portfolioController.getPortfolio(portfolioId),
+                portfolioController.getPortfolio(portfolioId),
                     portfolioController
                         .getHoldings({ portfolio_id: portfolioId })
                         .catch(() => ({
@@ -41,10 +42,10 @@
                     portfolioController
                         .getPortfolioAnalytics({
                             portfolio_id: portfolioId,
-                            timeframe: "1y",
+                            timeframe: "all",
                         })
                         .catch(() => null),
-                ]);
+            ]);
 
             portfolio = portfolioData;
             currentPortfolio.set(portfolioData);
@@ -89,7 +90,7 @@
                             stroke-linejoin="round"
                             stroke-width="2"
                             d="M15 19l-7-7 7-7"
-                        />
+                        ></path>
                     </svg>
                     Portfolios
                 </Button>
@@ -226,9 +227,7 @@
             <Card
                 title="Holdings"
                 subtitle="Current positions in this portfolio"
-            >
-                <HoldingsTable {holdings} />
-            </Card>
+            ><HoldingsTable holdings={holdings} /></Card>
         {/if}
     </div>
 </div>

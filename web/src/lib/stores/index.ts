@@ -1,5 +1,5 @@
 import { writable, derived } from "svelte/store";
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 export interface AuthUser {
     id: string;
@@ -108,20 +108,14 @@ export const userPreferences = writable<UserPreferences>({
 
 export const isLoading = writable(false);
 export const error = writable<string | null>(null);
+export const portfolioCount = derived(portfolios, ($portfolios) => $portfolios.length);
 
-export const portfolioCount = derived(
-    portfolios,
-    ($portfolios) => $portfolios.length,
-);
-
-export const baseCurrency = derived(
-    [currentPortfolio, portfolios],
-    ([$cp, $portfolios]) => {
-        if ($cp?.id && $cp?.base_currency) return $cp.base_currency;
-        // Aggregated view: use the first portfolio's base currency if available
+export const baseCurrency = derived([currentPortfolio, portfolios], ([$cp, $portfolios]) => {
+    if ($cp?.id && $cp?.base_currency) return $cp.base_currency;
+    // Aggregated view: use the first portfolio's base currency if available
         if ($portfolios.length > 0)
             return $portfolios[0].base_currency || "USD";
-        return "USD";
+    return "USD";
     },
 );
 
@@ -155,6 +149,24 @@ function createHideAmountsStore() {
 }
 
 export const hideAmounts = createHideAmountsStore();
+
+// Currency for views that combine portfolios (dashboard, analytics). A single
+// portfolio is always shown in its own base currency.
+function createDisplayCurrencyStore() {
+    const STORAGE_KEY = "folio.displayCurrency";
+    const initial = browser && localStorage.getItem(STORAGE_KEY) || "USD";
+    const { subscribe, set } = writable<string>(initial);
+
+    return {
+        subscribe,
+        set: (value: string) => {
+            if (browser) localStorage.setItem(STORAGE_KEY, value);
+            set(value);
+        },
+    };
+}
+
+export const displayCurrency = createDisplayCurrencyStore();
 
 export const authUser = writable<AuthUser | null>(null);
 export const isAuthenticated = derived(authUser, ($user) => $user !== null);

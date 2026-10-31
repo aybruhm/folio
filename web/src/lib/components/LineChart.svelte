@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { formatCurrency } from "$lib/utils/format";
-    import { hideAmounts } from "$lib/stores";
+    import { formatCurrency } from "#lib/utils/format.js";
+    import { hideAmounts } from "#lib/stores/index.js";
 
     export let data: { name: string; value: number }[] = [];
     export let title: string = "";

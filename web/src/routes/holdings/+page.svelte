@@ -1,21 +1,21 @@
 <script lang="ts">
-    import Card from "$lib/components/Card.svelte";
-    import Skeleton from "$lib/components/Skeleton.svelte";
-    import HoldingsTable from "$lib/components/HoldingsTable.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import Input from "$lib/components/Input.svelte";
-    import Modal from "$lib/components/Modal.svelte";
-    import TradeForm from "$lib/components/TradeForm.svelte";
-    import { currentPortfolio, portfolios } from "$lib/stores";
-    import { api } from "$lib/api/client";
-    import { PortfolioController, TradeController } from "$lib/api/controllers";
-    import type { CreateTradeRequest, Holding } from "$lib/api/types";
+    import Card from "#lib/components/Card.svelte";
+    import Skeleton from "#lib/components/Skeleton.svelte";
+    import HoldingsTable from "#lib/components/HoldingsTable.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import Input from "#lib/components/Input.svelte";
+    import Modal from "#lib/components/Modal.svelte";
+    import TradeForm from "#lib/components/TradeForm.svelte";
+    import { currentPortfolio, portfolios } from "#lib/stores/index.js";
+    import { api } from "#lib/api/client.js";
+    import { PortfolioController, TradeController } from "#lib/api/controllers/index.js";
+    import type { CreateTradeRequest, Holding } from "#lib/api/types/index.js";
     import {
         getCachedHoldings,
         setCachedHoldings,
         invalidatePortfolioHoldings,
-    } from "$lib/cache";
-    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
+    } from "#lib/cache/index.js";
+    import { cacheRefreshCounter } from "#lib/stores/cacheRefresh.js";
     import { onMount } from "svelte";
 
     let loading = true;

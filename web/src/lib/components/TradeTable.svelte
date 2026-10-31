@@ -2,13 +2,13 @@
     import Badge from "./Badge.svelte";
     import Amount from "./Amount.svelte";
     import Tooltip from "./Tooltip.svelte";
-    import { hideAmounts } from "$lib/stores";
+    import { hideAmounts } from "#lib/stores/index.js";
     import {
         formatCurrency,
         formatDateTime,
         formatQuantity,
         formatQuantityShort,
-    } from "$lib/utils/format";
+    } from "#lib/utils/format.js";
     import { createEventDispatcher } from "svelte";
 
     const dispatch = createEventDispatcher();

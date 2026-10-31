@@ -1,9 +1,9 @@
 import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
-import { envUtils } from "@/utils/env";
-import { queueRequest } from "$lib/stores/offline";
-import type { SyncQueueItem } from "$lib/stores/offline";
-import { clearAuthToken, getAuthToken, storeAuthToken } from "$lib/stores/offlineAuth";
+import { envUtils } from "#utils/env.js";
+import { queueRequest } from "#lib/stores/offline.js";
+import type { SyncQueueItem } from "#lib/stores/offline.js";
+import { clearAuthToken, getAuthToken, storeAuthToken } from "#lib/stores/offlineAuth.js";
 import { goto } from "$app/navigation";
 
 const API_BASE_URL = envUtils.getBaseUrl();
