@@ -2,7 +2,7 @@
     import Input from "./Input.svelte";
     import Select from "./Select.svelte";
     import Button from "./Button.svelte";
-    import { CURRENCIES } from "$lib/constants/currencies";
+    import { CURRENCIES } from "#lib/constants/currencies.js";
 
     export let portfolio: {
         name: string;

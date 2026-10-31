@@ -102,6 +102,11 @@ export interface GetAllocationQuery {
     group_by?: string;
 }
 
+export interface AnalyticsSummaryQuery {
+    timeframe?: string;
+    in_currency?: string;
+}
+
 export interface ListPortfolioAnalyticsQuery {
     timeframe?: string;
     in_currency?: string;

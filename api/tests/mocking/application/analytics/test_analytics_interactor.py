@@ -32,6 +32,26 @@ class FakeAssetRepository:
         return self.assets_by_ticker.get(ticker)
 
 
+class FakePriceCache:
+    """In-memory stand-in so tests never wait on a real Valkey connection."""
+
+    def __init__(self, *_args, **_kwargs):
+        self.prices = {}
+        self.fx_rates = {}
+
+    async def get_price(self, ticker):
+        return self.prices.get(ticker)
+
+    async def set_price(self, ticker, price_date, price):
+        self.prices[ticker] = (price_date, price)
+
+    async def get_fx_rate(self, from_ccy, to_ccy):
+        return self.fx_rates.get((from_ccy, to_ccy))
+
+    async def set_fx_rate(self, from_ccy, to_ccy, rate):
+        self.fx_rates[(from_ccy, to_ccy)] = rate
+
+
 class FakePriceRepository:
     def __init__(self, latest=None, history=None):
         self.latest = latest or {}
@@ -171,6 +191,7 @@ def _patch_analytics_deps(
     monkeypatch.setattr(analytics_module, "TiingoAdapter", lambda: tiingo)
     monkeypatch.setattr(analytics_module, "NgnMarketAdapter", lambda: ngnmarket)
     monkeypatch.setattr(analytics_module, "TradingviewAdapter", lambda: tradingview)
+    monkeypatch.setattr(analytics_module, "PriceCache", FakePriceCache)
 
     interactor = analytics_module.AnalyticsInteractor(
         session=object(), portfolio_base_currency=base_currency
@@ -1013,3 +1034,131 @@ async def test_get_holdings_keeps_eight_quantity_decimals(monkeypatch):
     assert holdings[0]["quantity"] == 0.12345677
     # 0.12345677 × $85,000 = $10,493.82545 → floored to cents
     assert holdings[0]["market_value"] == 10493.82
+
+
+def _windowed_stock_portfolio(monkeypatch):
+    """10 AAPL bought 2y ago at $100, 5 more 30 days ago at $150.
+
+    Stored price on the 1y window start is $120; current price is $200.
+    """
+    from datetime import timedelta
+
+    from application.analytics.timeframe import timeframe_start
+
+    today = date.today()
+    window_start = timeframe_start("1y", today)
+    old_buy = today - timedelta(days=730)
+    recent_buy = today - timedelta(days=30)
+
+    portfolio = Portfolio(
+        id=uuid4(), user_id=uuid4(), name="Window", base_currency=Currency.USD
+    )
+    asset = Asset(
+        id=uuid4(),
+        ticker="AAPL",
+        name="Apple",
+        asset_class=AssetClass.STOCK,
+        currency=Currency.USD,
+    )
+    trades = [
+        Trade(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            asset_id=asset.id,
+            ticker="AAPL",
+            trade_type=TradeType.BUY,
+            trade_date=datetime.combine(old_buy, datetime.min.time()),
+            quantity=10 * 100_000_000,
+            price=10000,
+            trade_currency=Currency.USD,
+        ),
+        Trade(
+            id=uuid4(),
+            portfolio_id=portfolio.id,
+            asset_id=asset.id,
+            ticker="AAPL",
+            trade_type=TradeType.BUY,
+            trade_date=datetime.combine(recent_buy, datetime.min.time()),
+            quantity=5 * 100_000_000,
+            price=15000,
+            trade_currency=Currency.USD,
+        ),
+    ]
+    interactor, *_ = _patch_analytics_deps(
+        monkeypatch,
+        trades=trades,
+        assets={asset.id: asset},
+        history={asset.id: [(window_start, 12000)]},
+        yfinance_price=20000,
+        ngnmarket_chart=False,
+    )
+    return interactor, portfolio, window_start, old_buy, recent_buy
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_get_performance_inputs_uses_window_start_value_and_later_flows(
+    monkeypatch,
+):
+    interactor, portfolio, window_start, _old_buy, recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+
+    inputs = await interactor.get_performance_inputs(portfolio.id, window_start)
+
+    assert inputs.start_date == window_start
+    assert inputs.beginning_value == 1200.0  # 10 × $120 on the window start
+    assert inputs.cash_flows == [(recent_buy, 750.0)]  # only the in-window buy
+    assert inputs.ending_value == 3000.0  # 15 × $200 today
+
+
+@pytest.mark.asyncio
+@pytest.mark.edge_case
+async def test_get_performance_inputs_without_window_is_all_time(monkeypatch):
+    interactor, portfolio, _window_start, old_buy, recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+
+    inputs = await interactor.get_performance_inputs(portfolio.id)
+    before_first_trade = await interactor.get_performance_inputs(
+        portfolio.id, date(2000, 1, 1)
+    )
+
+    assert inputs.start_date == old_buy
+    assert inputs.beginning_value == 0.0
+    assert inputs.cash_flows == [(old_buy, 1000.0), (recent_buy, 750.0)]
+    assert before_first_trade == inputs
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_get_performance_history_starts_at_timeframe_window(monkeypatch):
+    interactor, portfolio, window_start, old_buy, _recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+
+    one_year = await interactor.get_performance_history(portfolio.id, "1y")
+    all_time = await interactor.get_performance_history(portfolio.id, "all")
+
+    assert one_year[0]["name"] == window_start.strftime("%b %Y")
+    assert all_time[0]["name"] == old_buy.strftime("%b %Y")
+    assert len(all_time) > len(one_year)
+    # Both end at today's real holdings value.
+    assert one_year[-1]["value"] == all_time[-1]["value"] == 3000.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_get_contribution_history_respects_start_date(monkeypatch):
+    interactor, portfolio, window_start, old_buy, recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+
+    windowed = await interactor.get_contribution_history(portfolio.id, window_start)
+    all_time = await interactor.get_contribution_history(portfolio.id)
+
+    assert [p["name"] for p in windowed] == [recent_buy.strftime("%b %Y")]
+    assert {p["name"] for p in all_time} == {
+        old_buy.strftime("%b %Y"),
+        recent_buy.strftime("%b %Y"),
+    }

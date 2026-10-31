@@ -1,6 +1,6 @@
-import { idbGet, idbSet } from '$lib/stores/idb';
+import { idbGet, idbSet } from '#lib/stores/idb.js';
 import { CACHE_TTL } from './ttl';
-import type { GetBatchPriceHistoryResponse } from '$lib/api/types';
+import type { GetBatchPriceHistoryResponse } from '#lib/api/types/index.js';
 
 export async function getCachedBatchPriceHistory(
   key: string,

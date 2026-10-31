@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from '$lib/utils/cn'
+  import { cn } from '#lib/utils/cn.js'
 
   export let columns: { key: string; label: string; sortable?: boolean }[] = []
   export let rows: Record<string, unknown>[] = []

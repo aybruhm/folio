@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from '$lib/utils/cn'
+  import { cn } from '#lib/utils/cn.js'
 
   export let variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' = 'default'
   export let size: 'default' | 'sm' | 'lg' | 'icon' = 'default'

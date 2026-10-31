@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { offlineStore } from "$lib/stores/offline";
+    import { offlineStore } from "#lib/stores/offline.js";
 </script>
 
 {#if !$offlineStore.isOnline}

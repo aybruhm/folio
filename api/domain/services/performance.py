@@ -1,5 +1,50 @@
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import date
-from typing import List, Optional, Tuple
+from typing import Optional
+
+
+@dataclass
+class PerformanceInputs:
+    beginning_value: float
+    ending_value: float
+    start_date: date
+    end_date: date
+    cash_flows: list[tuple[date, float]] = field(default_factory=list)
+
+    def scaled(self, factor: float) -> "PerformanceInputs":
+        return PerformanceInputs(
+            beginning_value=self.beginning_value * factor,
+            ending_value=self.ending_value * factor,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            cash_flows=[(d, amount * factor) for d, amount in self.cash_flows],
+        )
+
+    def converted(
+        self, factor_on: Callable[[date], float], ending_factor: float
+    ) -> "PerformanceInputs":
+        # Amounts at the FX factor of their own date; the ending value is
+        # today's holdings, so it takes today's factor.
+        return PerformanceInputs(
+            beginning_value=self.beginning_value * factor_on(self.start_date),
+            ending_value=self.ending_value * ending_factor,
+            start_date=self.start_date,
+            end_date=self.end_date,
+            cash_flows=[(d, amount * factor_on(d)) for d, amount in self.cash_flows],
+        )
+
+    @staticmethod
+    def combine(inputs: list["PerformanceInputs"]) -> Optional["PerformanceInputs"]:
+        if not inputs:
+            return None
+        return PerformanceInputs(
+            beginning_value=sum(i.beginning_value for i in inputs),
+            ending_value=sum(i.ending_value for i in inputs),
+            start_date=min(i.start_date for i in inputs),
+            end_date=max(i.end_date for i in inputs),
+            cash_flows=[flow for i in inputs for flow in i.cash_flows],
+        )
 
 
 class PerformanceService:
@@ -7,7 +52,7 @@ class PerformanceService:
     def calculate_twr(
         beginning_value: float,
         ending_value: float,
-        cash_flows: List[Tuple[date, float]],
+        cash_flows: list[tuple[date, float]],
         start_date: date,
         end_date: date,
     ) -> float:
@@ -44,7 +89,7 @@ class PerformanceService:
     def calculate_mwr(
         beginning_value: float,
         ending_value: float,
-        cash_flows: List[Tuple[date, float]],
+        cash_flows: list[tuple[date, float]],
         start_date: date,
         end_date: date,
     ) -> float:
@@ -92,10 +137,39 @@ class PerformanceService:
             )
         return rate
 
+    @staticmethod
+    def summarize(inputs: PerformanceInputs | None = None) -> dict:
+        """TWR and MWR as percent strings, the shape the API returns."""
+        if inputs is None:
+            return {"twr": "0", "mwr": "0"}
+
+        args = (
+            inputs.beginning_value,
+            inputs.ending_value,
+            inputs.cash_flows,
+            inputs.start_date,
+            inputs.end_date,
+        )
+        twr_percent = round(PerformanceService.calculate_twr(*args) * 100, 2)
+        mwr_percent = round(PerformanceService.calculate_mwr(*args) * 100, 2)
+
+        # Avoid returning "-0.0" in API responses.
+        if abs(twr_percent) == 0:
+            twr_percent = 0.0
+        if abs(mwr_percent) == 0:
+            mwr_percent = 0.0
+
+        return {
+            "twr": str(twr_percent),
+            "mwr": str(mwr_percent),
+            "start_date": inputs.start_date.isoformat(),
+            "end_date": inputs.end_date.isoformat(),
+        }
+
 
 class AllocationService:
     @staticmethod
-    def group_by_attribute(holdings: List[dict], attribute: str) -> List[dict]:
+    def group_by_attribute(holdings: list[dict], attribute: str) -> list[dict]:
         """
         Group holdings by specified attribute.
         Returns list of {name, value, weight_percent}
@@ -194,7 +268,7 @@ class FIREService:
         target_value: float,
         monthly_savings: float,
         target_months: int,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Calculate required annual return to hit target given current savings.
         Uses Newton-Raphson approximation.

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { hideAmounts } from "$lib/stores";
+    import { hideAmounts } from "#lib/stores/index.js";
 
     export let data: { label: string; value: number }[] = [];
     export let title: string = "";

@@ -5,7 +5,7 @@
         formatCurrency,
         formatQuantity,
         formatPercent,
-    } from "$lib/utils/format";
+    } from "#lib/utils/format.js";
     import { createEventDispatcher } from "svelte";
 
     const dispatch = createEventDispatcher();

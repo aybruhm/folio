@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 import yfinance as yf
 
 from adapters.outbound.market_data.price_cache import PriceCache
+from adapters.outbound.market_data.yfinance_closes import last_close, valid_closes
 from domain.ports.outbound.repositories import IAssetPricePort, IFxRatePort
 from domain.value_objects.money import AssetMetadata, Currency
 
@@ -31,13 +32,14 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         try:
             t = yf.Ticker(ticker)
             data = t.history(start=start, end=end)
-            if data.empty:
+            closes = valid_closes(data)
+            if closes.empty:
                 logger.warning("yfinance: no price history returned for %s (%s → %s)", ticker, start, end)
                 return []
 
             result = [
-                (idx.date(), round(float(row["Close"]) * 100))
-                for idx, row in data.iterrows()
+                (idx.date(), round(float(close) * 100))
+                for idx, close in closes.items()
             ]
             logger.info("yfinance: price history OK for %s — %d data points", ticker, len(result))
             return result
@@ -55,13 +57,14 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         try:
             t = yf.Ticker(ticker)
             data = t.history(period="1d")
-            if data.empty:
+            closes = valid_closes(data)
+            if closes.empty:
                 logger.warning("yfinance: no current price returned for %s", ticker)
                 await self.cache.set_price(ticker, date.today(), 0)
                 return (date.today(), 0)
 
-            price_date = data.index[-1].date()
-            close = round(float(data["Close"].iloc[-1]) * 100)
+            price_date = closes.index[-1].date()
+            close = round(float(closes.iloc[-1]) * 100)
             logger.info("yfinance: current price OK for %s — %.2f on %s", ticker, close / 100, price_date)
 
             await self.cache.set_price(ticker, price_date, close)
@@ -140,14 +143,15 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             t = yf.Ticker(ticker)
             data = t.history(start=on_date, end=on_date + timedelta(days=1))
 
-            if data.empty:
+            close = last_close(data)
+            if close is None:
                 logger.warning(
                     "yfinance: no historical FX rate returned for %s/%s on %s",
                     from_currency.value, to_currency.value, on_date,
                 )
                 return None
 
-            rate = round(float(data["Close"].iloc[-1]) * 100)
+            rate = round(close * 100)
             logger.info(
                 "yfinance: historical FX rate OK for %s/%s on %s — %.4f",
                 from_currency.value, to_currency.value, on_date, rate / 100,
@@ -183,14 +187,15 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             t = yf.Ticker(ticker)
             data = t.history(period="1d")
 
-            if data.empty:
+            close = last_close(data)
+            if close is None:
                 logger.warning(
                     "yfinance: no current FX rate returned for %s/%s",
                     from_currency.value, to_currency.value,
                 )
                 return None
 
-            rate = round(float(data["Close"].iloc[-1]) * 100)
+            rate = round(close * 100)
             logger.info(
                 "yfinance: current FX rate OK for %s/%s — %.4f",
                 from_currency.value, to_currency.value, rate / 100,

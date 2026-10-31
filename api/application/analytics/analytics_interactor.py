@@ -1,5 +1,4 @@
-from datetime import date, timedelta
-from typing import List, Optional
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,12 +9,14 @@ from adapters.outbound.market_data.price_cache import PriceCache
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from adapters.outbound.market_data.yfinance_closes import last_close
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from adapters.outbound.persistence.price_repository import (
     FxRateRepository,
     PriceHistoryRepository,
 )
 from adapters.outbound.persistence.trade_repository import TradeRepository
+from application.analytics.timeframe import timeframe_start
 from domain.ports.inbound.use_cases import IAnalyticsUseCase
 from domain.ports.outbound.repositories import (
     IAssetRepository,
@@ -23,8 +24,17 @@ from domain.ports.outbound.repositories import (
     IPriceHistoryRepository,
     ITradeRepository,
 )
-from domain.services.performance import AllocationService, PerformanceService
+from domain.services.performance import (
+    AllocationService,
+    PerformanceInputs,
+    PerformanceService,
+)
 from domain.value_objects.money import QUANTITY_SCALE, Currency
+
+
+def _trade_day(trade) -> date:
+    trade_date = trade.trade_date
+    return trade_date.date() if hasattr(trade_date, "date") else trade_date
 
 
 class AnalyticsInteractor(IAnalyticsUseCase):
@@ -74,7 +84,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         return await self.yfinance.get_current_price(symbol)
 
     async def _resolve_price(
-        self, asset_id: UUID, ticker: str, provider_hint: Optional[str] = None
+        self, asset_id: UUID, ticker: str, provider_hint: str | None = None
     ) -> int:
         asset = await self.asset_repo.get_by_id(asset_id)
         symbol = ticker.upper()
@@ -146,11 +156,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             ticker = f"{frm}{to}=X"
             try:
                 t = factory(ticker)
-                data = t.history(period="1d")
-                if data.empty:
-                    return 0
-                close = float(data["Close"].iloc[-1])
-                return round(close * 100)
+                close = last_close(t.history(period="1d"))
+                return round(close * 100) if close is not None else 0
             except Exception:
                 return 0
 
@@ -183,8 +190,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         return (amount * rate) // 100
 
     async def get_holdings(
-        self, portfolio_id: UUID, in_currency: Optional[Currency] = None
-    ) -> List[dict]:
+        self, portfolio_id: UUID, in_currency: Currency | None = None
+    ) -> list[dict]:
         trades, _ = await self.trade_repo.list_by_portfolio(
             portfolio_id, skip=0, limit=10000
         )
@@ -332,96 +339,81 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
         return result
 
-    async def calculate_performance(
+    async def get_performance_inputs(
         self,
         portfolio_id: UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-    ) -> dict:
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> PerformanceInputs | None:
+        """TWR/MWR inputs in the base currency, or None without trades.
+
+        With *start_date*, the beginning value is the portfolio's value at the
+        end of that day and only later flows count. A *start_date* on or
+        before the first trade means all-time.
+        """
         trades, _ = await self.trade_repo.list_by_portfolio(
             portfolio_id, skip=0, limit=10000
         )
-
         if not trades:
-            return {"twr": "0", "mwr": "0"}
+            return None
 
-        trades = sorted(
-            trades,
-            key=lambda t: (
-                t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
-            ),
+        trades_sorted = sorted(trades, key=_trade_day)
+        first_trade_date = _trade_day(trades_sorted[0])
+        window_start = (
+            start_date if start_date and start_date > first_trade_date else None
         )
 
         cash_flows = []
-        for t in trades:
-            if t.trade_type.value in ["buy", "sell"]:
-                trade_date = (
-                    t.trade_date.date()
-                    if hasattr(t.trade_date, "date")
-                    else t.trade_date
-                )
-                # Trade value in trade currency (×100 int)
-                trade_value_int = (t.quantity * t.price) // QUANTITY_SCALE + t.fees
-                # Convert to base currency
-                converted = await self._convert_amount(
-                    trade_value_int,
-                    t.trade_currency.value,
-                    self.base_currency.value,
-                )
-                amount = converted / 100
+        for t in trades_sorted:
+            if t.trade_type.value not in ["buy", "sell"]:
+                continue
+            trade_date = _trade_day(t)
+            if window_start and trade_date <= window_start:
+                continue
+            # Trade value in trade currency (×100 int)
+            trade_value_int = (t.quantity * t.price) // QUANTITY_SCALE + t.fees
+            # Convert to base currency
+            converted = await self._convert_amount(
+                trade_value_int,
+                t.trade_currency.value,
+                self.base_currency.value,
+            )
+            amount = converted / 100
 
-                if t.trade_type.value == "buy":
-                    cash_flows.append((trade_date, amount))
-                else:
-                    cash_flows.append((trade_date, -amount))
+            if t.trade_type.value == "buy":
+                cash_flows.append((trade_date, amount))
+            else:
+                cash_flows.append((trade_date, -amount))
+
+        beginning_value = 0.0
+        if window_start:
+            [beginning_value] = await self._portfolio_values_on(
+                trades_sorted, [window_start]
+            )
 
         holdings = await self.get_holdings(portfolio_id)
-        beginning_value = 0.0
         ending_value = sum(h["market_value"] for h in holdings)
 
-        first_trade_date = trades[0].trade_date
-        first_trade_date = (
-            first_trade_date.date()
-            if hasattr(first_trade_date, "date")
-            else first_trade_date
-        )
-        actual_start = start_date or first_trade_date
-        actual_end = end_date or date.today()
-
-        twr = PerformanceService.calculate_twr(
-            beginning_value,
-            ending_value,
-            cash_flows,
-            actual_start,
-            actual_end,
-        )
-        mwr = PerformanceService.calculate_mwr(
-            beginning_value,
-            ending_value,
-            cash_flows,
-            actual_start,
-            actual_end,
+        return PerformanceInputs(
+            beginning_value=beginning_value,
+            ending_value=ending_value,
+            start_date=window_start or first_trade_date,
+            end_date=end_date or date.today(),
+            cash_flows=cash_flows,
         )
 
-        twr_percent = round(twr * 100, 2)
-        mwr_percent = round(mwr * 100, 2)
-
-        # Avoid returning "-0.0" in API responses.
-        if abs(twr_percent) == 0:
-            twr_percent = 0.0
-        if abs(mwr_percent) == 0:
-            mwr_percent = 0.0
-
-        return {
-            "twr": str(twr_percent),
-            "mwr": str(mwr_percent),
-            "start_date": actual_start.isoformat(),
-            "end_date": actual_end.isoformat(),
-        }
+    async def calculate_performance(
+        self,
+        portfolio_id: UUID,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
+        inputs = await self.get_performance_inputs(portfolio_id, start_date, end_date)
+        return PerformanceService.summarize(inputs)
 
     async def get_allocation(
         self, portfolio_id: UUID, group_by: str = "asset_class"
-    ) -> List[dict]:
+    ) -> list[dict]:
         holdings = await self.get_holdings(portfolio_id)
 
         asset_classes = {}
@@ -450,41 +442,15 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             for item in allocation
         ]
 
-    async def get_performance_history(
-        self, portfolio_id: UUID, timeframe: str = "1y"
-    ) -> List[dict]:
-        trades, _ = await self.trade_repo.list_by_portfolio(
-            portfolio_id, skip=0, limit=10000
-        )
-        if not trades:
-            return []
+    async def _portfolio_values_on(
+        self, trades_sorted: list, sample_dates: list[date]
+    ) -> list[float]:
+        """Portfolio value in the base currency at the end of each sample date.
 
-        trades_sorted = sorted(
-            trades,
-            key=lambda t: (
-                t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
-            ),
-        )
-        first_date = (
-            trades_sorted[0].trade_date.date()
-            if hasattr(trades_sorted[0].trade_date, "date")
-            else trades_sorted[0].trade_date
-        )
-        end_date = date.today()
-
-        # Monthly sample points from first trade month-end to today
-        sample_dates: List[date] = []
-        month_start = first_date.replace(day=1)
-        while month_start <= end_date:
-            next_month_start = (
-                month_start.replace(day=28) + timedelta(days=4)
-            ).replace(day=1)
-            month_end = next_month_start - timedelta(days=1)
-            sample_dates.append(min(month_end, end_date))
-            month_start = next_month_start
-
-        if sample_dates[-1] != end_date:
-            sample_dates.append(end_date)
+        *trades_sorted* must be non-empty and sorted by trade date.
+        """
+        first_date = _trade_day(trades_sorted[0])
+        end_date = max(max(sample_dates), first_date)
 
         # Fetch stored price history for every asset in one pass
         asset_ids = {t.asset_id: t.ticker for t in trades_sorted}
@@ -529,7 +495,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 d -= timedelta(days=1)
             return 0
 
-        result = []
+        values: list[float] = []
         for sample_date in sample_dates:
             positions: dict = {}
             last_trade_price: dict = {}
@@ -600,6 +566,47 @@ class AnalyticsInteractor(IAnalyticsUseCase):
                 )
                 portfolio_value += converted / 100
 
+            values.append(portfolio_value)
+
+        return values
+
+    async def get_performance_history(
+        self, portfolio_id: UUID, timeframe: str = "all"
+    ) -> list[dict]:
+        trades, _ = await self.trade_repo.list_by_portfolio(
+            portfolio_id, skip=0, limit=10000
+        )
+        if not trades:
+            return []
+
+        trades_sorted = sorted(trades, key=_trade_day)
+        first_date = _trade_day(trades_sorted[0])
+        end_date = date.today()
+
+        window_start = timeframe_start(timeframe, end_date)
+        if not window_start or window_start < first_date:
+            window_start = first_date
+
+        # The window's opening value, then month-end samples up to today
+        sample_dates: list[date] = [window_start]
+        month_start = window_start.replace(day=1)
+        while month_start <= end_date:
+            next_month_start = (
+                month_start.replace(day=28) + timedelta(days=4)
+            ).replace(day=1)
+            month_end = next_month_start - timedelta(days=1)
+            sample = min(month_end, end_date)
+            if sample > window_start:
+                sample_dates.append(sample)
+            month_start = next_month_start
+
+        if sample_dates[-1] != end_date:
+            sample_dates.append(end_date)
+
+        values = await self._portfolio_values_on(trades_sorted, sample_dates)
+
+        result = []
+        for sample_date, portfolio_value in zip(sample_dates, values):
             label = sample_date.strftime("%b %Y")
             point = {"name": label, "value": round(portfolio_value, 2)}
             if result and result[-1]["name"] == label:
@@ -618,7 +625,10 @@ class AnalyticsInteractor(IAnalyticsUseCase):
 
         return result
 
-    async def get_contribution_history(self, portfolio_id: UUID) -> List[dict]:
+    async def get_contribution_history(
+        self, portfolio_id: UUID, start_date: date | None = None
+    ) -> list[dict]:
+        """Net buys minus sells per month; only months after *start_date*."""
         trades, _ = await self.trade_repo.list_by_portfolio(
             portfolio_id, skip=0, limit=10000
         )
@@ -629,9 +639,9 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         for t in trades:
             if t.trade_type.value not in ("buy", "sell"):
                 continue
-            t_date = (
-                t.trade_date.date() if hasattr(t.trade_date, "date") else t.trade_date
-            )
+            t_date = _trade_day(t)
+            if start_date and t_date <= start_date:
+                continue
             key = t_date.strftime("%b %Y")
             # Trade value in trade currency (×100 int)
             trade_value_int = (t.quantity * t.price) // QUANTITY_SCALE
@@ -647,15 +657,12 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             else:
                 monthly[key] = monthly.get(key, 0.0) - amount
 
-        # Sort chronologically
-        from datetime import datetime
-
         return sorted(
             [{"name": k, "value": round(v, 2)} for k, v in monthly.items()],
             key=lambda x: datetime.strptime(x["name"], "%b %Y"),
         )
 
-    async def get_sector_breakdown(self, portfolio_id: UUID) -> List[dict]:
+    async def get_sector_breakdown(self, portfolio_id: UUID) -> list[dict]:
         holdings = await self.get_holdings(portfolio_id)
 
         sectors: dict = {}
@@ -673,8 +680,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
     async def get_benchmark_comparison(
         self,
         portfolio_id: UUID,
-        benchmark_tickers: List[str],
-        start_date: Optional[date] = None,
+        benchmark_tickers: list[str],
+        start_date: date | None = None,
     ) -> dict:
         portfolio_perf = await self.calculate_performance(portfolio_id, start_date)
 

@@ -13,6 +13,7 @@ from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from adapters.outbound.market_data.yfinance_closes import valid_closes
 from adapters.outbound.persistence.asset_repository import AssetRepository
 from domain.value_objects.money import Currency
 from infrastructure.db.session import get_session
@@ -61,21 +62,21 @@ async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date,
 
     try:
         t = yf.Ticker(f"{from_ccy}USD=X")
-        data = t.history(start=start, end=end)
-        if not data.empty:
+        closes = valid_closes(t.history(start=start, end=end))
+        if not closes.empty:
             return {
-                idx.date(): round(float(row["Close"]) * 100)
-                for idx, row in data.iterrows()
+                idx.date(): round(float(close) * 100)
+                for idx, close in closes.items()
             }
     except Exception:
         pass
     try:
         t = yf.Ticker(f"USD{from_ccy}=X")
-        data = t.history(start=start, end=end)
-        if not data.empty:
+        closes = valid_closes(t.history(start=start, end=end))
+        if not closes.empty:
             return {
-                idx.date(): -round(float(row["Close"]) * 100)
-                for idx, row in data.iterrows()
+                idx.date(): -round(float(close) * 100)
+                for idx, close in closes.items()
             }
     except Exception:
         pass

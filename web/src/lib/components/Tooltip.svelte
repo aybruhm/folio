@@ -1,6 +1,8 @@
 <script lang="ts">
   export let text: string = ''
   export let position: 'top' | 'bottom' | 'left' | 'right' = 'top'
+  // Let long text wrap instead of staying on one line.
+  export let wrap = false
 
   let showTooltip = false
 
@@ -16,13 +18,17 @@
   <div
     on:mouseenter={() => (showTooltip = true)}
     on:mouseleave={() => (showTooltip = false)}
+    on:focusin={() => (showTooltip = true)}
+    on:focusout={() => (showTooltip = false)}
   >
     <slot />
   </div>
 
   {#if showTooltip && text}
     <div
-      class="absolute bg-gray-900 dark:bg-gray-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 {positionClasses[position]}"
+      class="absolute bg-gray-900 dark:bg-gray-700 text-white text-xs rounded px-2 py-1 z-10 {wrap
+        ? 'w-64 whitespace-normal'
+        : 'whitespace-nowrap'} {positionClasses[position]}"
     >
       {text}
     </div>

@@ -1,6 +1,10 @@
-import { idbGet, idbSet, idbInvalidateByPrefix, idbClearStore } from '$lib/stores/idb';
+import { idbGet, idbSet, idbInvalidateByPrefix, idbClearStore } from '#lib/stores/idb.js';
 import { CACHE_TTL } from './ttl';
-import type { GetPortfolioAnalyticsResponse, ListPortfolioAnalyticsResponse } from '$lib/api/types';
+import type {
+  AnalyticsSummaryResponse,
+  GetPortfolioAnalyticsResponse,
+  ListPortfolioAnalyticsResponse,
+} from '#lib/api/types/index.js';
 
 export async function getCachedAnalytics(
   portfolioId: string,
@@ -30,6 +34,21 @@ export async function setCachedListAnalytics(
   data: ListPortfolioAnalyticsResponse,
 ): Promise<void> {
   return idbSet('analytics', `list_${timeframe}_${currency}`, data, CACHE_TTL.MARKET_DATA);
+}
+
+export async function getCachedAnalyticsSummary(
+  timeframe: string,
+  currency: string,
+): Promise<AnalyticsSummaryResponse | null> {
+  return idbGet<AnalyticsSummaryResponse>('analytics', `summary_${timeframe}_${currency}`);
+}
+
+export async function setCachedAnalyticsSummary(
+  timeframe: string,
+  currency: string,
+  data: AnalyticsSummaryResponse,
+): Promise<void> {
+  return idbSet('analytics', `summary_${timeframe}_${currency}`, data, CACHE_TTL.MARKET_DATA);
 }
 
 export async function invalidatePortfolioAnalytics(portfolioId: string): Promise<void> {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from '$lib/utils/cn'
+  import { cn } from '#lib/utils/cn.js'
   import Button from './Button.svelte'
 
   export let open = false

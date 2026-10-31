@@ -1,16 +1,16 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { page } from "$app/stores";
-    import { api } from "$lib/api/client";
-    import { authUser } from "$lib/stores";
-    import { env } from "$env/dynamic/public";
+    import { page } from '$app/state';
+    import { api } from "#lib/api/client.js";
+    import { authUser } from "#lib/stores/index.js";
+    import { PUBLIC_ENABLE_REGISTRATION } from '$app/env/public';
 
     let email = "";
     let password = "";
     let errorMessage = "";
     let isSubmitting = false;
 
-    const registrationEnabled = env.PUBLIC_ENABLE_REGISTRATION !== "false";
+    const registrationEnabled = PUBLIC_ENABLE_REGISTRATION !== "false";
 
     async function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
@@ -23,8 +23,13 @@
                 { email, password },
             );
             authUser.set(user);
-            const redirectTo = $page.url.searchParams.get("redirect") ?? "/";
-            await goto(redirectTo);
+            const requested = page.url.searchParams.get("redirect") ?? "/";
+            // Same-site paths only; goto() rejects anything that isn't a route.
+            const redirectTo =
+                requested.startsWith("/") && !requested.startsWith("//")
+                    ? requested
+                    : "/";
+            await goto(redirectTo).catch(() => goto("/"));
         } catch {
             errorMessage = "Invalid email or password. Please try again.";
             password = "";
@@ -44,12 +49,42 @@
     <div class="w-full max-w-sm animate-in">
         <!-- Brand -->
         <div class="text-center mb-10">
-            <div class="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-accent/15 border border-accent/30 mb-5">
-                <svg class="h-6 w-6 text-accent" viewBox="0 0 16 16" fill="currentColor">
-                    <rect x="1" y="1" width="6" height="6" rx="1" />
-                    <rect x="9" y="1" width="6" height="6" rx="1" opacity="0.6" />
-                    <rect x="1" y="9" width="6" height="6" rx="1" opacity="0.6" />
-                    <rect x="9" y="9" width="6" height="6" rx="1" opacity="0.3" />
+            <div
+                class="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-accent/15 border border-accent/30 mb-5"
+            >
+                <svg
+                    class="h-6 w-6 text-accent"
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                >
+                    <rect x="1" y="1" width="6" height="6" rx="1"></rect>
+
+                    <rect
+                        x="9"
+                        y="1"
+                        width="6"
+                        height="6"
+                        rx="1"
+                        opacity="0.6"
+                    ></rect>
+
+                    <rect
+                        x="1"
+                        y="9"
+                        width="6"
+                        height="6"
+                        rx="1"
+                        opacity="0.6"
+                    ></rect>
+
+                    <rect
+                        x="9"
+                        y="9"
+                        width="6"
+                        height="6"
+                        rx="1"
+                        opacity="0.3"
+                    ></rect>
                 </svg>
             </div>
             <h1 class="font-serif text-4xl text-foreground mb-2">Folio</h1>

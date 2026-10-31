@@ -1,20 +1,20 @@
 <script lang="ts">
-    import Card from "$lib/components/Card.svelte";
-    import Skeleton from "$lib/components/Skeleton.svelte";
-    import Button from "$lib/components/Button.svelte";
-    import Modal from "$lib/components/Modal.svelte";
-    import GoalForm from "$lib/components/GoalForm.svelte";
-    import Badge from "$lib/components/Badge.svelte";
-    import Amount from "$lib/components/Amount.svelte";
-    import { currentPortfolio } from "$lib/stores";
-    import { api } from "$lib/api/client";
-    import { PortfolioController, GoalController } from "$lib/api/controllers";
-    import type { CreateGoalRequest, Goal, Currency } from "$lib/api/types";
+    import Card from "#lib/components/Card.svelte";
+    import Skeleton from "#lib/components/Skeleton.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import Modal from "#lib/components/Modal.svelte";
+    import GoalForm from "#lib/components/GoalForm.svelte";
+    import Badge from "#lib/components/Badge.svelte";
+    import Amount from "#lib/components/Amount.svelte";
+    import { currentPortfolio } from "#lib/stores/index.js";
+    import { api } from "#lib/api/client.js";
+    import { PortfolioController, GoalController } from "#lib/api/controllers/index.js";
+    import type { CreateGoalRequest, Goal, Currency } from "#lib/api/types/index.js";
     import {
         formatCurrency,
         formatDate,
         getMonthsFromNow,
-    } from "$lib/utils/format";
+    } from "#lib/utils/format.js";
     import { onMount } from "svelte";
 
     type GoalFormData = {

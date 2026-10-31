@@ -1,29 +1,31 @@
 <script lang="ts">
-    import Card from "$lib/components/Card.svelte";
-    import Skeleton from "$lib/components/Skeleton.svelte";
-    import LineChart from "$lib/components/LineChart.svelte";
-    import DonutChart from "$lib/components/DonutChart.svelte";
-    import Amount from "$lib/components/Amount.svelte";
-    import { formatCurrency, formatPercent } from "$lib/utils/format";
-    import { api } from "$lib/api/client";
-    import { PortfolioController, AssetController } from "$lib/api/controllers";
-    import type { PortfolioStats } from "$lib/api/types";
+    import Card from "#lib/components/Card.svelte";
+    import Skeleton from "#lib/components/Skeleton.svelte";
+    import LineChart from "#lib/components/LineChart.svelte";
+    import BarChart from "#lib/components/BarChart.svelte";
+    import DonutChart from "#lib/components/DonutChart.svelte";
+    import Amount from "#lib/components/Amount.svelte";
+    import Button from "#lib/components/Button.svelte";
+    import Select from "#lib/components/Select.svelte";
+    import StatCard from "#lib/components/StatCard.svelte";
+    import ErrorState from "#lib/components/ErrorState.svelte";
+    import { formatCurrency, formatPercent } from "#lib/utils/format.js";
+    import { api } from "#lib/api/client.js";
+    import { PortfolioController, AssetController } from "#lib/api/controllers/index.js";
+    import type { PortfolioStats } from "#lib/api/types/index.js";
     import {
-        getCachedListAnalytics,
-        setCachedListAnalytics,
+        getCachedAnalytics,
+        setCachedAnalytics,
+        getCachedAnalyticsSummary,
+        setCachedAnalyticsSummary,
         getCachedBatchPriceHistory,
         setCachedBatchPriceHistory,
         buildBatchPriceHistoryKey,
-    } from "$lib/cache";
-    import { cacheRefreshCounter } from "$lib/stores/cacheRefresh";
+    } from "#lib/cache/index.js";
+    import { CURRENCIES } from "#lib/constants/currencies.js";
+    import { cacheRefreshCounter } from "#lib/stores/cacheRefresh.js";
+    import { currentPortfolio, displayCurrency } from "#lib/stores/index.js";
     import { onMount } from "svelte";
-
-    let loading = true;
-    let fabOpen = false;
-    let portfolioController: PortfolioController;
-    let assetController: AssetController;
-    let performanceLoading = false;
-    let performanceHoldings: PerformanceHolding[] = [];
 
     interface PerformanceHolding {
         ticker: string;
@@ -32,11 +34,11 @@
         percent: number;
         currentPrice: number | null;
         dayChange: number | null;
-        weekAvg: number | null;
-        monthAvg: number | null;
+        weekChange: number | null;
         monthChange: number | null;
     }
-    let stats: PortfolioStats = {
+
+    const EMPTY_STATS: PortfolioStats = {
         id: "",
         current_value: 0,
         cost_basis: 0,
@@ -48,208 +50,204 @@
         top_holdings: [],
     };
 
-    $: topHoldingsChart =
-        stats.top_holdings?.map((h) => ({
-            label: h.ticker,
-            value: Number(h.percent),
-        })) ?? [];
+    const currencyOptions = CURRENCIES.map((c) => ({
+        label: c.value,
+        value: c.value,
+    }));
 
-    const monthOrder = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-    ];
+    let loading = true;
+    let loadError: string | null = null;
+    let fabOpen = false;
+    let portfolioController: PortfolioController;
+    let assetController: AssetController;
+    let stats: PortfolioStats = EMPTY_STATS;
+    // Currency the loaded figures are in; holdings prices are always USD.
+    let currency = "USD";
+    let portfolioCount = 0;
+    let excludedCount = 0;
 
-    const getTimeFromLabel = (label: string) => {
-        const trimmed = label.trim();
-        const isoTime = Date.parse(trimmed);
-        if (!Number.isNaN(isoTime)) return isoTime;
+    let performanceLoading = false;
+    let performanceError = false;
+    let performanceHoldings: PerformanceHolding[] = [];
+    let pricesAsOf: string | null = null;
+    // Guard against an older response overwriting a newer one.
+    let dashboardRequestId = 0;
+    let performanceRequestId = 0;
 
-        const parts = trimmed.split(" ");
-        if (parts.length >= 2) {
-            const monthIndex = monthOrder.indexOf(parts[0]);
-            const year = Number(parts[1]);
-            if (monthIndex >= 0 && !Number.isNaN(year)) {
-                return new Date(year, monthIndex, 1).getTime();
-            }
-        }
-
-        return 0;
-    };
-
+    let lastLoadKey = "";
     let lastRefreshCount = 0;
 
-    onMount(async () => {
+    let currencyChoice = $displayCurrency;
+    $: if (currencyChoice !== $displayCurrency) displayCurrency.set(currencyChoice);
+
+    $: isAggregated = !$currentPortfolio?.id;
+    $: isPositive = Number(stats.gain_loss) >= 0;
+    $: hasActivity =
+        Number(stats.current_value) > 0 ||
+        (stats.performance_history?.length ?? 0) > 0 ||
+        (stats.contribution_history?.length ?? 0) > 0;
+
+    // Top positions, plus an "Other" slice so each slice keeps its real share.
+    $: topHoldingsChart = (() => {
+        const slices = (stats.top_holdings ?? []).map((h) => ({
+            label: h.ticker,
+            value: Number(h.percent),
+        }));
+        const rest = 100 - slices.reduce((sum, s) => sum + s.value, 0);
+        if (slices.length > 0 && rest >= 0.1) {
+            slices.push({ label: "Other", value: Math.round(rest * 100) / 100 });
+        }
+        return slices;
+    })();
+
+    $: contributionChart = (stats.contribution_history ?? []).map((d) => ({
+        label: d.name,
+        value: d.value,
+    }));
+
+    onMount(() => {
         portfolioController = new PortfolioController(api.getInstance());
         assetController = new AssetController(api.getInstance());
-        await loadDashboardData(false);
     });
 
-    $: if ($cacheRefreshCounter > lastRefreshCount && portfolioController) {
+    // Reload when the selected portfolio, display currency or refresh changes.
+    $: loadKey = portfolioController
+        ? `${$cacheRefreshCounter}:${$currentPortfolio?.id || "all"}:${$displayCurrency}`
+        : "";
+
+    $: if (loadKey && loadKey !== lastLoadKey) {
+        lastLoadKey = loadKey;
+        const force = $cacheRefreshCounter > lastRefreshCount;
         lastRefreshCount = $cacheRefreshCounter;
-        void loadDashboardData(true);
+        void loadDashboardData(force);
+    }
+
+    // Cache first, then the API; a forced refresh falls back to the cache.
+    async function cached<T>(
+        force: boolean,
+        read: () => Promise<T | null>,
+        fetch: () => Promise<T>,
+        write: (data: T) => Promise<void>,
+    ): Promise<T> {
+        const hit = force ? null : await read();
+        if (hit) return hit;
+        try {
+            const data = await fetch();
+            await write(data);
+            return data;
+        } catch (e) {
+            const fallback = force ? await read() : null;
+            if (fallback) return fallback;
+            throw e;
+        }
     }
 
     async function loadDashboardData(force = false) {
+        const requestId = ++dashboardRequestId;
+        loading = true;
+        loadError = null;
         try {
-            loading = true;
-            let analyticsList = force
-                ? null
-                : await getCachedListAnalytics("1y", "USD");
-            if (!analyticsList) {
-                try {
-                    analyticsList =
-                        await portfolioController.listPortfolioAnalytics({
-                            timeframe: "1y",
-                            in_currency: "USD",
-                        });
-                    await setCachedListAnalytics("1y", "USD", analyticsList);
-                } catch (apiError) {
-                    if (force) {
-                        analyticsList = await getCachedListAnalytics(
-                            "1y",
-                            "USD",
-                        );
-                    }
-                    if (!analyticsList) throw apiError;
-                }
+            const portfolio = $currentPortfolio;
+            let next: PortfolioStats;
+            let nextCurrency: string;
+
+            if (portfolio?.id) {
+                const data = await cached(
+                    force,
+                    () => getCachedAnalytics(portfolio.id, "all"),
+                    () =>
+                        portfolioController.getPortfolioAnalytics({
+                            portfolio_id: portfolio.id,
+                            timeframe: "all",
+                        }),
+                    (d) => setCachedAnalytics(portfolio.id, "all", d),
+                );
+                if (requestId !== dashboardRequestId) return;
+                nextCurrency = portfolio.base_currency || "USD";
+                portfolioCount = 1;
+                excludedCount = 0;
+                next = toStats(data);
+            } else {
+                const target = $displayCurrency;
+                const data = await cached(
+                    force,
+                    () => getCachedAnalyticsSummary("all", target),
+                    () =>
+                        portfolioController.getAnalyticsSummary({
+                            timeframe: "all",
+                            in_currency: target,
+                        }),
+                    (d) => setCachedAnalyticsSummary("all", target, d),
+                );
+                if (requestId !== dashboardRequestId) return;
+                nextCurrency = data.currency;
+                portfolioCount = data.portfolio_count;
+                excludedCount = data.excluded_portfolio_ids?.length ?? 0;
+                next = toStats(data);
             }
 
-            const analyticsData = (analyticsList || []).reduce(
-                (acc, item) => {
-                    acc.total_invested += Number(item.total_invested || 0);
-                    acc.current_value += Number(item.current_value || 0);
-                    acc.total_gain_loss += Number(item.total_gain_loss || 0);
-                    acc.allocation.push(...(item.allocation || []));
-                    acc.performance_history.push(
-                        ...(item.performance_history || []),
-                    );
-                    acc.contribution_history.push(
-                        ...(item.contribution_history || []),
-                    );
-                    acc.top_holdings.push(...(item.top_holdings || []));
-                    return acc;
-                },
-                {
-                    total_invested: 0,
-                    current_value: 0,
-                    total_gain_loss: 0,
-                    allocation: [] as { label: string; value: number }[],
-                    performance_history: [] as {
-                        name: string;
-                        value: number;
-                    }[],
-                    contribution_history: [] as {
-                        name: string;
-                        value: number;
-                    }[],
-                    top_holdings: [] as {
-                        ticker: string;
-                        name?: string;
-                        value: number;
-                        percent: number;
-                    }[],
-                },
+            stats = next;
+            currency = nextCurrency;
+            // Price history comes from external providers and can be slow;
+            // the table has its own skeleton, so don't hold the page for it.
+            void loadPerformanceData(
+                (next.top_holdings ?? []).map((h) => ({
+                    ticker: h.ticker,
+                    name: h.name || h.ticker,
+                    value: Number(h.value),
+                    percent: Number(h.percent),
+                })),
+                force,
             );
-
-            const allocationMap = new Map<string, number>();
-            for (const item of analyticsData.allocation) {
-                allocationMap.set(
-                    item.label,
-                    (allocationMap.get(item.label) || 0) +
-                        Number(item.value || 0),
-                );
-            }
-            const allocation = Array.from(allocationMap.entries()).map(
-                ([label, value]) => ({ label, value }),
-            );
-
-            const performanceMap = new Map<string, number>();
-            for (const point of analyticsData.performance_history) {
-                performanceMap.set(
-                    point.name,
-                    (performanceMap.get(point.name) || 0) +
-                        Number(point.value || 0),
-                );
-            }
-            const performance_history = Array.from(performanceMap.entries())
-                .map(([name, value]) => ({ name, value }))
-                .sort(
-                    (a, b) =>
-                        getTimeFromLabel(a.name) - getTimeFromLabel(b.name),
-                );
-
-            const contributionMap = new Map<string, number>();
-            for (const point of analyticsData.contribution_history) {
-                contributionMap.set(
-                    point.name,
-                    (contributionMap.get(point.name) || 0) +
-                        Number(point.value || 0),
-                );
-            }
-            const contribution_history = Array.from(contributionMap.entries())
-                .map(([name, value]) => ({ name, value }))
-                .sort(
-                    (a, b) =>
-                        getTimeFromLabel(a.name) - getTimeFromLabel(b.name),
-                );
-
-            const topHoldingsByWeightMap = new Map<
-                string,
-                { value: number; name: string }
-            >();
-            for (const item of analyticsData.top_holdings) {
-                const prev = topHoldingsByWeightMap.get(item.ticker);
-                topHoldingsByWeightMap.set(item.ticker, {
-                    value: (prev?.value || 0) + Number(item.value || 0),
-                    name: item.name || prev?.name || item.ticker,
-                });
-            }
-            const totalValue = analyticsData.current_value || 0;
-            const topHoldingsByWeight = Array.from(
-                topHoldingsByWeightMap.entries(),
-            )
-                .map(([ticker, { value, name }]) => ({
-                    ticker,
-                    name,
-                    value,
-                    percent: totalValue > 0 ? (value / totalValue) * 100 : 0,
-                }))
-                .sort((a, b) => b.percent - a.percent)
-                .slice(0, 10);
-
-            const costBasis = analyticsData.total_invested;
-            const gainLoss = analyticsData.total_gain_loss;
-            const currentValue = analyticsData.current_value;
-
-            stats = {
-                id: "aggregated",
-                current_value: currentValue,
-                cost_basis: costBasis,
-                gain_loss: gainLoss,
-                return_percent:
-                    costBasis > 0 ? (gainLoss / costBasis) * 100 : 0,
-                allocation,
-                performance_history,
-                contribution_history,
-                top_holdings: topHoldingsByWeight,
-            };
-
-            await loadPerformanceData(topHoldingsByWeight, force);
         } catch (e) {
+            if (requestId !== dashboardRequestId) return;
             console.error("Failed to load dashboard data:", e);
+            loadError =
+                e instanceof Error && e.message
+                    ? e.message
+                    : "The server didn't respond.";
         } finally {
-            loading = false;
+            if (requestId === dashboardRequestId) loading = false;
         }
+    }
+
+    function toStats(data: {
+        current_value: number;
+        total_invested: number;
+        total_gain_loss: number;
+        total_gain_loss_percent: number;
+        allocation: PortfolioStats["allocation"];
+        performance_history: PortfolioStats["performance_history"];
+        contribution_history: PortfolioStats["contribution_history"];
+        top_holdings: PortfolioStats["top_holdings"];
+    }): PortfolioStats {
+        return {
+            id: "dashboard",
+            current_value: data.current_value,
+            cost_basis: data.total_invested,
+            gain_loss: data.total_gain_loss,
+            return_percent: data.total_gain_loss_percent,
+            allocation: data.allocation ?? [],
+            performance_history: data.performance_history ?? [],
+            contribution_history: data.contribution_history ?? [],
+            top_holdings: data.top_holdings ?? [],
+        };
+    }
+
+    // Percent change from the last close on or before `daysBack` days before
+    // the latest close; null when the history doesn't reach that far.
+    function changeSince(
+        points: { date: string; close: number }[],
+        daysBack: number,
+    ): number | null {
+        if (points.length < 2) return null;
+        const latest = points[points.length - 1];
+        const cutoff = new Date(latest.date);
+        cutoff.setDate(cutoff.getDate() - daysBack);
+        const cutoffIso = cutoff.toISOString().slice(0, 10);
+        const reference = [...points].reverse().find((p) => p.date <= cutoffIso);
+        if (!reference || reference.close <= 0) return null;
+        return ((latest.close - reference.close) / reference.close) * 100;
     }
 
     async function loadPerformanceData(
@@ -261,108 +259,91 @@
         }[],
         force = false,
     ) {
-        if (!holdings.length) return;
+        const requestId = ++performanceRequestId;
+        performanceError = false;
+        if (!holdings.length) {
+            performanceHoldings = [];
+            pricesAsOf = null;
+            return;
+        }
         performanceLoading = true;
         try {
+            // A little over a month, so 30D still has a reference after weekends.
             const end = new Date();
             const start = new Date();
-            start.setDate(start.getDate() - 30);
+            start.setDate(start.getDate() - 35);
             const startStr = start.toISOString().slice(0, 10);
             const endStr = end.toISOString().slice(0, 10);
+            const tickers = holdings.map((h) => h.ticker);
+            const batchKey = buildBatchPriceHistoryKey(tickers, startStr, endStr);
+
+            const batch = await cached(
+                force,
+                () => getCachedBatchPriceHistory(batchKey),
+                () =>
+                    assetController.getBatchPriceHistory({
+                        tickers,
+                        start_date: startStr,
+                        end_date: endStr,
+                    }),
+                (d) => setCachedBatchPriceHistory(batchKey, d),
+            );
 
             const holdingByTicker = Object.fromEntries(
                 holdings.map((h) => [h.ticker, h]),
             );
-
-            const tickers = holdings.map((h) => h.ticker);
-            const batchKey = buildBatchPriceHistoryKey(
-                tickers,
-                startStr,
-                endStr,
-            );
-            let batch = force
-                ? null
-                : await getCachedBatchPriceHistory(batchKey);
-            if (!batch) {
-                try {
-                    batch = await assetController.getBatchPriceHistory({
-                        tickers,
-                        start_date: startStr,
-                        end_date: endStr,
-                    });
-                    await setCachedBatchPriceHistory(batchKey, batch);
-                } catch (apiError) {
-                    if (force) {
-                        batch = await getCachedBatchPriceHistory(batchKey);
-                    }
-                    if (!batch) throw apiError;
-                }
-            }
+            let latestDate: string | null = null;
 
             const results: PerformanceHolding[] = batch.results.map(
                 (history) => {
                     const h = holdingByTicker[history.ticker];
-                    const prices = (history.data || [])
-                        .map((d) => Number(d.close))
-                        .filter((p) => p > 0 && Number.isFinite(p));
-
-                    if (prices.length < 2) {
-                        const fallback = prices[prices.length - 1] || null;
-                        return {
-                            ticker: history.ticker,
-                            name: h?.name ?? history.ticker,
-                            value: h?.value ?? 0,
-                            percent: h?.percent ?? 0,
-                            currentPrice: fallback,
-                            dayChange: null,
-                            weekAvg: fallback,
-                            monthAvg: fallback,
-                            monthChange: null,
-                        };
+                    const points = (history.data || [])
+                        .map((d) => ({ date: d.date, close: Number(d.close) }))
+                        .filter((p) => p.close > 0 && Number.isFinite(p.close))
+                        .sort((a, b) => a.date.localeCompare(b.date));
+                    const latest = points[points.length - 1];
+                    if (latest && (!latestDate || latest.date > latestDate)) {
+                        latestDate = latest.date;
                     }
-
-                    const currentPrice = prices[prices.length - 1];
-                    const prevPrice = prices[prices.length - 2];
-                    const dayChange =
-                        prevPrice > 0
-                            ? ((currentPrice - prevPrice) / prevPrice) * 100
-                            : 0;
-
-                    const weekPrices = prices.slice(-7);
-                    const weekAvg =
-                        weekPrices.reduce((a, b) => a + b, 0) /
-                        weekPrices.length;
-
-                    const monthAvg =
-                        prices.reduce((a, b) => a + b, 0) / prices.length;
-
-                    const oldestPrice = prices[0];
-                    const monthChange =
-                        oldestPrice > 0
-                            ? ((currentPrice - oldestPrice) / oldestPrice) * 100
-                            : 0;
 
                     return {
                         ticker: history.ticker,
                         name: h?.name ?? history.ticker,
                         value: h?.value ?? 0,
                         percent: h?.percent ?? 0,
-                        currentPrice,
-                        dayChange,
-                        weekAvg,
-                        monthAvg,
-                        monthChange,
+                        currentPrice: latest?.close ?? null,
+                        dayChange: changeSince(points, 1),
+                        weekChange: changeSince(points, 7),
+                        monthChange: changeSince(points, 30),
                     };
                 },
             );
 
-            performanceHoldings = results;
+            if (requestId === performanceRequestId) {
+                performanceHoldings = results;
+                pricesAsOf = latestDate;
+            }
+        } catch (e) {
+            console.error("Failed to load holdings performance:", e);
+            if (requestId === performanceRequestId) performanceError = true;
         } finally {
-            performanceLoading = false;
+            if (requestId === performanceRequestId) {
+                performanceLoading = false;
+            }
         }
     }
 
-    $: isPositive = Number(stats.gain_loss) >= 0;
+    function retry() {
+        void loadDashboardData(true);
+    }
+
+    function formatAsOf(isoDate: string): string {
+        return new Date(`${isoDate}T00:00:00`).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    }
 
     const today = new Date().toLocaleDateString("en-US", {
         weekday: "long",
@@ -378,17 +359,37 @@
 <div class="min-h-screen p-4 md:p-6 lg:p-8">
     <div class="mx-auto max-w-7xl space-y-6">
         <!-- Header -->
-        <div class="animate-in space-y-1">
-            <p
-                class="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-            >
-                {today}
-            </p>
-            <h1
-                class="font-serif text-3xl md:text-4xl text-foreground leading-tight"
-            >
-                Dashboard
-            </h1>
+        <div
+            class="animate-in flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+        >
+            <div class="space-y-1">
+                <p
+                    class="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+                >
+                    {today}
+                </p>
+                <h1
+                    class="font-serif text-3xl md:text-4xl text-foreground leading-tight"
+                >
+                    Dashboard
+                </h1>
+                <p class="text-xs md:text-sm text-muted-foreground">
+                    {#if isAggregated}
+                        All portfolios · {currency}
+                    {:else}
+                        {$currentPortfolio?.name} · {currency}
+                    {/if}
+                </p>
+            </div>
+            {#if isAggregated}
+                <div class="w-full md:w-40">
+                    <Select
+                        label="Display currency"
+                        bind:value={currencyChoice}
+                        options={currencyOptions}
+                    />
+                </div>
+            {/if}
         </div>
 
         {#if loading}
@@ -409,118 +410,106 @@
                     <Card><Skeleton className="h-48 w-full" /></Card>
                 {/each}
             </div>
+        {:else if loadError}
+            <ErrorState
+                title="Couldn't load your dashboard"
+                message="Folio couldn't fetch your portfolio data ({loadError}). Your data is safe; check your connection and try again."
+                onRetry={retry}
+            />
+        {:else if isAggregated && portfolioCount === 0}
             <Card>
-                <div class="space-y-3">
-                    <div class="flex gap-4 border-b border-border pb-2">
-                        {#each Array(6) as _}
-                            <Skeleton className="h-4 flex-1" />
-                        {/each}
+                <div
+                    class="flex flex-col items-center justify-center py-16 text-center"
+                >
+                    <p class="font-medium text-foreground mb-1">
+                        Welcome to Folio
+                    </p>
+                    <p class="text-sm text-muted-foreground mb-6 max-w-md">
+                        Create a portfolio to start tracking your investments.
+                        Your dashboard fills in as you add trades.
+                    </p>
+                    <Button variant="default" href="/portfolios?new=true">
+                        Create a portfolio
+                    </Button>
+                </div>
+            </Card>
+        {:else if !hasActivity}
+            <Card>
+                <div
+                    class="flex flex-col items-center justify-center py-16 text-center"
+                >
+                    <p class="font-medium text-foreground mb-1">No trades yet</p>
+                    <p class="text-sm text-muted-foreground mb-6 max-w-md">
+                        {#if isAggregated}
+                            Choose a portfolio in the switcher, then add a
+                            trade or import a CSV from your broker.
+                        {:else}
+                            Add your first trade or import a CSV from your
+                            broker to see performance here.
+                        {/if}
+                    </p>
+                    <div class="flex flex-wrap justify-center gap-2">
+                        <Button
+                            variant="default"
+                            href={isAggregated ? undefined : "/trades?new=true"}
+                            disabled={isAggregated}
+                        >
+                            Add a trade
+                        </Button>
+                        <Button
+                            variant="outline"
+                            href={isAggregated ? undefined : "/trades/import"}
+                            disabled={isAggregated}
+                        >
+                            Import CSV
+                        </Button>
                     </div>
-                    {#each Array(10) as _}
-                        <div class="flex gap-4">
-                            {#each Array(6) as _}
-                                <Skeleton className="h-4 flex-1" />
-                            {/each}
-                        </div>
-                    {/each}
                 </div>
             </Card>
         {:else}
+            {#if excludedCount > 0}
+                <div
+                    class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+                    role="status"
+                >
+                    {excludedCount === 1
+                        ? "1 portfolio is"
+                        : `${excludedCount} portfolios are`} left out of these
+                    totals: its exchange rate to {currency} is unavailable right
+                    now.
+                </div>
+            {/if}
+
             <!-- Stat Cards -->
             <div
                 class="animate-in animate-in-delay-1 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4"
             >
-                <!-- Total Value -->
-                <div
-                    class="rounded-xl border border-border bg-card p-4 md:p-5 shadow-sm transition-shadow hover:shadow-md"
-                >
-                    <p
-                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
-                    >
-                        Total Value
-                    </p>
-                    <div
-                        class="font-serif text-2xl sm:text-3xl md:text-4xl text-foreground leading-none break-all"
-                    >
-                        <Amount
-                            value={formatCurrency(stats.current_value, "USD")}
-                        />
-                    </div>
-                    <p class="mt-2 text-xs text-muted-foreground">
-                        Current portfolio value
-                    </p>
-                </div>
-
-                <!-- Cost Basis -->
-                <div
-                    class="rounded-xl border border-border bg-card p-4 md:p-5 shadow-sm transition-shadow hover:shadow-md"
-                >
-                    <p
-                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
-                    >
-                        Cost Basis
-                    </p>
-                    <div
-                        class="font-serif text-2xl sm:text-3xl md:text-4xl text-foreground leading-none break-all"
-                    >
-                        <Amount
-                            value={formatCurrency(stats.cost_basis, "USD")}
-                        />
-                    </div>
-                    <p class="mt-2 text-xs text-muted-foreground">
-                        Total amount invested
-                    </p>
-                </div>
-
-                <!-- Gain / Loss -->
-                <div
-                    class="rounded-xl border shadow-sm transition-shadow hover:shadow-md p-4 md:p-5
-                    {isPositive
-                        ? 'border-[#34D399]/20 bg-[#34D399]/5'
-                        : 'border-[#F87171]/20 bg-[#F87171]/5'}"
-                >
-                    <p
-                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
-                    >
-                        Gain / Loss
-                    </p>
-                    <div
-                        class="font-serif text-2xl sm:text-3xl md:text-4xl leading-none break-all"
-                        class:text-positive={isPositive}
-                        class:text-negative={!isPositive}
-                    >
-                        <Amount
-                            value={formatCurrency(stats.gain_loss, "USD")}
-                        />
-                    </div>
-                    <p class="mt-2 text-xs text-muted-foreground">
-                        Unrealized P&L
-                    </p>
-                </div>
-
-                <!-- Return -->
-                <div
-                    class="rounded-xl border shadow-sm transition-shadow hover:shadow-md p-4 md:p-5
-                    {isPositive
-                        ? 'border-[#34D399]/20 bg-[#34D399]/5'
-                        : 'border-[#F87171]/20 bg-[#F87171]/5'}"
-                >
-                    <p
-                        class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2"
-                    >
-                        Total Return
-                    </p>
-                    <div
-                        class="font-serif text-2xl sm:text-3xl md:text-4xl leading-none"
-                        class:text-positive={isPositive}
-                        class:text-negative={!isPositive}
-                    >
-                        <Amount value={formatPercent(stats.return_percent)} />
-                    </div>
-                    <p class="mt-2 text-xs text-muted-foreground">
-                        Return on investment
-                    </p>
-                </div>
+                <StatCard
+                    label="Total Value"
+                    value={stats.current_value}
+                    {currency}
+                    description="Current market value"
+                />
+                <StatCard
+                    label="Cost Basis"
+                    value={stats.cost_basis}
+                    {currency}
+                    description="Cost of current holdings"
+                />
+                <StatCard
+                    label="Gain / Loss"
+                    value={stats.gain_loss}
+                    {currency}
+                    tone={isPositive ? "positive" : "negative"}
+                    description="Unrealized P&L"
+                />
+                <StatCard
+                    label="Total Return"
+                    value={stats.return_percent}
+                    format="percent"
+                    tone={isPositive ? "positive" : "negative"}
+                    description="On current holdings' cost"
+                />
             </div>
 
             <!-- Performance Chart -->
@@ -534,23 +523,22 @@
                         data={stats.performance_history}
                         title=""
                         height="h-72 md:h-96"
-                        currency="USD"
+                        {currency}
                     />
                 </Card>
             </div>
 
-            <!-- Contribution History Chart -->
+            <!-- Contributions Chart -->
             <div class="animate-in animate-in-delay-2">
                 <Card
-                    title="Contribution History"
-                    subtitle="Net contributions over time"
+                    title="Net Contributions"
+                    subtitle="Buys minus sells each month"
                     className="md:px-4"
                 >
-                    <LineChart
-                        data={stats.contribution_history}
+                    <BarChart
+                        data={contributionChart}
                         title=""
                         height="h-72 md:h-96"
-                        currency="USD"
                     />
                 </Card>
             </div>
@@ -565,7 +553,7 @@
 
                 <Card
                     title="Top Positions by Weight"
-                    subtitle="10 largest positions by weight"
+                    subtitle="10 largest positions, with the rest as Other"
                 >
                     <DonutChart data={topHoldingsChart} title="" />
                 </Card>
@@ -575,7 +563,9 @@
             <div class="animate-in animate-in-delay-4">
                 <Card
                     title="Top Holdings Performance"
-                    subtitle="10 largest positions — current value, price, averages & change"
+                    subtitle={pricesAsOf
+                        ? `10 largest positions · prices in USD as of ${formatAsOf(pricesAsOf)}`
+                        : "10 largest positions · prices in USD"}
                 >
                     {#if performanceLoading}
                         <div class="space-y-3">
@@ -589,66 +579,45 @@
                                 </div>
                             {/each}
                         </div>
+                    {:else if performanceError}
+                        <p class="py-8 text-center text-sm text-muted-foreground">
+                            Couldn't load price history right now.
+                            <button
+                                class="underline underline-offset-2 hover:text-foreground"
+                                on:click={retry}>Try again</button
+                            >
+                        </p>
                     {:else if performanceHoldings.length > 0}
                         <div class="overflow-x-auto -mx-4 md:mx-0">
                             <table class="w-full text-sm">
                                 <thead class="border-b border-border">
                                     <tr>
-                                        <th
-                                            class="h-9 px-3 text-left align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            Ticker
-                                        </th>
-                                        <th
-                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            Price
-                                        </th>
-                                        <th
-                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            Value
-                                        </th>
-                                        <th
-                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            Day
-                                        </th>
-                                        <th
-                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            7D Avg
-                                        </th>
-                                        <th
-                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            30D Avg
-                                        </th>
-                                        <th
-                                            class="h-9 px-3 text-right align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                                        >
-                                            30D Chg
-                                        </th>
+                                        {#each ["Ticker", "Price", "Value", "1D", "7D", "30D"] as heading, i}
+                                            <th
+                                                class="h-9 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                                class:text-left={i === 0}
+                                                class:text-right={i > 0}
+                                            >
+                                                {heading}
+                                            </th>
+                                        {/each}
                                     </tr>
                                 </thead>
                                 <tbody class="[&_tr:last-child]:border-0">
-                                    {#each performanceHoldings as h}
+                                    {#each performanceHoldings as h (h.ticker)}
                                         <tr
-                                            class="relative border-b border-border/60 hover:bg-muted/30 transition-colors"
+                                            class="border-b border-border/60 transition-colors"
                                         >
                                             <td class="px-3 py-3 align-middle">
-                                                <div
-                                                    class="flex items-center gap-2"
-                                                >
+                                                <div class="flex items-center gap-2">
                                                     <span
                                                         class="inline-block h-1 w-1 rounded-full flex-shrink-0
-                                                        {h.monthChange != null
-                                                            ? h.monthChange >= 0
-                                                                ? 'bg-[#34D399]'
-                                                                : 'bg-[#F87171]'
-                                                            : 'bg-muted-foreground'}"
-                                                    >
-                                                    </span>
+                                                        {h.monthChange == null
+                                                            ? 'bg-muted-foreground'
+                                                            : h.monthChange >= 0
+                                                              ? 'bg-positive'
+                                                              : 'bg-negative'}"
+                                                    ></span>
                                                     <div>
                                                         <span
                                                             class="font-semibold text-foreground font-mono text-xs tracking-wide"
@@ -668,6 +637,8 @@
                                                             <Amount
                                                                 value={formatPercent(
                                                                     h.percent,
+                                                                    2,
+                                                                    false,
                                                                 )}
                                                             /> of portfolio
                                                         </span>
@@ -685,8 +656,7 @@
                                                         )}
                                                     />
                                                 {:else}
-                                                    <span
-                                                        class="text-muted-foreground"
+                                                    <span class="text-muted-foreground"
                                                         >—</span
                                                     >
                                                 {/if}
@@ -698,107 +668,43 @@
                                                     <Amount
                                                         value={formatCurrency(
                                                             h.value,
-                                                            "USD",
+                                                            currency,
                                                         )}
                                                     />
                                                 {:else}
-                                                    <span
-                                                        class="text-muted-foreground"
+                                                    <span class="text-muted-foreground"
                                                         >—</span
                                                     >
                                                 {/if}
                                             </td>
-                                            <td
-                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
-                                            >
-                                                {#if h.dayChange != null}
-                                                    <span
-                                                        class:text-positive={h.dayChange >=
-                                                            0}
-                                                        class:text-negative={h.dayChange <
-                                                            0}
-                                                    >
-                                                        <Amount
-                                                            value={formatPercent(
-                                                                h.dayChange,
-                                                            )}
-                                                        />
-                                                    </span>
-                                                {:else}
-                                                    <span
-                                                        class="text-muted-foreground"
-                                                        >—</span
-                                                    >
-                                                {/if}
-                                            </td>
-                                            <td
-                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
-                                            >
-                                                {#if h.weekAvg != null}
-                                                    <Amount
-                                                        value={formatCurrency(
-                                                            h.weekAvg,
-                                                            "USD",
-                                                        )}
-                                                    />
-                                                {:else}
-                                                    <span
-                                                        class="text-muted-foreground"
-                                                        >—</span
-                                                    >
-                                                {/if}
-                                            </td>
-                                            <td
-                                                class="px-3 py-3 align-middle text-right font-mono text-xs"
-                                            >
-                                                {#if h.monthAvg != null}
-                                                    <Amount
-                                                        value={formatCurrency(
-                                                            h.monthAvg,
-                                                            "USD",
-                                                        )}
-                                                    />
-                                                {:else}
-                                                    <span
-                                                        class="text-muted-foreground"
-                                                        >—</span
-                                                    >
-                                                {/if}
-                                            </td>
-                                            <td
-                                                class="px-3 py-3 align-middle text-right"
-                                            >
-                                                {#if h.monthChange != null}
-                                                    <span
-                                                        class="font-semibold font-mono text-xs"
-                                                        class:text-positive={h.monthChange >=
-                                                            0}
-                                                        class:text-negative={h.monthChange <
-                                                            0}
-                                                    >
-                                                        <Amount
-                                                            value={formatPercent(
-                                                                h.monthChange,
-                                                            )}
-                                                        />
-                                                    </span>
-                                                {:else}
-                                                    <span
-                                                        class="text-muted-foreground"
-                                                        >—</span
-                                                    >
-                                                {/if}
-                                            </td>
+                                            {#each [h.dayChange, h.weekChange, h.monthChange] as change}
+                                                <td
+                                                    class="px-3 py-3 align-middle text-right font-mono text-xs"
+                                                >
+                                                    {#if change != null}
+                                                        <span
+                                                            class:text-positive={change >= 0}
+                                                            class:text-negative={change < 0}
+                                                        >
+                                                            <Amount
+                                                                value={formatPercent(change)}
+                                                            />
+                                                        </span>
+                                                    {:else}
+                                                        <span class="text-muted-foreground"
+                                                            >—</span
+                                                        >
+                                                    {/if}
+                                                </td>
+                                            {/each}
                                         </tr>
                                     {/each}
                                 </tbody>
                             </table>
                         </div>
                     {:else}
-                        <p
-                            class="text-sm text-muted-foreground py-8 text-center"
-                        >
-                            No holdings data available.
+                        <p class="py-8 text-center text-sm text-muted-foreground">
+                            No price history available for your holdings.
                         </p>
                     {/if}
                 </Card>
@@ -810,10 +716,16 @@
 <!-- Floating Action Button -->
 <div class="fixed bottom-6 right-6 z-30 flex flex-col-reverse gap-2">
     {#if fabOpen}
+        <!-- A trade needs a portfolio, so this is disabled in the aggregated view. -->
         <a
-            href="/trades?new=true"
-            class="h-10 w-10 rounded-full bg-card border border-border text-foreground flex items-center justify-center hover:bg-muted transition-all shadow-lg"
-            title="New Trade"
+            href={$currentPortfolio?.id ? "/trades?new=true" : undefined}
+            aria-disabled={!$currentPortfolio?.id}
+            class="h-10 w-10 rounded-full bg-card border border-border text-foreground flex items-center justify-center transition-all shadow-lg {$currentPortfolio?.id
+                ? 'hover:bg-muted'
+                : 'opacity-50 cursor-not-allowed'}"
+            title={$currentPortfolio?.id
+                ? "New Trade"
+                : "Select a portfolio to add a trade"}
         >
             <svg
                 class="h-4 w-4"

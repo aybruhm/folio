@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import type { Readable } from 'svelte/store';
-import { invalidateAllAnalytics, invalidateAllHoldings } from '$lib/cache';
+import { invalidateAllAnalytics, invalidateAllHoldings } from '#lib/cache/index.js';
 
 export interface SyncQueueItem {
   id: string;

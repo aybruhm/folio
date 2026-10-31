@@ -23,8 +23,8 @@ export default {
                 'secondary-foreground': 'hsl(var(--secondary-foreground))',
                 primary: 'hsl(var(--primary))',
                 'primary-foreground': 'hsl(var(--primary-foreground))',
-                positive: '#22c55e',
-                negative: '#ef4444'
+                positive: '#34D399',
+                negative: '#F87171'
             },
             borderRadius: {
                 lg: 'calc(var(--radius) + 0.25rem)',
