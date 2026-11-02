@@ -38,8 +38,15 @@
     let showArchived = false;
     let archivingId: string | null = null;
 
+    // Active and archived together stay in one alphabetical list; the Archived
+    // badge and dimmed row tell them apart.
     $: visiblePortfolios = showArchived
-        ? [...$portfolios, ...archivedPortfolios]
+        ? [...$portfolios, ...archivedPortfolios].sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, {
+                  sensitivity: "base",
+                  numeric: true,
+              }),
+          )
         : $portfolios;
 
     onMount(async () => {
