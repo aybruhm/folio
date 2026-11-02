@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
 
 import aiohttp
 
@@ -26,8 +25,8 @@ class TradingviewAdapter:
     so that the 150-request monthly cap is the governing constraint.
     """
 
-    _shared_session: Optional[aiohttp.ClientSession] = None
-    _session_lock: Optional[asyncio.Lock] = None
+    _shared_session: aiohttp.ClientSession | None = None
+    _session_lock: asyncio.Lock | None = None
     _shared_timeout = aiohttp.ClientTimeout(total=15)
 
     # Rolling-window rate tracking (per-process, not distributed)
@@ -66,7 +65,7 @@ class TradingviewAdapter:
 
     async def get_asset_metadata(
         self, ticker: str, currency: str = "USD"
-    ) -> Optional[AssetMetadata]:
+    ) -> AssetMetadata | None:
         """Return metadata for *ticker* using the TradingView price endpoint."""
         if not self._enabled:
             logger.debug("TradingView (RapidAPI) is not configured; skipping lookup")
@@ -160,7 +159,7 @@ class TradingviewAdapter:
     # Price endpoint
     # ------------------------------------------------------------------
 
-    async def _get_price(self, symbol: str) -> Optional[dict]:
+    async def _get_price(self, symbol: str) -> dict | None:
         """Call GET /api/price/{symbol} and return the inner 'data' dict on success."""
         params = {
             "timeframe": self._DEFAULT_TIMEFRAME,
@@ -199,7 +198,7 @@ class TradingviewAdapter:
     # HTTP helpers
     # ------------------------------------------------------------------
 
-    async def _get(self, path: str, params: Optional[dict] = None) -> Optional[dict]:
+    async def _get(self, path: str, params: dict | None = None) -> dict | None:
         url = f"{self._base_url.rstrip('/')}{path}"
         headers = {
             "x-rapidapi-host": "tradingview-data1.p.rapidapi.com",
@@ -334,7 +333,7 @@ class TradingviewAdapter:
     @staticmethod
     def _parse_metadata(
         ticker: str, symbol: str, data: dict, currency_hint: str
-    ) -> Optional[AssetMetadata]:
+    ) -> AssetMetadata | None:
         """Extract AssetMetadata from the 'data' portion of a /api/price response.
 
         The shape of *data*:
@@ -391,14 +390,14 @@ class TradingviewAdapter:
             return None
 
     @staticmethod
-    def _extract_exchange(symbol: str, info: dict) -> Optional[str]:
+    def _extract_exchange(symbol: str, info: dict) -> str | None:
         """Derive exchange from the qualified symbol or info dict."""
         if ":" in symbol:
             return symbol.split(":")[0]
         return info.get("exchange") or info.get("market") or info.get("provider")
 
     @staticmethod
-    def _guess_currency_from_symbol(symbol: str) -> Optional[str]:
+    def _guess_currency_from_symbol(symbol: str) -> str | None:
         """Try to infer currency from the symbol's quote portion."""
         if ":" not in symbol:
             return None
@@ -422,7 +421,7 @@ class TradingviewAdapter:
 
     @staticmethod
     def _derive_asset_class(
-        ticker: str, symbol: str, type_info: str, exchange: Optional[str]
+        ticker: str, symbol: str, type_info: str, exchange: str | None
     ) -> str:
         """Heuristically determine asset class from type string, symbol, and exchange."""
         type_lower = type_info.lower()
@@ -453,7 +452,7 @@ class TradingviewAdapter:
         return "stock"
 
     @staticmethod
-    def _extract_price(data: dict) -> Optional[float]:
+    def _extract_price(data: dict) -> float | None:
         """Extract the current closing price from the 'data' portion of a /api/price response.
 
         Prefers ``data.current.close``, falls back to ``data.current.open``,

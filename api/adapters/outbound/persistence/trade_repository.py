@@ -1,5 +1,4 @@
 from datetime import date
-from typing import List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import func
@@ -37,20 +36,20 @@ class TradeRepository(ITradeRepository):
         self.session.add(model)
         await self.session.flush()
 
-    async def get_by_id(self, trade_id: UUID) -> Optional[Trade]:
+    async def get_by_id(self, trade_id: UUID) -> Trade | None:
         model = await self.session.get(TradeModel, trade_id)
         return self._to_domain(model) if model else None
 
     async def list_by_portfolio(
         self,
         portfolio_id: UUID,
-        ticker: Optional[str] = None,
-        trade_type: Optional[TradeType] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        ticker: str | None = None,
+        trade_type: TradeType | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> Tuple[List[Trade], int]:
+    ) -> tuple[list[Trade], int]:
         query = select(TradeModel).where(TradeModel.portfolio_id == portfolio_id)
 
         if ticker:
@@ -77,7 +76,7 @@ class TradeRepository(ITradeRepository):
 
         return [self._to_domain(m) for m in models], total
 
-    async def list_by_asset(self, asset_id: UUID) -> List[Trade]:
+    async def list_by_asset(self, asset_id: UUID) -> list[Trade]:
         result = await self.session.execute(
             select(TradeModel)
             .where(TradeModel.asset_id == asset_id)
@@ -86,7 +85,7 @@ class TradeRepository(ITradeRepository):
         models = result.scalars().all()
         return [self._to_domain(m) for m in models]
 
-    async def list_all_tickers(self) -> List[str]:
+    async def list_all_tickers(self) -> list[str]:
         """Return distinct tickers from all trades."""
         from sqlalchemy import distinct
 
@@ -113,7 +112,7 @@ class TradeRepository(ITradeRepository):
             await self.session.delete(model)
             await self.session.flush()
 
-    async def delete_batch(self, trade_ids: List[UUID]) -> int:
+    async def delete_batch(self, trade_ids: list[UUID]) -> int:
         result = await self.session.execute(
             select(TradeModel).where(TradeModel.id.in_(trade_ids))
         )

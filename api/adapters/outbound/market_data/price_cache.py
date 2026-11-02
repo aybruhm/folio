@@ -1,7 +1,6 @@
 import json
 import logging
 from datetime import date, timedelta
-from typing import Optional
 
 import valkey.asyncio as valkey
 
@@ -77,7 +76,7 @@ class PriceCache:
 
     # -- price ------------------------------------------------------------
 
-    async def get_price(self, ticker: str) -> Optional[tuple[date, int]]:
+    async def get_price(self, ticker: str) -> tuple[date, int] | None:
         """Return ``(date, price×100)`` if cached, else ``None``.
 
         A cached value of ``(date.min, 0)`` is the sentinel meaning
@@ -125,7 +124,7 @@ class PriceCache:
 
     # -- metadata ---------------------------------------------------------
 
-    async def get_metadata(self, ticker: str) -> Optional[AssetMetadata]:
+    async def get_metadata(self, ticker: str) -> AssetMetadata | None:
         """Return cached ``AssetMetadata`` or ``None``."""
         try:
             raw = await self._client.get(_meta_key(ticker))
@@ -179,7 +178,7 @@ class PriceCache:
 
     # -- FX rates ---------------------------------------------------------
 
-    async def get_fx_rate(self, from_ccy: str, to_ccy: str) -> Optional[int]:
+    async def get_fx_rate(self, from_ccy: str, to_ccy: str) -> int | None:
         """Return cached current FX rate (×100 int) or ``None``."""
         try:
             raw = await self._client.get(_fx_current_key(from_ccy, to_ccy))
@@ -215,7 +214,7 @@ class PriceCache:
 
     async def get_historical_fx_rate(
         self, from_ccy: str, to_ccy: str, date_val: date
-    ) -> Optional[int]:
+    ) -> int | None:
         """Return cached historical FX rate or ``None``."""
         try:
             raw = await self._client.get(_fx_historical_key(from_ccy, to_ccy, date_val))

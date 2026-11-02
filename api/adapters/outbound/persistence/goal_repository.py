@@ -1,4 +1,3 @@
-from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,11 +30,11 @@ class GoalRepository(IGoalRepository):
         self.session.add(model)
         await self.session.flush()
 
-    async def get_by_id(self, goal_id: UUID) -> Optional[Goal]:
+    async def get_by_id(self, goal_id: UUID) -> Goal | None:
         model = await self.session.get(GoalModel, goal_id)
         return self._to_domain(model) if model else None
 
-    async def list_by_user(self, user_id: UUID) -> List[Goal]:
+    async def list_by_user(self, user_id: UUID) -> list[Goal]:
         result = await self.session.execute(
             select(GoalModel)
             .where(GoalModel.user_id == user_id)

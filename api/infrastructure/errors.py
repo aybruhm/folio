@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 
@@ -21,8 +21,8 @@ class ErrorCode(str, Enum):
 class ErrorDetail(BaseModel):
     code: ErrorCode
     message: str
-    field: Optional[str] = None
-    details: Optional[dict[str, Any]] = None
+    field: str | None = None
+    details: dict[str, Any] | None = None
 
 
 class AppException(Exception):
@@ -30,8 +30,8 @@ class AppException(Exception):
         self,
         code: ErrorCode,
         message: str,
-        field: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None,
+        field: str | None = None,
+        details: dict[str, Any] | None = None,
         status_code: int = 400,
     ):
         self.code = code
@@ -56,8 +56,8 @@ class ValidationError(AppException):
     def __init__(
         self,
         message: str,
-        field: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None,
+        field: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(
             code=ErrorCode.VALIDATION_ERROR,
@@ -106,8 +106,8 @@ class CsvImportError(AppException):
     def __init__(
         self,
         message: str,
-        row_number: Optional[int] = None,
-        field: Optional[str] = None,
+        row_number: int | None = None,
+        field: str | None = None,
     ):
         details = {}
         if row_number:

@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,14 +26,14 @@ class UserRepository(IUserRepository):
         await self.session.flush()
         return self._to_domain(model)
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         result = await self.session.execute(
             select(UserModel).where(UserModel.email == email)
         )
         model = result.scalar_one_or_none()
         return self._to_domain(model) if model else None
 
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+    async def get_by_id(self, user_id: UUID) -> User | None:
         result = await self.session.execute(
             select(UserModel).where(UserModel.id == user_id)
         )

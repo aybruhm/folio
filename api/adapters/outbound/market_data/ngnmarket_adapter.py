@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from datetime import date
-from typing import Optional
 
 import aiohttp
 
@@ -12,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class NgnMarketAdapter:
-    _shared_session: Optional[aiohttp.ClientSession] = None
-    _session_lock: Optional[asyncio.Lock] = None
+    _shared_session: aiohttp.ClientSession | None = None
+    _session_lock: asyncio.Lock | None = None
     _shared_timeout = aiohttp.ClientTimeout(total=15)
 
     def __init__(self) -> None:
@@ -23,7 +22,7 @@ class NgnMarketAdapter:
 
     async def get_asset_metadata(
         self, ticker: str, currency: str = "NGN", asset_class: str = ""
-    ) -> Optional[AssetMetadata]:
+    ) -> AssetMetadata | None:
         symbol = self._extract_symbol(ticker)
         if not symbol:
             return None
@@ -89,7 +88,7 @@ class NgnMarketAdapter:
             logger.warning("NGNMarket: no price history data for %s (%s → %s)", ticker, start, end)
         return sorted(result)
 
-    async def get_current_forex_rates(self) -> Optional[dict]:
+    async def get_current_forex_rates(self) -> dict | None:
         payload = await self._get("/forex/current")
         if not payload or not payload.get("success"):
             return None
@@ -99,9 +98,9 @@ class NgnMarketAdapter:
         self,
         source: Currency,
         target: Currency,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-    ) -> Optional[list[dict]]:
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict] | None:
         params = {
             "source": source.value,
             "target": target.value,
@@ -118,7 +117,7 @@ class NgnMarketAdapter:
 
     async def get_current_rate(
         self, from_currency: Currency, to_currency: Currency
-    ) -> Optional[int]:
+    ) -> int | None:
         if from_currency == to_currency:
             return 100
 
@@ -151,7 +150,7 @@ class NgnMarketAdapter:
 
     async def get_fx_rate(
         self, from_currency: Currency, to_currency: Currency, on_date: date
-    ) -> Optional[int]:
+    ) -> int | None:
         if from_currency == to_currency:
             return 100
 
@@ -179,19 +178,19 @@ class NgnMarketAdapter:
         except Exception:
             return None
 
-    async def list_indices(self) -> Optional[list[dict]]:
+    async def list_indices(self) -> list[dict] | None:
         payload = await self._get("/indices")
         if not payload or not payload.get("success"):
             return None
         return payload.get("data") or []
 
-    async def get_etf_detail(self, symbol: str) -> Optional[dict]:
+    async def get_etf_detail(self, symbol: str) -> dict | None:
         payload = await self._get(f"/etfs/{symbol.upper()}")
         if not payload or not payload.get("success"):
             return None
         return payload.get("data")
 
-    async def get_index_detail(self, symbol: str) -> Optional[dict]:
+    async def get_index_detail(self, symbol: str) -> dict | None:
         payload = await self._get(f"/indices/{symbol.upper()}")
         if not payload or not payload.get("success"):
             return None
@@ -199,7 +198,7 @@ class NgnMarketAdapter:
 
     async def get_index_chart(
         self, symbol: str, period: str = "30d", response_format: str = "detailed"
-    ) -> Optional[dict]:
+    ) -> dict | None:
         payload = await self._get(
             f"/indices/{symbol.upper()}/chart",
             params={"period": period, "format": response_format},
@@ -208,7 +207,7 @@ class NgnMarketAdapter:
             return None
         return payload.get("data")
 
-    async def _get(self, path: str, params: Optional[dict] = None) -> Optional[dict]:
+    async def _get(self, path: str, params: dict | None = None) -> dict | None:
         if not self._enabled:
             return None
 
@@ -281,7 +280,7 @@ class NgnMarketAdapter:
     @staticmethod
     def _extract_rate(
         from_currency: str, to_currency: str, base: str, rates: dict
-    ) -> Optional[float]:
+    ) -> float | None:
         # /forex/current returns rates relative to base currency (example: base NGN)
         # If base=NGN and rates[USD]=0.000623 then 1 NGN = 0.000623 USD
         # Therefore USD->NGN = 1 / rates[USD]

@@ -1,5 +1,4 @@
 from uuid import UUID, uuid4
-from typing import List, Optional
 from datetime import datetime
 
 from domain.entities.models import Portfolio
@@ -38,15 +37,15 @@ class PortfolioInteractor(IPortfolioUseCase):
 
     async def list_portfolios(
         self, user_id: UUID, include_archived: bool = False
-    ) -> List[dict]:
+    ) -> list[dict]:
         portfolios = await self.repository.list_by_user(user_id, include_archived)
         return [self._to_dict(p) for p in portfolios]
 
     async def update_portfolio(
         self,
         portfolio_id: UUID,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         portfolio = await self.repository.get_by_id(portfolio_id)
         if not portfolio:

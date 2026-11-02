@@ -3,7 +3,6 @@ from sqlalchemy.future import select
 from sqlalchemy import and_
 from uuid import UUID
 from datetime import date
-from typing import List, Optional, Tuple
 
 from domain.value_objects.money import Currency
 from domain.ports.outbound.repositories import (
@@ -31,7 +30,7 @@ class PriceHistoryRepository(IPriceHistoryRepository):
 
     async def get_history(
         self, asset_id: UUID, start: date, end: date
-    ) -> List[Tuple[date, int]]:
+    ) -> list[tuple[date, int]]:
         result = await self.session.execute(
             select(PriceHistoryModel)
             .where(
@@ -46,7 +45,7 @@ class PriceHistoryRepository(IPriceHistoryRepository):
         models = result.scalars().all()
         return [(m.date, int(m.close)) for m in models]
 
-    async def get_latest(self, asset_id: UUID) -> Optional[Tuple[date, int]]:
+    async def get_latest(self, asset_id: UUID) -> tuple[date, int] | None:
         result = await self.session.execute(
             select(PriceHistoryModel)
             .where(PriceHistoryModel.asset_id == asset_id)
@@ -75,7 +74,7 @@ class FxRateRepository(IFxRateRepository):
 
     async def get_rate(
         self, from_currency: Currency, to_currency: Currency, date_val: date
-    ) -> Optional[int]:
+    ) -> int | None:
         result = await self.session.execute(
             select(FxRateModel).where(
                 and_(
@@ -90,7 +89,7 @@ class FxRateRepository(IFxRateRepository):
 
     async def get_latest_rate(
         self, from_currency: Currency, to_currency: Currency
-    ) -> Optional[int]:
+    ) -> int | None:
         result = await self.session.execute(
             select(FxRateModel)
             .where(

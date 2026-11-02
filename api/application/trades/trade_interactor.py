@@ -1,6 +1,5 @@
 from dataclasses import replace
 from datetime import date, datetime
-from typing import List, Optional, Tuple
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -152,10 +151,10 @@ class TradeInteractor(ITradeUseCase):
         await self.trade_repo.add(trade)
         return trade.id
 
-    async def create_trades(self, requests: List[CreateTradeRequest]) -> List[UUID]:
+    async def create_trades(self, requests: list[CreateTradeRequest]) -> list[UUID]:
         # Every row is attempted so the caller gets all the problems at once.
         # The caller must roll back when this raises: earlier rows are flushed.
-        trade_ids: List[UUID] = []
+        trade_ids: list[UUID] = []
         errors: list[dict] = []
         for index, request in enumerate(requests):
             try:
@@ -180,14 +179,14 @@ class TradeInteractor(ITradeUseCase):
 
     async def list_trades(
         self,
-        portfolio_id: Optional[UUID] = None,
-        ticker: Optional[str] = None,
-        trade_type: Optional[TradeType] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        portfolio_id: UUID | None = None,
+        ticker: str | None = None,
+        trade_type: TradeType | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> Tuple[List[dict], int]:
+    ) -> tuple[list[dict], int]:
         if portfolio_id:
             trades, total = await self.trade_repo.list_by_portfolio(
                 portfolio_id,
@@ -207,9 +206,7 @@ class TradeInteractor(ITradeUseCase):
             result.append(self._trade_to_dict(t, name, asset_class))
         return result, total
 
-    async def _get_asset_info(
-        self, asset_id: UUID
-    ) -> tuple[Optional[str], Optional[str]]:
+    async def _get_asset_info(self, asset_id: UUID) -> tuple[str | None, str | None]:
         asset = await self.asset_repo.get_by_id(asset_id)
         if asset:
             return asset.name, asset.asset_class.value
@@ -249,7 +246,7 @@ class TradeInteractor(ITradeUseCase):
 
         await self.trade_repo.delete(trade_id)
 
-    async def delete_batch_trades(self, trade_ids: List[UUID]) -> int:
+    async def delete_batch_trades(self, trade_ids: list[UUID]) -> int:
         if not trade_ids:
             raise ValueError("No trade IDs provided")
         return await self.trade_repo.delete_batch(trade_ids)
@@ -257,8 +254,8 @@ class TradeInteractor(ITradeUseCase):
     @staticmethod
     def _trade_to_dict(
         trade: Trade,
-        asset_name: Optional[str] = None,
-        asset_class: Optional[str] = None,
+        asset_name: str | None = None,
+        asset_class: str | None = None,
     ) -> dict:
         return {
             "id": str(trade.id),

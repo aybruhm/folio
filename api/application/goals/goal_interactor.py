@@ -1,6 +1,5 @@
 from dataclasses import replace
 from datetime import date, datetime
-from typing import List
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +40,7 @@ class GoalInteractor(IGoalUseCase):
 
         return self._goal_to_dict(goal)
 
-    async def list_goals(self, user_id: UUID) -> List[dict]:
+    async def list_goals(self, user_id: UUID) -> list[dict]:
         goals = await self.repository.list_by_user(user_id)
         return [self._goal_to_dict(g) for g in goals]
 

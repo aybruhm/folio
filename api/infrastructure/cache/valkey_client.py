@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 import valkey.asyncio as valkey
 
@@ -7,7 +6,7 @@ from infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: Optional[valkey.Valkey] = None
+_client: valkey.Valkey | None = None
 
 
 def get_valkey_client() -> valkey.Valkey:
