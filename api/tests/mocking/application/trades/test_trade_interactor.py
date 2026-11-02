@@ -683,3 +683,59 @@ async def test_create_trade_uses_tradingview_provider_when_selected(monkeypatch)
     assert asset_repo.added[0].exchange == "NASDAQ"
     assert trade_repo.added[0].id == trade_id
     assert trade_repo.added[0].market_data_provider == "tradingview"
+
+
+def _cash_request(portfolio_id, ticker="CASH"):
+    return CreateTradeRequest(
+        portfolio_id=portfolio_id,
+        ticker=ticker,
+        trade_type=TradeType.BUY,
+        trade_date=datetime(2024, 1, 1, 9, 30),
+        quantity=100_000_000,
+        price=100,
+        trade_currency=Currency.USD,
+        asset_class=AssetClass.CASH,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_create_trades_creates_every_row_in_order(monkeypatch):
+    portfolio = Portfolio(
+        id=uuid4(), user_id=uuid4(), name="Bulk", base_currency=Currency.USD
+    )
+    interactor, _pr, asset_repo, trade_repo, *_ = _patch_trade_deps(
+        monkeypatch, portfolio=portfolio
+    )
+
+    ids = await interactor.create_trades(
+        [_cash_request(portfolio.id, "CASH"), _cash_request(portfolio.id, "CASH")]
+    )
+
+    assert [t.id for t in trade_repo.added] == ids
+    assert len(ids) == 2
+    # Both rows share one asset: the second row finds the first row's asset.
+    assert len(asset_repo.added) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.grumpy_path
+async def test_create_trades_reports_every_failing_row(monkeypatch):
+    portfolio = Portfolio(
+        id=uuid4(), user_id=uuid4(), name="Bulk", base_currency=Currency.USD
+    )
+    interactor, *_ = _patch_trade_deps(monkeypatch, portfolio=portfolio)
+    missing_portfolio = uuid4()
+
+    with pytest.raises(trade_module.BulkTradeError) as raised:
+        await interactor.create_trades(
+            [
+                _cash_request(portfolio.id),
+                _cash_request(missing_portfolio),
+                _cash_request(portfolio.id),
+                _cash_request(missing_portfolio),
+            ]
+        )
+
+    assert [e["index"] for e in raised.value.errors] == [1, 3]
+    assert "not found" in raised.value.errors[0]["message"]

@@ -3,6 +3,7 @@ import type { AxiosRequestConfig } from "axios";
 import { envUtils } from "#utils/env.js";
 import { queueRequest } from "#lib/stores/offline.js";
 import type { SyncQueueItem } from "#lib/stores/offline.js";
+import { savePendingTradesFromRequest } from "#lib/stores/pendingTrades.js";
 import { clearAuthToken, getAuthToken, storeAuthToken } from "#lib/stores/offlineAuth.js";
 import { goto } from "$app/navigation";
 
@@ -104,9 +105,32 @@ axiosInstance.interceptors.request.use(async (config) => {
     };
 });
 
+// The session is over: keep a trade the user was submitting (it would otherwise
+// be lost), clear auth, and send them to /login, which returns them here.
+async function endSession(config: { method?: string; url?: string; data?: unknown }) {
+  const isAuthCall = (config.url ?? "").startsWith("/auth/");
+  const saved = isAuthCall ? 0 : await savePendingTradesFromRequest(config);
+
+  clearAuthToken();
+  if (typeof window === "undefined") return;
+
+  // A failed login or refresh is not an expired session: no notice, no redirect target.
+  if (isAuthCall) {
+    goto("/login");
+    return;
+  }
+  const params = new URLSearchParams({
+    notice: saved ? "trade-saved" : "session-expired",
+  });
+  if (saved) params.set("saved", String(saved));
+  const here = window.location.pathname + window.location.search;
+  if (!here.startsWith("/login")) params.set("redirect", here);
+  goto(`/login?${params}`);
+}
+
 // Response interceptor for error handling
 axiosInstance.interceptors.response.use(
-  (response) => {
+  async (response) => {
     // Handle error responses from API
     if (response.status >= 400) {
       // Handle 401 Unauthorized - attempt token refresh
@@ -123,12 +147,9 @@ axiosInstance.interceptors.response.use(
               };
               return axiosInstance(retryConfig);
             })
-            .catch(() => {
+            .catch(async () => {
               // If all refresh attempts fail, clear auth and redirect to login
-              clearAuthToken();
-              if (typeof window !== 'undefined') {
-                goto('/login');
-              }
+              await endSession(response.config);
               const errorData = response.data?.error || response.data;
               const error = new Error(
                 errorData?.message || `API error: ${response.status} ${response.statusText}`,
@@ -139,10 +160,7 @@ axiosInstance.interceptors.response.use(
             });
         } else {
           // No refresh token available, clear auth and redirect to login
-          clearAuthToken();
-          if (typeof window !== 'undefined') {
-            goto('/login');
-          }
+          await endSession(response.config);
         }
       }
 

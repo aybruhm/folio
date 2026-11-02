@@ -9,9 +9,9 @@
         formatQuantity,
         formatQuantityShort,
     } from "#lib/utils/format.js";
-    import { createEventDispatcher } from "svelte";
 
-    const dispatch = createEventDispatcher();
+    export let onEdit: (trade: any) => void = () => {};
+    export let onDelete: (tradeId: string) => void = () => {};
 
     export let trades: any[] = [];
     export let loading = false;
@@ -189,7 +189,7 @@
                             <td class="p-4 align-middle">
                                 <div class="flex gap-2">
                                     <button
-                                        on:click={() => dispatch("edit", row)}
+                                        on:click={() => onEdit(row)}
                                         class="text-muted-foreground hover:text-foreground transition-colors"
                                         title="Edit trade"
                                     >
@@ -209,7 +209,7 @@
                                     </button>
                                     <button
                                         on:click={() =>
-                                            dispatch("delete", row.id)}
+                                            onDelete(row.id)}
                                         class="text-muted-foreground hover:text-destructive transition-colors"
                                         title="Delete trade"
                                     >

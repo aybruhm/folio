@@ -492,3 +492,165 @@ def test_bulk_delete_trades_error(authed_client, monkeypatch):
     )
 
     assert response.status_code == 400
+
+
+class TrackingSession:
+    def __init__(self):
+        self.commits = 0
+        self.rollbacks = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def rollback(self) -> None:
+        self.rollbacks += 1
+
+
+class FakeBulkTradeInteractor(FakeTradeInteractor):
+    def __init__(self, fail_rows=()):
+        super().__init__()
+        self.fail_rows = set(fail_rows)
+        self.last_bulk = None
+
+    async def create_trades(self, requests):
+        self.last_bulk = requests
+        errors = [
+            {"index": i, "message": f"Cannot find asset metadata for {requests[i].ticker}"}
+            for i in sorted(self.fail_rows)
+        ]
+        if errors:
+            raise trade_routes.BulkTradeError(errors)
+        return [uuid4() for _ in requests]
+
+
+class FakePortfolioLookup:
+    def __init__(self, owner_id, missing=False):
+        self.owner_id = owner_id
+        self.missing = missing
+
+    async def get_portfolio(self, portfolio_id):
+        if self.missing:
+            raise ValueError(f"Portfolio {portfolio_id} not found")
+        return {"id": str(portfolio_id), "user_id": str(self.owner_id)}
+
+
+def _bulk_body(rows=2, **overrides):
+    return {
+        "portfolio_id": str(uuid4()),
+        "trades": [
+            {
+                "ticker": f"T{i}",
+                "trade_type": "buy",
+                "trade_date": "2024-01-01T09:30:00",
+                "quantity": 0.12345678,
+                "price": 10.5,
+                "trade_currency": "USD",
+            }
+            for i in range(rows)
+        ],
+        **overrides,
+    }
+
+
+def _patch_bulk(monkeypatch, authed_client, owner_id, interactor, session, missing=False):
+    from infrastructure.db.session import get_session
+    from main import app
+
+    app.dependency_overrides[get_session] = lambda: session
+    _patch_trade_interactor(monkeypatch, interactor)
+    monkeypatch.setattr(
+        trade_routes,
+        "PortfolioInteractor",
+        lambda s: FakePortfolioLookup(owner_id, missing=missing),
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_bulk_create_saves_all_rows_in_one_commit(
+    authed_client, monkeypatch, fake_user
+):
+    interactor, session = FakeBulkTradeInteractor(), TrackingSession()
+    _patch_bulk(monkeypatch, authed_client, fake_user.id, interactor, session)
+    body = _bulk_body(rows=3)
+
+    response = authed_client.post("/api/v1/trades/bulk", json=body)
+
+    assert response.status_code == 201
+    assert response.json()["created"] == 3
+    assert len(response.json()["trades"]) == 3
+    assert [r.ticker for r in interactor.last_bulk] == ["T0", "T1", "T2"]
+    assert {str(r.portfolio_id) for r in interactor.last_bulk} == {body["portfolio_id"]}
+    assert interactor.last_bulk[0].quantity == 12_345_678  # 8 decimals kept
+    assert (session.commits, session.rollbacks) == (1, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+def test_bulk_create_is_all_or_nothing_and_lists_failing_rows(
+    authed_client, monkeypatch, fake_user
+):
+    interactor, session = FakeBulkTradeInteractor(fail_rows=[0, 2]), TrackingSession()
+    _patch_bulk(monkeypatch, authed_client, fake_user.id, interactor, session)
+
+    response = authed_client.post("/api/v1/trades/bulk", json=_bulk_body(rows=3))
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "bulk_trade_invalid"
+    assert "No trades were saved" in body["message"]
+    assert [e["index"] for e in body["details"]["errors"]] == [0, 2]
+    assert (session.commits, session.rollbacks) == (0, 1)
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+def test_bulk_create_rejects_invalid_rows_before_touching_the_database(
+    authed_client, monkeypatch, fake_user
+):
+    interactor, session = FakeBulkTradeInteractor(), TrackingSession()
+    _patch_bulk(monkeypatch, authed_client, fake_user.id, interactor, session)
+    body = _bulk_body(rows=3)
+    body["trades"][1]["trade_type"] = "swap"
+    body["trades"][2]["trade_currency"] = "XXX"
+
+    response = authed_client.post("/api/v1/trades/bulk", json=body)
+
+    assert response.status_code == 422
+    assert [e["index"] for e in response.json()["details"]["errors"]] == [1, 2]
+    assert interactor.last_bulk is None
+    assert session.commits == 0
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+@pytest.mark.parametrize(
+    "missing,owner_is_caller,expected_status",
+    [(True, True, 404), (False, False, 403)],
+)
+def test_bulk_create_requires_the_callers_own_portfolio(
+    authed_client, monkeypatch, fake_user, missing, owner_is_caller, expected_status
+):
+    interactor, session = FakeBulkTradeInteractor(), TrackingSession()
+    owner = fake_user.id if owner_is_caller else uuid4()
+    _patch_bulk(monkeypatch, authed_client, owner, interactor, session, missing=missing)
+
+    response = authed_client.post("/api/v1/trades/bulk", json=_bulk_body())
+
+    assert response.status_code == expected_status
+    assert interactor.last_bulk is None
+    assert session.commits == 0
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+@pytest.mark.parametrize("rows,expected_status", [(0, 422), (1, 201), (50, 201), (51, 422)])
+def test_bulk_create_enforces_row_limits(
+    authed_client, monkeypatch, fake_user, rows, expected_status
+):
+    interactor, session = FakeBulkTradeInteractor(), TrackingSession()
+    _patch_bulk(monkeypatch, authed_client, fake_user.id, interactor, session)
+
+    response = authed_client.post("/api/v1/trades/bulk", json=_bulk_body(rows=rows))
+
+    assert response.status_code == expected_status

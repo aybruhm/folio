@@ -355,7 +355,7 @@
                 <div class="overflow-x-auto -mx-4 md:mx-0">
                     <HoldingsTable
                         holdings={filteredHoldings}
-                        on:deleteHolding={(e) => handleDeleteHolding(e.detail)}
+                        onDeleteHolding={handleDeleteHolding}
                     />
                 </div>
             </Card>
@@ -371,7 +371,7 @@
 >
     <TradeForm
         isLoading={tradeFormLoading}
-        on:submit={(e) => handleCreateTrade(e.detail)}
+        onSubmit={handleCreateTrade}
         trade={{
             ticker: "",
             trade_type: "buy",

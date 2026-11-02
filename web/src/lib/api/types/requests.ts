@@ -32,6 +32,14 @@ export interface CreateTradeRequest {
     market_data_provider?: MarketDataProvider;
 }
 
+// One row of a bulk create: a trade without its portfolio, which is shared.
+export type BulkTradeRow = Omit<CreateTradeRequest, "portfolio_id">;
+
+export interface BulkCreateTradeRequest {
+    portfolio_id: string;
+    trades: BulkTradeRow[];
+}
+
 export interface ListTradesQuery {
     portfolio_id: string;
     ticker?: string | null;

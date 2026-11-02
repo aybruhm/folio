@@ -8,6 +8,24 @@
     import Select from "#lib/components/Select.svelte";
     import Input from "#lib/components/Input.svelte";
     import SearchPagination from "#lib/components/SearchPagination.svelte";
+    import Amount from "#lib/components/Amount.svelte";
+    import BulkTradeForm from "#lib/components/BulkTradeForm.svelte";
+    import {
+        newBulkRow,
+        rowToPendingInput,
+        rowsFromPending,
+        toBulkPayload,
+        type BulkRow,
+    } from "#lib/utils/bulkTrades.js";
+    import type { BulkTradeRowError } from "#lib/api/types/index.js";
+    import { formatCurrency, formatDateTime, formatQuantity } from "#lib/utils/format.js";
+    import {
+        pendingTrades,
+        refreshPendingTrades,
+        removePendingTrade,
+        updatePendingTrade,
+        type PendingTrade,
+    } from "#lib/stores/pendingTrades.js";
     import { currentPortfolio, portfolios } from "#lib/stores/index.js";
     import { api } from "#lib/api/client.js";
     import { TradeController, PortfolioController } from "#lib/api/controllers/index.js";
@@ -83,6 +101,130 @@
     }
 
     $: isAggregated = !$currentPortfolio?.id;
+
+    // Trades saved when the session expired mid-submit, for the selected portfolio.
+    $: void refreshPendingTrades($currentPortfolio?.id);
+
+    // Add several trades at once, or review every pending trade as one batch.
+    let showBulkModal = false;
+    let bulkFromPending = false;
+    let bulkRows: BulkRow[] = [];
+    let bulkServerErrors: BulkTradeRowError[] = [];
+    let bulkFormError = "";
+
+    function openBulk(fromPending = false) {
+        bulkFromPending = fromPending;
+        bulkServerErrors = [];
+        bulkFormError = "";
+        bulkRows = fromPending
+            ? rowsFromPending($pendingTrades)
+            : [newBulkRow(), newBulkRow(), newBulkRow()];
+        showBulkModal = true;
+    }
+
+    async function submitBulk(rows: BulkRow[]) {
+        const portfolioId = $currentPortfolio?.id;
+        if (!portfolioId) return;
+        tradeFormLoading = true;
+        bulkServerErrors = [];
+        bulkFormError = "";
+        try {
+            // Keep edits to pending rows first: if the session is gone by now,
+            // the interceptor saves the batch again and they come back as edited.
+            for (const row of rows) {
+                if (row.pendingId) {
+                    await updatePendingTrade(
+                        row.pendingId,
+                        rowToPendingInput(portfolioId, row),
+                    );
+                }
+            }
+            await tradeController.createTrades(toBulkPayload(portfolioId, rows));
+            for (const row of rows) {
+                if (row.pendingId) await removePendingTrade(row.pendingId);
+            }
+            await refreshPendingTrades(portfolioId);
+            await invalidatePortfolioCache(portfolioId);
+            showBulkModal = false;
+            await loadTrades();
+        } catch (e: any) {
+            console.error("Failed to create trades:", e);
+            if (e?.code === "bulk_trade_invalid" && Array.isArray(e?.details?.errors)) {
+                bulkServerErrors = e.details.errors;
+            }
+            bulkFormError =
+                e instanceof Error && e.message
+                    ? e.message
+                    : "Couldn't save these trades. Nothing was saved.";
+        } finally {
+            tradeFormLoading = false;
+        }
+    }
+
+    // The pending trade open in the review modal; `any` like editingTrade, because
+    // TradeForm types market_data_provider as a union.
+    let reviewingPending: any = null;
+    let pendingError = "";
+
+    function reviewPending(t: PendingTrade) {
+        pendingError = "";
+        reviewingPending = { ...t };
+    }
+
+    async function discardPending(t: PendingTrade) {
+        if (!confirm(`Discard the pending ${t.ticker.toUpperCase()} trade? This cannot be undone.`))
+            return;
+        await removePendingTrade(t.id);
+        await refreshPendingTrades($currentPortfolio?.id);
+    }
+
+    async function submitPending(trade: any) {
+        if (!reviewingPending) return;
+        const { id, portfolio_id } = reviewingPending;
+        tradeFormLoading = true;
+        pendingError = "";
+        try {
+            // Keep the user's edits in the store first: if this submit also fails
+            // because the session is gone, they come back to the edited version.
+            await updatePendingTrade(id, {
+                portfolio_id,
+                ticker: trade.ticker,
+                trade_type: trade.trade_type,
+                trade_date: trade.trade_date,
+                quantity: String(trade.quantity),
+                price: String(trade.price),
+                trade_currency: trade.trade_currency,
+                fees: String(trade.fees ?? "0"),
+                asset_class: trade.asset_class || "",
+                market_data_provider: trade.market_data_provider || "yfinance",
+            });
+            await tradeController.createTrade({
+                portfolio_id,
+                ticker: trade.ticker,
+                trade_type: trade.trade_type,
+                trade_date: trade.trade_date,
+                quantity: parseFloat(trade.quantity),
+                price: parseFloat(trade.price),
+                trade_currency: trade.trade_currency,
+                fees: parseFloat(trade.fees) || 0,
+                asset_class: trade.asset_class || undefined,
+                market_data_provider: trade.market_data_provider || "yfinance",
+            });
+            await removePendingTrade(id);
+            await refreshPendingTrades($currentPortfolio?.id);
+            await invalidatePortfolioCache(portfolio_id);
+            reviewingPending = null;
+            await loadTrades();
+        } catch (e) {
+            console.error("Failed to submit pending trade:", e);
+            pendingError =
+                e instanceof Error && e.message
+                    ? e.message
+                    : "Couldn't submit this trade. It is still saved here.";
+        } finally {
+            tradeFormLoading = false;
+        }
+    }
 
     $: if (
         searchTerm !== lastSearchTerm ||
@@ -365,6 +507,14 @@
                     Import CSV
                 </Button>
                 <Button
+                    variant="outline"
+                    on:click={() => openBulk()}
+                    class="flex-1 sm:flex-none {!$currentPortfolio?.id ? 'opacity-50 cursor-not-allowed' : ''}"
+                    disabled={!$currentPortfolio?.id}
+                >
+                    Add Multiple
+                </Button>
+                <Button
                     variant="default"
                     on:click={() => showNewModal = true}
                     class="flex-1 sm:flex-none {!$currentPortfolio?.id ? 'opacity-50 cursor-not-allowed' : ''}"
@@ -387,6 +537,60 @@
                 </Button>
             </div>
         </div>
+
+        <!-- Pending trades: saved when the session expired during a submit -->
+        {#if !isAggregated && $pendingTrades.length > 0}
+            <Card
+                title="Pending trades ({$pendingTrades.length})"
+                subtitle="Saved on this device when your session expired. Review each one and submit it again, or discard it."
+            >
+                {#if $pendingTrades.length > 1}
+                    <div class="mb-3 flex justify-end">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            on:click={() => openBulk(true)}
+                            >Review all {$pendingTrades.length} together</Button
+                        >
+                    </div>
+                {/if}
+                <div class="divide-y divide-border">
+                    {#each $pendingTrades as t (t.id)}
+                        <div
+                            class="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div class="text-sm">
+                                <span class="font-medium">{t.ticker.toUpperCase()}</span>
+                                <span
+                                    class="ml-2 text-xs uppercase text-muted-foreground"
+                                    >{t.trade_type}</span
+                                >
+                                <p class="text-xs text-muted-foreground">
+                                    {formatDateTime(t.trade_date)} ·
+                                    <Amount value={formatQuantity(t.quantity)} /> ×
+                                    <Amount
+                                        value={formatCurrency(t.price, t.trade_currency)}
+                                    />
+                                </p>
+                            </div>
+                            <div class="flex gap-2">
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    on:click={() => reviewPending(t)}
+                                    >Review &amp; submit</Button
+                                >
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    on:click={() => discardPending(t)}>Discard</Button
+                                >
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </Card>
+        {/if}
 
         <!-- Search + Filters -->
         <Card>
@@ -499,8 +703,8 @@
                     <TradeTable
                         trades={pagedTrades}
                         bind:selectedIds={selectedTradeIds}
-                        on:edit={(e) => handleEditTrade(e.detail)}
-                        on:delete={(e) => handleDeleteTrade(e.detail)}
+                        onEdit={handleEditTrade}
+                        onDelete={handleDeleteTrade}
                     />
                 </div>
             </Card>
@@ -516,7 +720,7 @@
 >
     <TradeForm
         isLoading={tradeFormLoading}
-        on:submit={(e) => handleCreateTrade(e.detail)}
+        onSubmit={handleCreateTrade}
         trade={{
             ticker: "",
             trade_type: "buy",
@@ -536,6 +740,50 @@
     </svelte:fragment>
 </Modal>
 
+<!-- Add Multiple Trades / Review All Pending -->
+<Modal
+    open={showBulkModal}
+    size="xl"
+    title={bulkFromPending ? "Review pending trades" : "Add multiple trades"}
+    onClose={() => (showBulkModal = false)}
+>
+    <BulkTradeForm
+        bind:rows={bulkRows}
+        isLoading={tradeFormLoading}
+        serverErrors={bulkServerErrors}
+        formError={bulkFormError}
+        onSubmit={submitBulk}
+    />
+    <svelte:fragment slot="footer">
+        <Button variant="outline" on:click={() => (showBulkModal = false)}
+            >Cancel</Button
+        >
+    </svelte:fragment>
+</Modal>
+
+<!-- Review Pending Trade Modal -->
+{#if reviewingPending}
+    <Modal
+        open={true}
+        title="Review pending trade"
+        onClose={() => (reviewingPending = null)}
+    >
+        {#if pendingError}
+            <p class="mb-3 text-sm text-destructive" role="alert">{pendingError}</p>
+        {/if}
+        <TradeForm
+            isLoading={tradeFormLoading}
+            onSubmit={submitPending}
+            trade={reviewingPending}
+        />
+        <svelte:fragment slot="footer">
+            <Button variant="outline" on:click={() => (reviewingPending = null)}
+                >Cancel</Button
+            >
+        </svelte:fragment>
+    </Modal>
+{/if}
+
 <!-- Edit Trade Modal -->
 {#if editingTrade}
     <Modal
@@ -548,7 +796,7 @@
     >
         <TradeForm
             isLoading={tradeFormLoading}
-            on:submit={(e) => handleUpdateTrade(e.detail)}
+            onSubmit={handleUpdateTrade}
             trade={editingTrade}
         />
         <svelte:fragment slot="footer">

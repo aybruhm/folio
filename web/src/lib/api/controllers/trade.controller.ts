@@ -2,6 +2,8 @@ import type { AxiosInstance } from "axios";
 import type {
     Trade,
     CreateTradeRequest,
+    BulkCreateTradeRequest,
+    BulkCreateTradeResponse,
     ListTradesQuery,
     ListTradesResponse,
     ValidateCsvResponse,
@@ -23,6 +25,13 @@ export class TradeController {
                 limit: params.limit || 100,
             },
         });
+        return response.data;
+    }
+
+    // All or nothing. On a 422 the thrown error has code "bulk_trade_invalid" and
+    // details.errors = BulkTradeRowError[] naming the rejected rows.
+    async createTrades(data: BulkCreateTradeRequest): Promise<BulkCreateTradeResponse> {
+        const response = await this.client.post("/trades/bulk", data);
         return response.data;
     }
 
