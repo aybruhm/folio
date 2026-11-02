@@ -5,6 +5,8 @@
   export let open = false
   export let title: string = ''
   export let onClose: () => void = () => {}
+  // 'xl' for wide content such as a table of rows.
+  export let size: 'md' | 'xl' = 'md'
 
   function handleEscKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -18,7 +20,7 @@
 {#if open}
   <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4 sm:p-0">
     <div
-      class="relative w-full sm:max-w-lg overflow-hidden rounded-t-lg sm:rounded-lg border border-border bg-card shadow-lg max-h-[90vh] sm:max-h-none overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out"
+      class="relative w-full {size === 'xl' ? 'sm:max-w-6xl' : 'sm:max-w-lg'} overflow-hidden rounded-t-lg sm:rounded-lg border border-border bg-card shadow-lg max-h-[90vh] sm:max-h-none overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out"
       role="dialog"
       aria-labelledby="modal-title"
     >

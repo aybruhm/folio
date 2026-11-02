@@ -10,6 +10,21 @@
     let errorMessage = "";
     let isSubmitting = false;
 
+    // Set by the API client when a 401 ends the session (see endSession in client.ts).
+    // Read when rendering, since `page` is not tracked by a legacy `$:` statement.
+    function noticeText(): string {
+        const notice = page.url.searchParams.get("notice");
+        if (notice === "trade-saved") {
+            const count = Number(page.url.searchParams.get("saved")) || 1;
+            return count > 1
+                ? `Your session expired. The ${count} trades you were entering are saved: sign in, then open Trades to review and submit them.`
+                : "Your session expired. The trade you were entering is saved: sign in, then open Trades to review and submit it.";
+        }
+        return notice === "session-expired"
+            ? "Your session expired. Sign in to continue."
+            : "";
+    }
+
     const registrationEnabled = PUBLIC_ENABLE_REGISTRATION !== "false";
 
     async function handleSubmit(e: SubmitEvent) {
@@ -96,6 +111,15 @@
             <h2 class="text-base font-semibold text-foreground mb-5">
                 Welcome back
             </h2>
+
+            {#if !errorMessage && noticeText()}
+                <div
+                    class="mb-4 p-3 rounded-lg border border-accent/40 bg-accent/10 text-foreground text-sm"
+                    role="status"
+                >
+                    {noticeText()}
+                </div>
+            {/if}
 
             {#if errorMessage}
                 <div

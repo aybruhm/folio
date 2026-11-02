@@ -6,9 +6,8 @@
         formatQuantity,
         formatPercent,
     } from "#lib/utils/format.js";
-    import { createEventDispatcher } from "svelte";
 
-    const dispatch = createEventDispatcher();
+    export let onDeleteHolding: (ticker: string) => void = () => {};
 
     export let holdings: any[] = [];
     export let loading = false;
@@ -154,7 +153,7 @@
                             <td class="p-4 align-middle">
                                 <button
                                     on:click={() =>
-                                        dispatch("deleteHolding", row.ticker)}
+                                        onDeleteHolding(row.ticker)}
                                     class="text-muted-foreground hover:text-destructive transition-colors"
                                     title="Delete all trades for this holding"
                                 >

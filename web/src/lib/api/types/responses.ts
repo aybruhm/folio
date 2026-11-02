@@ -96,6 +96,16 @@ export interface GetPriceHistoryResponse {
     }>;
 }
 
+export interface BulkCreateTradeResponse {
+    created: number;
+    trades: Trade[];
+}
+
+export interface BulkTradeRowError {
+    index: number;
+    message: string;
+}
+
 export interface GetBatchPriceHistoryResponse {
     results: GetPriceHistoryResponse[];
 }

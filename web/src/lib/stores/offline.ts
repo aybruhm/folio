@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import type { Readable } from 'svelte/store';
 import { invalidateAllAnalytics, invalidateAllHoldings } from '#lib/cache/index.js';
+import { openFolioDb } from '#lib/stores/folioDb.js';
 
 export interface SyncQueueItem {
   id: string;
@@ -32,21 +33,8 @@ const initialState: OfflineState = {
 export const offlineStore = writable<OfflineState>(initialState);
 
 // Initialize IndexedDB for persistent sync queue
-async function initDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('folio-db', 1);
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains('syncQueue')) {
-        const store = db.createObjectStore('syncQueue', { keyPath: 'id' });
-        store.createIndex('timestamp', 'timestamp', { unique: false });
-      }
-    };
-  });
+function initDB(): Promise<IDBDatabase> {
+  return openFolioDb();
 }
 
 let db: IDBDatabase | null = null;

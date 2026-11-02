@@ -2,13 +2,11 @@
     import Input from "./Input.svelte";
     import Select from "./Select.svelte";
     import Button from "./Button.svelte";
-    import { createEventDispatcher } from "svelte";
     import { CURRENCIES } from "#lib/constants/currencies.js";
     import { formatCurrency } from "#lib/utils/format.js";
     import { api } from "#lib/api/client.js";
     import { AssetController } from "#lib/api/controllers/index.js";
 
-    const dispatch = createEventDispatcher();
 
     export let trade: {
         ticker: string;
@@ -37,6 +35,8 @@
         market_data_provider: "yfinance",
     };
     export let isLoading = false;
+    // The submitted form values (the same shape as the `trade` prop).
+    export let onSubmit: (trade: any) => void = () => {};
 
     const tradeTypes = [
         { label: "Buy", value: "buy" },
@@ -132,7 +132,7 @@
 
         isSubmitting = true;
         try {
-            dispatch("submit", trade);
+            onSubmit(trade);
         } catch (e: unknown) {
             const message =
                 e instanceof Error ? e.message : "An error occurred";

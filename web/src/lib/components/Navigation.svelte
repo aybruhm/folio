@@ -4,9 +4,9 @@
     import { portfolios, currentPortfolio, hideAmounts } from "#lib/stores/index.js";
     import { clearAuthToken } from "#lib/stores/offlineAuth.js";
     import { triggerCacheRefresh } from "#lib/stores/cacheRefresh.js";
-    import { createEventDispatcher } from "svelte";
 
-    const dispatch = createEventDispatcher();
+    export let onToggleSidebar: () => void = () => {};
+    export let onToggleTheme: () => void = () => {};
 
     export let isDark: boolean;
 
@@ -22,11 +22,11 @@
     }
 
     function handleToggleSidebar() {
-        dispatch("toggleSidebar");
+        onToggleSidebar();
     }
 
     function handleToggleTheme() {
-        dispatch("toggleTheme");
+        onToggleTheme();
     }
 
     async function handleLogout() {
