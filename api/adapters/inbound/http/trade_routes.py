@@ -8,7 +8,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.inbound.http.dependencies import get_current_user
+from adapters.inbound.http.dependencies import (
+    get_current_user,
+    invalidate_benchmark_cache,
+)
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from application.trades.csv_import_interactor import CsvImportInteractor
 from application.trades.trade_interactor import BulkTradeError, TradeInteractor
@@ -99,7 +102,7 @@ async def list_trades(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(invalidate_benchmark_cache)])
 async def create_trade(
     body: TradeBody,
     _: User = Depends(get_current_user),
@@ -128,7 +131,7 @@ async def _require_portfolio_access(
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-@router.post("/bulk", status_code=status.HTTP_201_CREATED)
+@router.post("/bulk", status_code=status.HTTP_201_CREATED, dependencies=[Depends(invalidate_benchmark_cache)])
 async def create_trades_bulk(
     body: BulkTradeBody,
     current_user: User = Depends(get_current_user),
@@ -190,7 +193,7 @@ async def get_trade(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.put("/{trade_id}")
+@router.put("/{trade_id}", dependencies=[Depends(invalidate_benchmark_cache)])
 async def update_trade(
     trade_id: UUID,
     body: TradeBody,
@@ -212,7 +215,7 @@ async def update_trade(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{trade_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{trade_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(invalidate_benchmark_cache)])
 async def delete_trade(
     trade_id: UUID,
     _: User = Depends(get_current_user),
@@ -230,7 +233,7 @@ async def delete_trade(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/bulk/delete", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/bulk/delete", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(invalidate_benchmark_cache)])
 async def bulk_delete_trades(
     request: BulkDeleteRequest,
     _: User = Depends(get_current_user),
@@ -268,7 +271,7 @@ async def validate_csv(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/import/confirm")
+@router.post("/import/confirm", dependencies=[Depends(invalidate_benchmark_cache)])
 async def confirm_import(
     file: UploadFile = File(...),
     mapping: str = Form(...),
