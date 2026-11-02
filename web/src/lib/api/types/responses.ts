@@ -1,4 +1,5 @@
 import type { Portfolio, Trade, Goal, Asset, Benchmark } from "./common";
+import type { BenchmarkProvider } from "./requests";
 
 export type ListPortfoliosResponse = Portfolio[];
 
@@ -116,8 +117,44 @@ export interface ValidateTickerResponse {
     supported: boolean;
 }
 
-export interface ListBenchmarksResponse {
-    data: Benchmark[];
+// A suggested benchmark from GET /benchmarks/.
+export interface BenchmarkOption {
+    ticker: string;
+    name: string;
+    category: string;
+    provider: BenchmarkProvider;
+}
+
+export type ListBenchmarksResponse = BenchmarkOption[];
+
+// GET /portfolios/analytics/benchmark. Returns are percent; series values are
+// cumulative percent since start_date, so both lines begin at 0.
+export interface BenchmarkComparisonResponse {
+    // When the API computed this (ISO, UTC). Results are cached for 35 minutes.
+    generated_at: string;
+    period: string;
+    currency: string;
+    requested_start: string;
+    start_date: string;
+    end_date: string;
+    // What moved start_date later than requested_start, if anything.
+    limited_by: "portfolio" | "benchmark" | null;
+    portfolio_count: number;
+    excluded_portfolio_ids: string[];
+    portfolio: { return_pct: number; annualized_pct: number | null };
+    benchmark: {
+        ticker: string;
+        provider: BenchmarkProvider;
+        name: string;
+        quote_currency: string | null;
+        // False when its currency could not be converted to `currency`.
+        converted: boolean;
+        return_pct: number;
+        annualized_pct: number | null;
+    };
+    // Percentage points: portfolio minus benchmark.
+    excess_return_pct: number;
+    series: { date: string; portfolio: number; benchmark: number }[];
 }
 
 export interface AddBenchmarkResponse {

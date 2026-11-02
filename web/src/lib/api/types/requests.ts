@@ -121,6 +121,20 @@ export interface ListPortfolioAnalyticsQuery {
     include_archived?: boolean;
 }
 
+export type BenchmarkPeriod = "ytd" | "3m" | "6m" | "1y" | "3y" | "5y" | "10y";
+
+export type BenchmarkProvider = "yfinance" | "ngxpulse" | "ngnmarket";
+
+export interface BenchmarkComparisonQuery {
+    benchmark: string;
+    period: BenchmarkPeriod;
+    in_currency?: string;
+    // Omit to compare all portfolios together.
+    portfolio_id?: string | null;
+    // Where the benchmark's prices come from. Omit for catalog tickers: the API knows.
+    provider?: BenchmarkProvider | null;
+}
+
 export interface AddBenchmarkQuery {
     ticker: string;
     name: string;
