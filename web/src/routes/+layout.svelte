@@ -5,6 +5,7 @@
     import PWAInstall from "#lib/components/PWAInstall.svelte";
     import OfflineStatus from "#lib/components/OfflineStatus.svelte";
     import { onMount } from "svelte";
+    import { afterNavigate } from "$app/navigation";
     import { page } from "$app/state";
     import {
         portfolios,
@@ -19,6 +20,9 @@
     let isDark = true;
     let sidebarOpen = false;
     let portfolioController: PortfolioController;
+    // This layout stays mounted across /login and the app, so the mount-time load
+    // below is skipped when the first page is /login. Track it per signed-in session.
+    let portfoliosLoaded = false;
 
     // A function, not a `$:` statement: `page` is an import, so a legacy
     // reactive statement would be computed once and never follow navigation.
@@ -75,7 +79,17 @@
         }
     }
 
+    afterNavigate(() => {
+        if (isAuthRoute()) {
+            // Signed out, or about to sign in as someone else.
+            portfoliosLoaded = false;
+        } else if (!portfoliosLoaded && portfolioController) {
+            void loadPortfolios();
+        }
+    });
+
     async function loadPortfolios() {
+        portfoliosLoaded = true;
         try {
             const data = await portfolioController.listPortfolios();
             const portfolioList: Portfolio[] = ((data || []) as any[]).map(
@@ -102,8 +116,8 @@
     <div class="flex h-screen flex-col text-foreground">
         <Navigation
             {isDark}
-            on:toggleTheme={toggleTheme}
-            on:toggleSidebar={() => (sidebarOpen = !sidebarOpen)}
+            onToggleTheme={toggleTheme}
+            onToggleSidebar={() => (sidebarOpen = !sidebarOpen)}
         />
         <PWAInstall />
         <OfflineStatus />
