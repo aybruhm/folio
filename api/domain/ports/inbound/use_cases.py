@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import List, Optional
 from uuid import UUID
 
 from domain.value_objects.money import AssetClass, Currency, TradeType
@@ -11,7 +10,7 @@ from domain.value_objects.money import AssetClass, Currency, TradeType
 class CreatePortfolioRequest:
     name: str
     base_currency: Currency
-    description: Optional[str] = None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -24,8 +23,8 @@ class CreateTradeRequest:
     price: int  # ×100
     trade_currency: Currency
     fees: int = 0  # ×100
-    notes: Optional[str] = None
-    asset_class: Optional[AssetClass] = None
+    notes: str | None = None
+    asset_class: AssetClass | None = None
     market_data_provider: str = "yfinance"
 
 
@@ -53,14 +52,14 @@ class IPortfolioUseCase(ABC):
     @abstractmethod
     async def list_portfolios(
         self, user_id: UUID, include_archived: bool = False
-    ) -> List[dict]: ...
+    ) -> list[dict]: ...
 
     @abstractmethod
     async def update_portfolio(
         self,
         portfolio_id: UUID,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None: ...
 
     @abstractmethod
@@ -75,19 +74,22 @@ class ITradeUseCase(ABC):
     async def create_trade(self, request: CreateTradeRequest) -> UUID: ...
 
     @abstractmethod
+    async def create_trades(self, requests: list[CreateTradeRequest]) -> list[UUID]: ...
+
+    @abstractmethod
     async def get_trade(self, trade_id: UUID) -> dict: ...
 
     @abstractmethod
     async def list_trades(
         self,
-        portfolio_id: Optional[UUID] = None,
-        ticker: Optional[str] = None,
-        trade_type: Optional[TradeType] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        portfolio_id: UUID | None = None,
+        ticker: str | None = None,
+        trade_type: TradeType | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> tuple[List[dict], int]: ...
+    ) -> tuple[list[dict], int]: ...
 
     @abstractmethod
     async def update_trade(
@@ -101,28 +103,28 @@ class ITradeUseCase(ABC):
 class IAnalyticsUseCase(ABC):
     @abstractmethod
     async def get_holdings(
-        self, portfolio_id: UUID, in_currency: Optional[Currency] = None
-    ) -> List[dict]: ...
+        self, portfolio_id: UUID, in_currency: Currency | None = None
+    ) -> list[dict]: ...
 
     @abstractmethod
     async def calculate_performance(
         self,
         portfolio_id: UUID,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> dict: ...
 
     @abstractmethod
     async def get_allocation(
         self, portfolio_id: UUID, group_by: str = "asset_class"
-    ) -> List[dict]: ...
+    ) -> list[dict]: ...
 
     @abstractmethod
     async def get_benchmark_comparison(
         self,
         portfolio_id: UUID,
-        benchmark_tickers: List[str],
-        start_date: Optional[date] = None,
+        benchmark_tickers: list[str],
+        start_date: date | None = None,
     ) -> dict: ...
 
 
@@ -134,7 +136,7 @@ class IGoalUseCase(ABC):
     async def get_goal(self, goal_id: UUID) -> dict: ...
 
     @abstractmethod
-    async def list_goals(self, user_id: UUID) -> List[dict]: ...
+    async def list_goals(self, user_id: UUID) -> list[dict]: ...
 
     @abstractmethod
     async def update_goal(self, goal_id: UUID, request: CreateGoalRequest) -> None: ...
@@ -163,6 +165,6 @@ class ICsvImportUseCase(ABC):
         mapping: dict,
         date_format: str,
         portfolio_id: UUID,
-        profile_name: Optional[str] = None,
+        profile_name: str | None = None,
         market_data_provider: str = "yfinance",
     ) -> dict: ...

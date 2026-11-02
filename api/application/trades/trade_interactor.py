@@ -23,6 +23,15 @@ from domain.ports.outbound.repositories import (
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 
+class BulkTradeError(ValueError):
+    """One or more rows of a bulk create were rejected. `errors` is a list of
+    {"index": row position, "message": reason}; nothing has been saved."""
+
+    def __init__(self, errors: list[dict]):
+        super().__init__(f"{len(errors)} trade(s) could not be created")
+        self.errors = errors
+
+
 class TradeInteractor(ITradeUseCase):
     def __init__(self, session: AsyncSession):
         self.trade_repo: ITradeRepository = TradeRepository(session)
@@ -142,6 +151,20 @@ class TradeInteractor(ITradeUseCase):
 
         await self.trade_repo.add(trade)
         return trade.id
+
+    async def create_trades(self, requests: List[CreateTradeRequest]) -> List[UUID]:
+        # Every row is attempted so the caller gets all the problems at once.
+        # The caller must roll back when this raises: earlier rows are flushed.
+        trade_ids: List[UUID] = []
+        errors: list[dict] = []
+        for index, request in enumerate(requests):
+            try:
+                trade_ids.append(await self.create_trade(request))
+            except ValueError as e:
+                errors.append({"index": index, "message": str(e)})
+        if errors:
+            raise BulkTradeError(errors)
+        return trade_ids
 
     async def get_trade(self, trade_id: UUID) -> dict:
         trade = await self.trade_repo.get_by_id(trade_id)
