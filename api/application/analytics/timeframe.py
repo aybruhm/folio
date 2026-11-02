@@ -1,7 +1,7 @@
 import calendar
 from datetime import date
 
-_TIMEFRAME_MONTHS = {"1m": 1, "3m": 3, "6m": 6, "1y": 12, "3y": 36, "5y": 60}
+_TIMEFRAME_MONTHS = {"1m": 1, "3m": 3, "6m": 6, "1y": 12, "3y": 36, "5y": 60, "10y": 120}
 
 
 def _shift_months(d: date, months: int) -> date:

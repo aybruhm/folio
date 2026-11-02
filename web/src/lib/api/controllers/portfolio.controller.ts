@@ -15,6 +15,8 @@ import type {
     ListPortfolioAnalyticsResponse,
     AnalyticsSummaryQuery,
     AnalyticsSummaryResponse,
+    BenchmarkComparisonQuery,
+    BenchmarkComparisonResponse,
 } from "../types";
 
 export class PortfolioController {
@@ -108,6 +110,26 @@ export class PortfolioController {
                 ...(params.include_archived && { include_archived: true }),
             },
         });
+        return response.data;
+    }
+
+    async getBenchmarkComparison(
+        params: BenchmarkComparisonQuery,
+    ): Promise<BenchmarkComparisonResponse> {
+        const response = await this.client.get(
+            `/portfolios/analytics/benchmark`,
+            {
+                params: {
+                    benchmark: params.benchmark,
+                    period: params.period,
+                    in_currency: params.in_currency || "USD",
+                    ...(params.portfolio_id && {
+                        portfolio_id: params.portfolio_id,
+                    }),
+                    ...(params.provider && { provider: params.provider }),
+                },
+            },
+        );
         return response.data;
     }
 

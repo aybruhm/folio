@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, Request, status
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from adapters.outbound.market_data.benchmark_cache import BenchmarkCache
 from adapters.outbound.persistence.user_repository import UserRepository
 from domain.entities.models import User
 from infrastructure.db.session import get_session
@@ -35,3 +36,12 @@ async def get_current_user(
         )
 
     return user
+
+
+async def invalidate_benchmark_cache():
+    """Drop cached benchmark comparisons once a route that changes trades or
+    portfolios has run, so the next comparison reflects the change."""
+    try:
+        yield
+    finally:
+        await BenchmarkCache().invalidate()

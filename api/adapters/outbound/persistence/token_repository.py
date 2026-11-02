@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +27,7 @@ class RefreshTokenRepository(ITokenRepository):
         self.session.add(model)
         await self.session.flush()
 
-    async def get_by_token(self, token: str) -> Optional[dict]:
+    async def get_by_token(self, token: str) -> dict | None:
         result = await self.session.execute(
             select(RefreshTokenModel).where(RefreshTokenModel.token == token)
         )

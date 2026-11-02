@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
 
 
 @dataclass
@@ -35,7 +34,7 @@ class PerformanceInputs:
         )
 
     @staticmethod
-    def combine(inputs: list["PerformanceInputs"]) -> Optional["PerformanceInputs"]:
+    def combine(inputs: list["PerformanceInputs"]) -> "PerformanceInputs | None":
         if not inputs:
             return None
         return PerformanceInputs(

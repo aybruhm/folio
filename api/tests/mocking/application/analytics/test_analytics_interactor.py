@@ -298,28 +298,6 @@ async def test_calculate_performance_returns_zero_when_no_trades(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.happy_path
-async def test_get_benchmark_comparison_uses_portfolio_performance_and_requests_prices(
-    monkeypatch,
-):
-    portfolio = Portfolio(
-        id=uuid4(), user_id=uuid4(), name="Core", base_currency=Currency.USD
-    )
-    interactor, *_ = _patch_analytics_deps(monkeypatch, trades=[], assets={})
-
-    async def fake_calculate_performance(portfolio_id, start_date=None, end_date=None):
-        return {"twr": "12.5"}
-
-    interactor.calculate_performance = fake_calculate_performance
-
-    result = await interactor.get_benchmark_comparison(portfolio.id, ["SPY", "QQQ"])
-
-    assert result["portfolio_twr"] == "12.5"
-    assert set(result["benchmarks"].keys()) == {"SPY", "QQQ"}
-    assert interactor.yfinance.price_history_calls[0][0] == "SPY"
-
-
-@pytest.mark.asyncio
-@pytest.mark.happy_path
 async def test_get_holdings_cash_roundtrip_results_in_no_remaining_position(
     monkeypatch,
 ):
@@ -1162,3 +1140,56 @@ async def test_get_contribution_history_respects_start_date(monkeypatch):
         old_buy.strftime("%b %Y"),
         recent_buy.strftime("%b %Y"),
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_get_first_trade_date_returns_the_earliest_trade(monkeypatch):
+    interactor, portfolio, _window_start, old_buy, _recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+
+    assert await interactor.get_first_trade_date(portfolio.id) == old_buy
+
+
+@pytest.mark.asyncio
+@pytest.mark.edge_case
+async def test_get_first_trade_date_and_value_series_without_trades(monkeypatch):
+    interactor, *_ = _patch_analytics_deps(monkeypatch, trades=[], assets={})
+
+    assert await interactor.get_first_trade_date(uuid4()) is None
+    assert await interactor.get_value_series(uuid4(), [date.today()]) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.happy_path
+async def test_get_value_series_returns_values_and_in_window_flows(monkeypatch):
+    interactor, portfolio, window_start, _old_buy, recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+
+    values, flows = await interactor.get_value_series(
+        portfolio.id, [window_start, recent_buy, date.today()]
+    )
+
+    assert values[0] == 1200.0  # 10 shares at the $120 stored on the window start
+    assert values[-1] == 3000.0  # today is live: 15 shares at $200
+    # The buy on `recent_buy` falls in (window_start, recent_buy]; the old buy
+    # before the window is not a flow of the window.
+    assert flows == [(recent_buy, 750.0)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.edge_case
+async def test_get_value_series_excludes_flows_after_the_last_date(monkeypatch):
+    interactor, portfolio, window_start, _old_buy, recent_buy = (
+        _windowed_stock_portfolio(monkeypatch)
+    )
+    from datetime import timedelta
+
+    values, flows = await interactor.get_value_series(
+        portfolio.id, [window_start, recent_buy - timedelta(days=1)]
+    )
+
+    assert flows == []
+    assert len(values) == 2

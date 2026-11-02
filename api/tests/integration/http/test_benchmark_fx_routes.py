@@ -19,7 +19,11 @@ class FakeYFinanceAdapter:
 def test_benchmark_routes(client):
     listed = client.get("/api/v1/benchmarks/")
     assert listed.status_code == 200
-    assert len(listed.json()) == 3
+    catalog = listed.json()
+    assert all({"ticker", "name", "category"} <= set(item) for item in catalog)
+    assert {item["category"] for item in catalog} == {"Indices", "ETFs", "Crypto"}
+    assert {"^GSPC", "VOO", "BTC-USD"} <= {item["ticker"] for item in catalog}
+    assert len({item["ticker"] for item in catalog}) == len(catalog)
 
     created = client.post("/api/v1/benchmarks/", params={"ticker": "SPY", "name": "S&P 500"})
     assert created.status_code == 200

@@ -119,14 +119,6 @@ class IAnalyticsUseCase(ABC):
         self, portfolio_id: UUID, group_by: str = "asset_class"
     ) -> list[dict]: ...
 
-    @abstractmethod
-    async def get_benchmark_comparison(
-        self,
-        portfolio_id: UUID,
-        benchmark_tickers: list[str],
-        start_date: date | None = None,
-    ) -> dict: ...
-
 
 class IGoalUseCase(ABC):
     @abstractmethod

@@ -1,6 +1,5 @@
 import logging
 from datetime import date, timedelta
-from typing import List, Optional, Tuple
 
 import yfinance as yf
 
@@ -27,7 +26,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
     async def get_price_history(
         self, ticker: str, start: date, end: date
-    ) -> List[Tuple[date, int]]:
+    ) -> list[tuple[date, int]]:
         logger.debug("yfinance: fetching price history for %s (%s → %s)", ticker, start, end)
         try:
             t = yf.Ticker(ticker)
@@ -47,7 +46,15 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             logger.error("yfinance: price history failed for %s: %s", ticker, e)
             return []
 
-    async def get_current_price(self, ticker: str) -> Tuple[date, int]:
+    async def get_quote_currency(self, ticker: str) -> str | None:
+        """The currency Yahoo quotes `ticker` in (e.g. "GBp"), or None."""
+        try:
+            return yf.Ticker(ticker).fast_info["currency"] or None
+        except Exception as e:
+            logger.warning("yfinance: no quote currency for %s: %s", ticker, e)
+            return None
+
+    async def get_current_price(self, ticker: str) -> tuple[date, int]:
         # Check Valkey cache first
         cached = await self.cache.get_price(ticker)
         if cached is not None:
@@ -76,7 +83,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
     async def get_asset_metadata(
         self, ticker: str, currency: str = "USD"
-    ) -> Optional[AssetMetadata]:
+    ) -> AssetMetadata | None:
         # Check Valkey cache first
         cached = await self.cache.get_metadata(ticker)
         if cached is not None:
@@ -123,7 +130,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
     async def get_fx_rate(
         self, from_currency: Currency, to_currency: Currency, on_date: date
-    ) -> Optional[int]:
+    ) -> int | None:
         if from_currency == to_currency:
             return 100  # 1.00 × 100
 
@@ -169,7 +176,7 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
     async def get_current_rate(
         self, from_currency: Currency, to_currency: Currency
-    ) -> Optional[int]:
+    ) -> int | None:
         if from_currency == to_currency:
             return 100  # 1.00 × 100
 

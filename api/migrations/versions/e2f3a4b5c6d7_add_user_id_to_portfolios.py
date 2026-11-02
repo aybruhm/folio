@@ -6,15 +6,15 @@ Create Date: 2026-05-06 00:00:01.000000
 
 """
 
-from typing import Sequence, Union
+from typing import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e2f3a4b5c6d7"
-down_revision: Union[str, Sequence[str], None] = "d1e2f3a4b5c6"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "d1e2f3a4b5c6"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Stable UUID for the seed user created to own pre-existing portfolios
 SEED_USER_ID = "00000000-0000-0000-0000-000000000001"

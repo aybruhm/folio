@@ -6,6 +6,8 @@
     import DonutChart from "#lib/components/DonutChart.svelte";
     import Amount from "#lib/components/Amount.svelte";
     import Button from "#lib/components/Button.svelte";
+    import Modal from "#lib/components/Modal.svelte";
+    import BenchmarkPanel from "#lib/components/BenchmarkPanel.svelte";
     import Select from "#lib/components/Select.svelte";
     import StatCard from "#lib/components/StatCard.svelte";
     import ErrorState from "#lib/components/ErrorState.svelte";
@@ -58,6 +60,7 @@
     let loading = true;
     let loadError: string | null = null;
     let fabOpen = false;
+    let showBenchmark = false;
     let portfolioController: PortfolioController;
     let assetController: AssetController;
     let stats: PortfolioStats = EMPTY_STATS;
@@ -381,15 +384,40 @@
                     {/if}
                 </p>
             </div>
-            {#if isAggregated}
-                <div class="w-full md:w-40">
-                    <Select
-                        label="Display currency"
-                        bind:value={currencyChoice}
-                        options={currencyOptions}
-                    />
-                </div>
-            {/if}
+            <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-end md:w-auto">
+                {#if isAggregated}
+                    <div class="w-full md:w-40">
+                        <Select
+                            label="Display currency"
+                            bind:value={currencyChoice}
+                            options={currencyOptions}
+                        />
+                    </div>
+                {/if}
+                {#if hasActivity && !loading && !loadError}
+                    <Button
+                        variant="outline"
+                        class="h-10 w-full sm:w-auto"
+                        on:click={() => (showBenchmark = true)}
+                    >
+                        <svg
+                            class="mr-2 h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M3 17l6-6 4 4 8-8m0 0h-5m5 0v5"
+                            />
+                        </svg>
+                        Benchmark
+                    </Button>
+                {/if}
+            </div>
         </div>
 
         {#if loading}
@@ -712,6 +740,25 @@
         {/if}
     </div>
 </div>
+
+<!-- Benchmark: your portfolio against an index, ETF or crypto -->
+<Modal
+    open={showBenchmark}
+    size="xl"
+    title="Benchmark"
+    onClose={() => (showBenchmark = false)}
+>
+    <BenchmarkPanel
+        portfolioId={isAggregated ? null : ($currentPortfolio?.id ?? null)}
+        {currency}
+        scopeLabel={isAggregated ? "All portfolios" : ($currentPortfolio?.name ?? "Portfolio")}
+    />
+    <svelte:fragment slot="footer">
+        <Button variant="outline" on:click={() => (showBenchmark = false)}
+            >Close</Button
+        >
+    </svelte:fragment>
+</Modal>
 
 <!-- Floating Action Button -->
 <div class="fixed bottom-6 right-6 z-30 flex flex-col-reverse gap-2">

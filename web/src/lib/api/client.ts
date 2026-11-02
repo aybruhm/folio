@@ -105,6 +105,17 @@ axiosInstance.interceptors.request.use(async (config) => {
     };
 });
 
+// The most useful text in an error response: our own `message`, or FastAPI's
+// `detail` when it is a plain string, else a generic line.
+function errorText(
+  errorData: { message?: string; detail?: unknown } | undefined,
+  response: { status: number; statusText: string },
+): string {
+  if (errorData?.message) return errorData.message;
+  if (typeof errorData?.detail === "string" && errorData.detail) return errorData.detail;
+  return `API error: ${response.status} ${response.statusText}`;
+}
+
 // The session is over: keep a trade the user was submitting (it would otherwise
 // be lost), clear auth, and send them to /login, which returns them here.
 async function endSession(config: { method?: string; url?: string; data?: unknown }) {
@@ -152,7 +163,7 @@ axiosInstance.interceptors.response.use(
               await endSession(response.config);
               const errorData = response.data?.error || response.data;
               const error = new Error(
-                errorData?.message || `API error: ${response.status} ${response.statusText}`,
+                errorText(errorData, response),
               ) as Error & { code?: string; details?: Record<string, unknown> };
               error.code = errorData?.code;
               error.details = errorData?.details;
@@ -166,8 +177,7 @@ axiosInstance.interceptors.response.use(
 
       const errorData = response.data?.error || response.data;
       const error = new Error(
-        errorData?.message ||
-          `API error: ${response.status} ${response.statusText}`,
+        errorText(errorData, response),
       ) as Error & { code?: string; details?: Record<string, unknown> };
       error.code = errorData?.code;
       error.details = errorData?.details;

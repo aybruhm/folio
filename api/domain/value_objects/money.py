@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
-from typing import Optional
 
 # Trade quantities are stored as integers at this scale (8 decimal places).
 QUANTITY_SCALE = 100_000_000
@@ -88,8 +87,8 @@ class DateRange:
 
 @dataclass(frozen=True)
 class ReturnMetric:
-    twr: Optional[float] = None
-    mwr: Optional[float] = None
+    twr: float | None = None
+    mwr: float | None = None
 
 
 @dataclass(frozen=True)
@@ -98,11 +97,11 @@ class AssetMetadata:
     name: str
     asset_class: str
     currency: Currency
-    exchange: Optional[str] = None
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    country: Optional[str] = None
-    isin: Optional[str] = None
+    exchange: str | None = None
+    sector: str | None = None
+    industry: str | None = None
+    country: str | None = None
+    isin: str | None = None
 
 
 class TradeType(str, Enum):

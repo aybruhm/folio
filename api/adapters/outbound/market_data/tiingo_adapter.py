@@ -1,7 +1,6 @@
 import json
 import logging
 from datetime import UTC, date, datetime, timedelta
-from typing import Optional
 
 from tiingo import TiingoClient
 
@@ -39,7 +38,7 @@ class TiingoAdapter:
     _MAX_BANDWIDTH_BYTES_PER_MONTH = 1_000_000_000  # 1 GB
 
     def __init__(self) -> None:
-        self._client: Optional[TiingoClient] = None
+        self._client: TiingoClient | None = None
         self._enabled = bool(settings.TIINGO_API_KEY)
 
         self._hour_window_start: datetime = datetime.now(UTC).replace(
@@ -55,10 +54,10 @@ class TiingoAdapter:
         )
         self._month_bandwidth_bytes = 0
 
-        self._ticker_catalog_cache: Optional[list[dict]] = None
-        self._ticker_catalog_cached_at: Optional[datetime] = None
+        self._ticker_catalog_cache: list[dict] | None = None
+        self._ticker_catalog_cached_at: datetime | None = None
 
-    def _get_client(self) -> Optional[TiingoClient]:
+    def _get_client(self) -> TiingoClient | None:
         if not self._enabled:
             return None
 
@@ -172,7 +171,7 @@ class TiingoAdapter:
 
     async def get_asset_metadata(
         self, ticker: str, currency: str = "USD"
-    ) -> Optional[AssetMetadata]:
+    ) -> AssetMetadata | None:
         client = self._get_client()
         if client is None:
             logger.debug("TIINGO_API_KEY is not configured; skipping Tiingo lookup")
@@ -211,7 +210,7 @@ class TiingoAdapter:
 
     def _lookup_metadata(
         self, client: TiingoClient, candidates: list[str]
-    ) -> Optional[dict]:
+    ) -> dict | None:
         seen = set()
         for symbol in candidates:
             if not symbol or symbol in seen:
@@ -238,7 +237,7 @@ class TiingoAdapter:
 
     def _resolve_ticker_for_exchange(
         self, client: TiingoClient, base_ticker: str, exchange_hint: str
-    ) -> Optional[str]:
+    ) -> str | None:
         canonical_exchange = self._canonical_exchange(exchange_hint)
         if not canonical_exchange:
             return None
@@ -258,7 +257,7 @@ class TiingoAdapter:
 
         return None
 
-    def _get_cached_stock_tickers(self, client: TiingoClient) -> Optional[list[dict]]:
+    def _get_cached_stock_tickers(self, client: TiingoClient) -> list[dict] | None:
         now = datetime.now(UTC)
         if (
             self._ticker_catalog_cache is not None
@@ -326,7 +325,7 @@ class TiingoAdapter:
         except Exception:
             return 0
 
-    def _canonical_exchange(self, exchange_hint: str) -> Optional[str]:
+    def _canonical_exchange(self, exchange_hint: str) -> str | None:
         normalized = " ".join(exchange_hint.upper().split())
         return self._SUPPORTED_EXCHANGES.get(normalized, exchange_hint)
 
@@ -335,7 +334,7 @@ class TiingoAdapter:
         return exchange.strip().lower() == expected.strip().lower()
 
     @staticmethod
-    def _parse_exchange_qualified_ticker(ticker: str) -> tuple[Optional[str], str]:
+    def _parse_exchange_qualified_ticker(ticker: str) -> tuple[str | None, str]:
         normalized = ticker.strip()
         for separator in (":", "/", "|"):
             if separator in normalized:

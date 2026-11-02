@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -621,3 +621,672 @@ def test_analytics_summary_converts_history_at_historical_rates(
     assert body["contribution_history"] == [{"name": "Jan 2024", "value": 220.0}]
     # Current value uses today's rate.
     assert body["current_value"] == pytest.approx(1852.0 + 1852.0 * 1.1)
+
+
+# --- GET /portfolios/analytics/benchmark ---------------------------------------
+
+
+class FakeBenchmarkPortfolios:
+    def __init__(self, portfolios):
+        self.portfolios = portfolios
+
+    async def list_portfolios(self, user_id, include_archived=False):
+        return self.portfolios
+
+    async def get_portfolio(self, portfolio_id):
+        for p in self.portfolios:
+            if p["id"] == str(portfolio_id):
+                return p
+        raise ValueError(f"Portfolio {portfolio_id} not found")
+
+
+class FakeBenchmarkAnalytics:
+    """One instance per portfolio id; `series` maps id to (first_trade, final
+    value, flows): flat 100 until the last date, then `final`."""
+
+    registry: dict = {}
+
+    def __init__(self, session, currency):
+        pass
+
+    async def get_first_trade_date(self, portfolio_id):
+        entry = self.registry.get(str(portfolio_id))
+        return entry[0] if entry else None
+
+    async def get_value_series(self, portfolio_id, dates):
+        first, final, flows = self.registry[str(portfolio_id)]
+        values = [100.0 if d < dates[-1] else final for d in dates]
+        return values, [f for f in flows if dates[0] < f[0] <= dates[-1]]
+
+
+class FakeBenchmarkYahoo:
+    """Closes: 100 up to today, `final` on today (stored as x100 integers)."""
+
+    closes_from = None  # first date with a price; default: far back
+    final = 105.0
+    currency = "USD"
+
+    async def get_price_history(self, ticker, start, end):
+        if ticker == "NOPE":
+            return []
+        first = type(self).closes_from or (start - timedelta(days=5))
+        return [(first, 10000), (end, round(type(self).final * 100))]
+
+    async def get_quote_currency(self, ticker):
+        return type(self).currency
+
+
+def _portfolio(owner_id, base="USD", pid=None):
+    return {
+        "id": str(pid or uuid4()),
+        "user_id": str(owner_id),
+        "base_currency": base,
+        "name": "P",
+    }
+
+
+def _setup_benchmark(
+    monkeypatch,
+    owner_id,
+    portfolios,
+    entries,
+    fx_factors=None,
+    fx_history=None,
+    closes_from=None,
+    final=105.0,
+    quote_currency="USD",
+):
+    FakeBenchmarkAnalytics.registry = entries
+    FakeBenchmarkYahoo.closes_from = closes_from
+    FakeBenchmarkYahoo.final = final
+    FakeBenchmarkYahoo.currency = quote_currency
+    fx_factors = fx_factors or {}
+    fx_history = fx_history or {}
+
+    async def factor(from_ccy, to_ccy):
+        return fx_factors.get((from_ccy, to_ccy), 0.0)
+
+    async def history(from_ccy, to_ccy, start, end):
+        return fx_history.get((from_ccy, to_ccy), [])
+
+    monkeypatch.setattr(
+        portfolio_routes, "PortfolioInteractor",
+        lambda s: FakeBenchmarkPortfolios(portfolios),
+    )
+    monkeypatch.setattr(portfolio_routes, "AnalyticsInteractor", FakeBenchmarkAnalytics)
+    monkeypatch.setattr(
+        portfolio_routes, "build_adapter", lambda provider: FakeBenchmarkYahoo()
+    )
+    monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor", factor)
+    monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor_history", history)
+
+
+def _get(client, **params):
+    params.setdefault("benchmark", "^GSPC")
+    return client.get("/api/v1/portfolios/analytics/benchmark", params=params)
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_benchmark_compares_returns_over_the_period(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    long_ago = date.today() - timedelta(days=2000)
+    _setup_benchmark(monkeypatch, fake_user.id, [p], {p["id"]: (long_ago, 110.0, [])})
+
+    response = _get(authed_client, period="1y")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["portfolio"]["return_pct"] == 10.0
+    assert body["benchmark"]["return_pct"] == 5.0
+    assert body["excess_return_pct"] == 5.0
+    assert body["limited_by"] is None
+    assert body["benchmark"]["name"] == "S&P 500"
+    assert body["currency"] == "USD" and body["portfolio_count"] == 1
+    assert body["start_date"] == body["requested_start"]
+    first, last = body["series"][0], body["series"][-1]
+    assert (first["portfolio"], first["benchmark"]) == (0.0, 0.0)
+    assert (last["portfolio"], last["benchmark"]) == (10.0, 5.0)
+    assert last["date"] == date.today().isoformat()
+    assert body["portfolio"]["annualized_pct"] is not None  # a full year
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_benchmark_annualizes_multi_year_periods(authed_client, monkeypatch, fake_user):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=5000), 133.1, [])},
+        final=133.1,
+    )
+
+    body = _get(authed_client, period="3y").json()
+
+    # +33.1% over three years is 10% a year.
+    assert body["portfolio"]["annualized_pct"] == pytest.approx(10.0, abs=0.1)
+    assert body["benchmark"]["annualized_pct"] == pytest.approx(10.0, abs=0.1)
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_benchmark_has_no_annualized_figure_for_short_periods(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=2000), 110.0, [])},
+    )
+
+    body = _get(authed_client, period="3m").json()
+
+    assert body["portfolio"]["annualized_pct"] is None
+    assert body["benchmark"]["annualized_pct"] is None
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"period": "2w"},
+        {"period": ""},
+        {"benchmark": "DROP TABLE"},
+        {"benchmark": ""},
+        {"in_currency": "XXX"},
+    ],
+)
+def test_benchmark_rejects_invalid_input(authed_client, monkeypatch, fake_user, params):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=2000), 110.0, [])},
+    )
+
+    assert _get(authed_client, **params).status_code == 422
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+@pytest.mark.parametrize("period", ["ytd", "3m", "6m", "1y", "3y", "5y", "10y"])
+def test_benchmark_accepts_every_documented_period(
+    authed_client, monkeypatch, fake_user, period
+):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=5000), 110.0, [])},
+    )
+
+    response = _get(authed_client, period=period.upper())
+
+    assert response.status_code == 200
+    assert response.json()["period"] == period
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+def test_benchmark_requires_the_callers_own_portfolio(
+    authed_client, monkeypatch, fake_user
+):
+    mine = _portfolio(fake_user.id)
+    theirs = _portfolio(uuid4())
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [mine, theirs],
+        {mine["id"]: (date.today() - timedelta(days=900), 110.0, [])},
+    )
+
+    assert _get(authed_client, portfolio_id=theirs["id"]).status_code == 403
+    assert _get(authed_client, portfolio_id=str(uuid4())).status_code == 404
+    assert _get(authed_client, portfolio_id=mine["id"]).status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+def test_benchmark_without_portfolios_trades_or_prices(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+
+    _setup_benchmark(monkeypatch, fake_user.id, [], {})
+    assert _get(authed_client).status_code == 404  # no portfolios
+
+    _setup_benchmark(monkeypatch, fake_user.id, [p], {})
+    assert _get(authed_client).status_code == 404  # portfolio without trades
+
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=900), 110.0, [])},
+    )
+    missing = _get(authed_client, benchmark="NOPE")
+    assert missing.status_code == 404
+    assert "NOPE" in missing.json()["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_a_young_portfolio_limits_the_comparison_window(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    first_trade = date.today() - timedelta(days=40)
+    _setup_benchmark(monkeypatch, fake_user.id, [p], {p["id"]: (first_trade, 110.0, [])})
+
+    body = _get(authed_client, period="5y").json()
+
+    assert body["limited_by"] == "portfolio"
+    assert body["start_date"] == first_trade.isoformat()
+    assert body["requested_start"] < body["start_date"]
+    assert body["series"][0]["date"] == first_trade.isoformat()
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_a_young_benchmark_limits_the_comparison_window(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    bench_first = date.today() - timedelta(days=100)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=2000), 110.0, [])},
+        closes_from=bench_first,
+    )
+
+    body = _get(authed_client, period="1y").json()
+
+    assert body["limited_by"] == "benchmark"
+    assert body["start_date"] == bench_first.isoformat()
+
+
+@pytest.mark.integration
+@pytest.mark.grumpy_path
+def test_a_portfolio_started_this_week_cannot_be_compared_yet(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=3), 110.0, [])},
+    )
+
+    response = _get(authed_client)
+
+    assert response.status_code == 422
+    assert "at least a week" in response.json()["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_portfolio_in_another_currency_is_converted_at_each_dates_rate(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id, base="EUR")
+    long_ago = date.today() - timedelta(days=2000)
+    # EUR worth 1.00 USD until today, 1.10 today. 100 EUR -> 110 EUR is +10% in
+    # euros but 100 USD -> 121 USD in dollars.
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p], {p["id"]: (long_ago, 110.0, [])},
+        fx_factors={("EUR", "USD"): 1.1},
+        fx_history={("EUR", "USD"): [(long_ago, 1.0), (date.today(), 1.1)]},
+    )
+
+    body = _get(authed_client, in_currency="USD").json()
+
+    assert body["portfolio"]["return_pct"] == 21.0
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_benchmark_in_another_currency_is_converted_too(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    long_ago = date.today() - timedelta(days=2000)
+    # A London-listed ETF quoted in pence: GBp -> GBP. Up 5% in pounds, and
+    # the pound rose 1.00 -> 1.20 against the dollar: 1.05 * 1.2 - 1 = 26%.
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p], {p["id"]: (long_ago, 110.0, [])},
+        fx_factors={("GBP", "USD"): 1.2},
+        fx_history={("GBP", "USD"): [(long_ago, 1.0), (date.today(), 1.2)]},
+        quote_currency="GBp",
+    )
+
+    body = _get(authed_client, benchmark="IWDA.L").json()
+
+    assert body["benchmark"]["return_pct"] == 26.0
+    assert body["benchmark"]["converted"] is True
+    assert body["benchmark"]["quote_currency"] == "GBP"
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_benchmark_is_flagged_when_its_currency_cannot_be_converted(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=2000), 110.0, [])},
+        quote_currency="JPY",  # no JPY->USD rate available
+    )
+
+    body = _get(authed_client, benchmark="^N225").json()
+
+    assert body["benchmark"]["converted"] is False
+    assert body["benchmark"]["return_pct"] == 5.0  # left in its own currency
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_portfolios_without_an_exchange_rate_are_excluded(
+    authed_client, monkeypatch, fake_user, fake_valkey
+):
+    usd = _portfolio(fake_user.id)
+    ngn = _portfolio(fake_user.id, base="NGN")
+    long_ago = date.today() - timedelta(days=2000)
+    entries = {usd["id"]: (long_ago, 110.0, []), ngn["id"]: (long_ago, 200.0, [])}
+    _setup_benchmark(monkeypatch, fake_user.id, [usd, ngn], entries)
+
+    body = _get(authed_client).json()
+
+    assert body["excluded_portfolio_ids"] == [ngn["id"]]
+    assert body["portfolio_count"] == 1
+    assert body["portfolio"]["return_pct"] == 10.0  # only the USD one
+
+    fake_valkey.store.clear()  # the first answer was cached
+    _setup_benchmark(monkeypatch, fake_user.id, [ngn], {ngn["id"]: entries[ngn["id"]]})
+    response = _get(authed_client)
+    assert response.status_code == 422
+    assert "unavailable" in response.json()["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_all_portfolios_are_combined_when_none_is_chosen(
+    authed_client, monkeypatch, fake_user
+):
+    a = _portfolio(fake_user.id)
+    b = _portfolio(fake_user.id)
+    long_ago = date.today() - timedelta(days=2000)
+    # +20% and -10% on equal capital combine to +5%, not their average of 5% by
+    # accident: 100 + 100 -> 120 + 90 = 210 on 200.
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [a, b],
+        {a["id"]: (long_ago, 120.0, []), b["id"]: (long_ago, 90.0, [])},
+    )
+
+    body = _get(authed_client).json()
+
+    assert body["portfolio_count"] == 2
+    assert body["portfolio"]["return_pct"] == 5.0
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_money_added_during_the_period_is_not_counted_as_gain(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    long_ago = date.today() - timedelta(days=2000)
+    # Worth 100 until today, then 200, because 100 was added today: no gain.
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (long_ago, 200.0, [(date.today(), 100.0)])},
+    )
+
+    assert _get(authed_client).json()["portfolio"]["return_pct"] == 0.0
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_benchmark_catalog_names_and_custom_tickers(
+    authed_client, monkeypatch, fake_user
+):
+    p = _portfolio(fake_user.id)
+    _setup_benchmark(
+        monkeypatch, fake_user.id, [p],
+        {p["id"]: (date.today() - timedelta(days=900), 110.0, [])},
+    )
+
+    # Case-insensitive input; the catalog supplies the display name.
+    crypto = _get(authed_client, benchmark="btc-usd").json()["benchmark"]
+    assert (crypto["ticker"], crypto["name"]) == ("BTC-USD", "Bitcoin")
+    assert crypto["return_pct"] == 5.0
+    # Anything else Yahoo knows is a custom benchmark, named by its ticker.
+    custom = _get(authed_client, benchmark="mstr").json()["benchmark"]
+    assert (custom["ticker"], custom["name"]) == ("MSTR", "MSTR")
+
+
+# --- benchmark providers and cache ----------------------------------------------
+
+
+class FakeNgxPulse(FakeBenchmarkYahoo):
+    enabled = True
+
+    def __init__(self):
+        self._enabled = type(self).enabled
+
+    async def get_quote_currency(self, ticker):
+        raise AssertionError("only Yahoo is asked for a quote currency")
+
+
+def _use_providers(monkeypatch, chosen):
+    """Route build_adapter() to fakes and record which providers were asked for."""
+
+    def build(provider):
+        chosen.append(provider)
+        return FakeNgxPulse() if provider != "yfinance" else FakeBenchmarkYahoo()
+
+    monkeypatch.setattr(portfolio_routes, "build_adapter", build)
+
+
+def _one_portfolio(monkeypatch, fake_user, **kwargs):
+    p = _portfolio(fake_user.id)
+    long_ago = date.today() - timedelta(days=2000)
+    _setup_benchmark(monkeypatch, fake_user.id, [p], {p["id"]: (long_ago, 110.0, [])}, **kwargs)
+    return p
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_catalog_tickers_are_served_by_their_own_provider(
+    authed_client, monkeypatch, fake_user
+):
+    _one_portfolio(monkeypatch, fake_user, fx_factors={("NGN", "USD"): 0.001})
+    chosen: list[str] = []
+    _use_providers(monkeypatch, chosen)
+
+    body = _get(authed_client, benchmark="NGX:ASI").json()
+
+    assert chosen == ["ngxpulse"]
+    assert body["benchmark"]["provider"] == "ngxpulse"
+    assert body["benchmark"]["name"] == "NGX All-Share Index"
+    assert body["benchmark"]["quote_currency"] == "NGN"
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_a_custom_ticker_can_name_its_provider(authed_client, monkeypatch, fake_user):
+    _one_portfolio(monkeypatch, fake_user, fx_factors={("NGN", "USD"): 0.001})
+    chosen: list[str] = []
+    _use_providers(monkeypatch, chosen)
+
+    body = _get(authed_client, benchmark="NGX30", provider="ngnmarket").json()
+
+    assert chosen == ["ngnmarket"]
+    assert body["benchmark"]["provider"] == "ngnmarket"
+    assert body["benchmark"]["quote_currency"] == "NGN"
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_other_tickers_default_to_yahoo(authed_client, monkeypatch, fake_user):
+    _one_portfolio(monkeypatch, fake_user)
+    chosen: list[str] = []
+    _use_providers(monkeypatch, chosen)
+
+    assert _get(authed_client, benchmark="MSFT").json()["benchmark"]["provider"] == "yfinance"
+    assert chosen == ["yfinance"]
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+@pytest.mark.parametrize("provider", ["tiingo", "tradingview", "nope"])
+def test_providers_that_cannot_serve_benchmarks_are_rejected(
+    authed_client, monkeypatch, fake_user, provider
+):
+    _one_portfolio(monkeypatch, fake_user)
+
+    response = _get(authed_client, provider=provider)
+
+    assert response.status_code == 422
+    assert "provider must be one of" in response.json()["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_a_provider_without_an_api_key_says_so(authed_client, monkeypatch, fake_user):
+    _one_portfolio(monkeypatch, fake_user)
+    _use_providers(monkeypatch, [])
+    monkeypatch.setattr(FakeNgxPulse, "enabled", False)
+
+    response = _get(authed_client, benchmark="NGX:ASI")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "NGXPulse isn't set up on this server, so NGX:ASI can't be loaded."
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_a_missing_series_names_the_provider(authed_client, monkeypatch, fake_user):
+    _one_portfolio(monkeypatch, fake_user)
+
+    response = _get(authed_client, benchmark="NOPE")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No price history found for NOPE on Yahoo Finance"
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_a_missing_series_from_a_keyed_provider_hints_at_the_key(
+    authed_client, monkeypatch, fake_user
+):
+    _one_portfolio(monkeypatch, fake_user)
+    _use_providers(monkeypatch, [])
+
+    response = _get(authed_client, benchmark="NOPE", provider="ngxpulse")
+
+    assert response.status_code == 404
+    assert "API key" in response.json()["detail"]
+    assert "NGXPulse" in response.json()["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_a_repeat_comparison_is_served_from_the_cache(
+    authed_client, monkeypatch, fake_user, fake_valkey
+):
+    _one_portfolio(monkeypatch, fake_user)
+    calls = []
+    original = FakeBenchmarkYahoo.get_price_history
+
+    async def counting(self, ticker, start, end):
+        calls.append(ticker)
+        return await original(self, ticker, start, end)
+
+    monkeypatch.setattr(FakeBenchmarkYahoo, "get_price_history", counting)
+
+    first = _get(authed_client)
+    second = _get(authed_client)
+
+    assert (first.headers["X-Cache"], second.headers["X-Cache"]) == ("MISS", "HIT")
+    assert second.json() == first.json()
+    assert calls == ["^GSPC"]
+    assert list(fake_valkey.expiries.values())[-1] == 35 * 60
+    assert "generated_at" in first.json()
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_the_cache_is_separate_per_period_currency_and_benchmark(
+    authed_client, monkeypatch, fake_user
+):
+    _one_portfolio(monkeypatch, fake_user, fx_factors={("USD", "EUR"): 0.9})
+
+    _get(authed_client)
+    different = [
+        _get(authed_client, period="3y"),
+        _get(authed_client, in_currency="EUR"),
+        _get(authed_client, benchmark="VOO"),
+    ]
+
+    assert [r.headers["X-Cache"] for r in different] == ["MISS"] * 3
+
+
+@pytest.mark.integration
+@pytest.mark.security
+def test_one_users_cache_is_not_served_to_another(
+    authed_client, monkeypatch, fake_user
+):
+    from adapters.inbound.http.dependencies import get_current_user
+    from domain.entities.models import User
+    from main import app
+
+    _one_portfolio(monkeypatch, fake_user)
+    assert _get(authed_client).headers["X-Cache"] == "MISS"
+
+    other = User(
+        id=uuid4(),
+        email="other@example.com",
+        hashed_password="x",
+        is_active=True,
+        created_at=fake_user.created_at,
+    )
+    app.dependency_overrides[get_current_user] = lambda: other
+    _one_portfolio(monkeypatch, other)
+
+    assert _get(authed_client).headers["X-Cache"] == "MISS"
+
+
+@pytest.mark.integration
+@pytest.mark.edge_case
+def test_failures_are_not_cached(authed_client, monkeypatch, fake_user, fake_valkey):
+    _one_portfolio(monkeypatch, fake_user)
+
+    assert _get(authed_client, benchmark="NOPE").status_code == 404
+
+    assert not [k for k in fake_valkey.store if "NOPE" in k]
+
+
+@pytest.mark.integration
+@pytest.mark.happy_path
+def test_changing_trades_drops_cached_comparisons(
+    authed_client, monkeypatch, fake_user
+):
+    from adapters.inbound.http import trade_routes
+
+    class FakeTrades:
+        def __init__(self, session):
+            pass
+
+        async def delete_batch_trades(self, trade_ids):
+            return len(trade_ids)
+
+    monkeypatch.setattr(trade_routes, "TradeInteractor", FakeTrades)
+    _one_portfolio(monkeypatch, fake_user)
+    assert _get(authed_client).headers["X-Cache"] == "MISS"
+    assert _get(authed_client).headers["X-Cache"] == "HIT"
+
+    deleted = authed_client.post(
+        "/api/v1/trades/bulk/delete", json={"trade_ids": [str(uuid4())]}
+    )
+
+    assert deleted.status_code == 204
+    assert _get(authed_client).headers["X-Cache"] == "MISS"

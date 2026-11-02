@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from datetime import date, timedelta
-from typing import Optional
 
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException
@@ -85,8 +84,8 @@ async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date,
 
 class BatchHistoryRequest(BaseModel):
     tickers: list[str]
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    start_date: date | None = None
+    end_date: date | None = None
 
 
 @router.post("/history/batch")
@@ -232,8 +231,8 @@ async def validate_ticker(
 @router.get("/{ticker}/history")
 async def get_price_history(
     ticker: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     session: AsyncSession = Depends(get_session),
 ):
     try:

@@ -2,7 +2,6 @@ import csv
 import io
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -161,7 +160,7 @@ class CsvImportInteractor(ICsvImportUseCase):
         mapping: dict,
         date_format: str,
         portfolio_id: UUID,
-        profile_name: Optional[str] = None,
+        profile_name: str | None = None,
         market_data_provider: str = "yfinance",
     ) -> dict:
         import_batch_id = uuid4()

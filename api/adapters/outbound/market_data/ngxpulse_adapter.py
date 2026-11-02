@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Optional
 
 import aiohttp
 
@@ -28,8 +27,8 @@ class NgxPulseAdapter:
       - 100 requests per day
     """
 
-    _shared_session: Optional[aiohttp.ClientSession] = None
-    _session_lock: Optional[asyncio.Lock] = None
+    _shared_session: aiohttp.ClientSession | None = None
+    _session_lock: asyncio.Lock | None = None
     _shared_timeout = aiohttp.ClientTimeout(total=15)
 
     # Rate limits (per-process rolling windows)
@@ -54,11 +53,11 @@ class NgxPulseAdapter:
         self._day_count = 0
 
         # Cached bulk responses
-        self._stocks_cache: Optional[list[dict]] = None
-        self._stocks_cached_at: Optional[datetime] = None
+        self._stocks_cache: list[dict] | None = None
+        self._stocks_cached_at: datetime | None = None
 
-        self._etfs_cache: Optional[dict] = None
-        self._etfs_cached_at: Optional[datetime] = None
+        self._etfs_cache: dict | None = None
+        self._etfs_cached_at: datetime | None = None
 
         # Valkey-backed cache for individual ticker results (shared
         # across processes, same infrastructure as the other adapters).
@@ -70,7 +69,7 @@ class NgxPulseAdapter:
 
     async def get_asset_metadata(
         self, ticker: str, currency: str = "NGN", asset_class: str = ""
-    ) -> Optional[AssetMetadata]:
+    ) -> AssetMetadata | None:
         """Resolve metadata for *ticker* from the stocks or ETFs snapshots.
 
         Individual ticker results are cached in Valkey via PriceCache
@@ -258,7 +257,7 @@ class NgxPulseAdapter:
     # Public API — bulk data
     # ------------------------------------------------------------------
 
-    async def get_stocks(self) -> Optional[list[dict]]:
+    async def get_stocks(self) -> list[dict] | None:
         """Return the full NGX equities list (cached for 30 min)."""
         now = datetime.now(timezone.utc)
         if (
@@ -313,7 +312,7 @@ class NgxPulseAdapter:
         logger.warning("NgxPulse: unexpected stocks response type: %s", type(payload))
         return None
 
-    async def get_etfs(self) -> Optional[dict]:
+    async def get_etfs(self) -> dict | None:
         """Return the full NGX ETF snapshot (cached for 30 min)."""
         now = datetime.now(timezone.utc)
         if (
@@ -340,9 +339,9 @@ class NgxPulseAdapter:
     async def get_index_history(
         self,
         code: str,
-        from_date: Optional[date] = None,
-        to_date: Optional[date] = None,
-    ) -> Optional[dict]:
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> dict | None:
         """Return daily value series for an NGX index (ASI, ngx-30, etc.)."""
         if not self._can_make_request():
             return None
@@ -408,7 +407,7 @@ class NgxPulseAdapter:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _lookup_stock(self, symbol: str) -> Optional[dict]:
+    async def _lookup_stock(self, symbol: str) -> dict | None:
         """Find a stock by symbol from the cached stocks snapshot."""
         stocks = await self.get_stocks()
         if not stocks:
@@ -420,7 +419,7 @@ class NgxPulseAdapter:
                 return stock
         return None
 
-    async def _lookup_etf(self, symbol: str) -> Optional[dict]:
+    async def _lookup_etf(self, symbol: str) -> dict | None:
         """Find an ETF by symbol or canonical_symbol from the cached ETF snapshot."""
         etfs_payload = await self.get_etfs()
         if not etfs_payload:
@@ -435,9 +434,7 @@ class NgxPulseAdapter:
                 return etf
         return None
 
-    async def _get(
-        self, path: str, params: Optional[dict] = None
-    ) -> Optional[dict | list]:
+    async def _get(self, path: str, params: dict | None = None) -> dict | list | None:
         if not self._enabled:
             return None
 
