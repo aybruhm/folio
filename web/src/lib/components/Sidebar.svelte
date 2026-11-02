@@ -3,6 +3,10 @@
   import { goto } from '$app/navigation'
   import { portfolios, currentPortfolio } from '#lib/stores/index.js'
   import { clearAuthToken } from '#lib/stores/offlineAuth.js'
+  import { onMount } from 'svelte'
+  import { checkForUpdate } from '#lib/stores/updateNotice.js'
+  import UpdateNotice from './UpdateNotice.svelte'
+  import AppVersion from './AppVersion.svelte'
 
   export let open = false
   export let onClose: () => void = () => {}
@@ -45,6 +49,10 @@
   // Read in the template, not a `$:` statement: `page` is an import, so a legacy
   // reactive statement would never re-run on navigation.
 
+  onMount(() => {
+    void checkForUpdate()
+  })
+
   async function handleLogout() {
     clearAuthToken()
     onClose()
@@ -82,6 +90,7 @@
   </nav>
 
   <div class="border-t border-border/40 px-2 py-3">
+    <UpdateNotice />
     <button
       on:click={handleLogout}
       class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all w-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -101,6 +110,7 @@
       </svg>
       Sign out
     </button>
+    <AppVersion />
   </div>
 </aside>
 
@@ -243,6 +253,7 @@
     </nav>
 
     <div class="border-t border-border/40 px-2 py-3">
+      <UpdateNotice />
       <button
         on:click={handleLogout}
         class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all w-full text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -262,6 +273,7 @@
         </svg>
         Sign out
       </button>
+      <AppVersion />
     </div>
   </aside>
 {/if}

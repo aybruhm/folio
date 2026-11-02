@@ -8,5 +8,6 @@ export const variables = defineEnvVars({
 	PUBLIC_PRICE_HISTORY_CACHE_TTL: { public: true, schema: (input) => input ?? '' },
 	PUBLIC_YFINANCE_CACHE_TTL: { public: true, schema: (input) => input ?? '' },
 	PUBLIC_FX_RATES_CACHE_TTL: { public: true, schema: (input) => input ?? '' },
-	PUBLIC_ENABLE_REGISTRATION: { public: true, schema: (input) => input ?? '' }
+	PUBLIC_ENABLE_REGISTRATION: { public: true, schema: (input) => input ?? '' },
+	PUBLIC_UPDATE_CHECK: { public: true, schema: (input) => input ?? '' }
 });
