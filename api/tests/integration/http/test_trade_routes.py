@@ -154,6 +154,22 @@ class FakeTradeUnitOfWork:
 
 def _patch_csv_interactor(monkeypatch, interactor):
     monkeypatch.setattr(trade_routes, "CsvImportInteractor", lambda session: interactor)
+    monkeypatch.setattr(
+        dependencies.csv_import_service,
+        "unit_of_work_factory",
+        lambda: FakeCsvImportUnitOfWork(interactor),
+    )
+
+
+class FakeCsvImportUnitOfWork:
+    def __init__(self, interactor):
+        self.interactor = interactor
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
 
 
 class FakeCsvImportInteractorWithMissingName(FakeCsvImportInteractor):

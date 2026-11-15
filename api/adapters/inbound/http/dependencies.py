@@ -8,7 +8,13 @@ from infrastructure.market_data.benchmark_cache import BenchmarkCache
 from application.auth.services import AuthService
 from application.portfolio.portfolio_service import PortfolioService
 from application.trades.trade_service import TradeService
-from infrastructure.composition import auth_service, portfolio_service, trade_service
+from application.trades.csv_import_service import CsvImportService
+from infrastructure.composition import (
+    auth_service,
+    csv_import_service,
+    portfolio_service,
+    trade_service,
+)
 from infrastructure.db.postgres.users.dao import UserRepository
 from domain.entities.models import User
 from infrastructure.db.postgres.engine import get_session
@@ -25,6 +31,10 @@ def get_portfolio_service() -> PortfolioService:
 
 def get_trade_service() -> TradeService:
     return trade_service
+
+
+def get_csv_import_service() -> CsvImportService:
+    return csv_import_service
 
 
 async def get_current_user(

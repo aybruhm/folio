@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import (
+    get_csv_import_service,
     get_trade_service,
     get_current_user,
     invalidate_benchmark_cache,
 )
 from application.trades.csv_import_interactor import CsvImportInteractor
+from application.trades.csv_import_service import CsvImportService
 from application.trades.trade_interactor import TradeInteractor
 from application.trades.trade_service import TradeService
 from domain.entities.models import User
@@ -211,13 +213,12 @@ async def validate_csv(
     mapping: str = Form(...),
     date_format: str = Form(...),
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: CsvImportService = Depends(get_csv_import_service),
 ):
     try:
         content = await file.read()
         mapping_dict = json.loads(mapping)
-        interactor = CsvImportInteractor(session)
-        validation = await interactor.validate_mapping(
+        validation = await service.validate_mapping(
             content, file.filename or "upload.csv", mapping_dict, date_format
         )
         return validation
@@ -234,13 +235,12 @@ async def confirm_import(
     profile_name: str | None = Form(None),
     market_data_provider: str = Form("yfinance"),
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: CsvImportService = Depends(get_csv_import_service),
 ):
     try:
         content = await file.read()
         mapping_dict = json.loads(mapping)
-        interactor = CsvImportInteractor(session)
-        result = await interactor.confirm_import(
+        result = await service.confirm_import(
             content,
             file.filename or "upload.csv",
             mapping_dict,
@@ -249,8 +249,6 @@ async def confirm_import(
             profile_name,
             market_data_provider,
         )
-        await session.commit()
         return result
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
