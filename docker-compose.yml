@@ -44,6 +44,7 @@ services:
             retries: 3
 
     api:
+        profiles: ["core"]
         build:
             context: .
             dockerfile: api/Dockerfile
@@ -53,10 +54,6 @@ services:
         container_name: folio-api-dev
         restart: unless-stopped
         env_file: ./api/.env
-        environment:
-            # Override for Docker networking
-            DATABASE_URL: postgresql+asyncpg://${DB_USER:-folio}:${DB_PASSWORD:-folio_dev_password}@db:5432/${DB_NAME:-folio}
-            REDIS_URL: redis://cache:6379/0
         ports:
             - "${API_PORT:-8000}:8000"
         depends_on:
@@ -92,6 +89,7 @@ services:
                 max-file: "3"
 
     web:
+        profiles: ["core"]
         build:
             context: .
             dockerfile: web/docker/Dockerfile.dev
