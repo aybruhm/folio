@@ -1,11 +1,12 @@
 from application.goals.goal_interactor import GoalInteractor
+from infrastructure.db.postgres.goals.dao import GoalRepository
 from infrastructure.db.postgres.engine import async_session
 
 
 class GoalUnitOfWork:
     async def __aenter__(self):
         self.session = async_session()
-        self.interactor = GoalInteractor(self.session)
+        self.interactor = GoalInteractor(GoalRepository(self.session))
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):

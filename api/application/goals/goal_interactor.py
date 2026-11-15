@@ -2,18 +2,21 @@ from dataclasses import replace
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from infrastructure.db.postgres.goals.dao import GoalRepository
 from domain.entities.models import Goal
 from domain.ports.inbound.use_cases import CreateGoalRequest, IGoalUseCase
 from domain.ports.outbound.repositories import IGoalRepository
 from domain.services.performance import FIREService
 
+GoalRepository = None
+
 
 class GoalInteractor(IGoalUseCase):
-    def __init__(self, session: AsyncSession):
-        self.repository: IGoalRepository = GoalRepository(session)
+    def __init__(self, repository: IGoalRepository | None = None, session=None):
+        if repository is None:
+            if GoalRepository is None:
+                raise ValueError("A goal repository is required")
+            repository = GoalRepository(session)
+        self.repository = repository
 
     async def create_goal(self, request: CreateGoalRequest) -> UUID:
         goal = Goal(
