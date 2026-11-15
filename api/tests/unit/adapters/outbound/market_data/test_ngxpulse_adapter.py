@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 import aiohttp
 import pytest
 
-from adapters.outbound.market_data import ngxpulse_adapter as ngx_module
+from infrastructure.market_data import ngxpulse_adapter as ngx_module
 from domain.value_objects.money import Currency
 
 # ---------------------------------------------------------------------------

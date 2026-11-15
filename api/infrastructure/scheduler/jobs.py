@@ -2,10 +2,10 @@ import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
-from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
-from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
+from infrastructure.market_data.tiingo_adapter import TiingoAdapter
+from infrastructure.market_data.tradingview_adapter import TradingviewAdapter
+from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
 from infrastructure.config import settings
 
 logging.basicConfig()

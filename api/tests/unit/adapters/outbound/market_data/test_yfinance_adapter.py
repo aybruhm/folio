@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from adapters.outbound.market_data import yfinance_adapter as yfinance_module
+from infrastructure.market_data import yfinance_adapter as yfinance_module
 from infrastructure.market_data.yfinance_closes import last_close, valid_closes
 
 

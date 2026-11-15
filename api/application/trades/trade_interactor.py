@@ -4,11 +4,11 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
-from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
-from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
-from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
+from infrastructure.market_data.ngxpulse_adapter import NgxPulseAdapter
+from infrastructure.market_data.tiingo_adapter import TiingoAdapter
+from infrastructure.market_data.tradingview_adapter import TradingviewAdapter
+from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
 from infrastructure.db.postgres.assets.dao import AssetRepository
 from infrastructure.db.postgres.portfolios.dao import PortfolioRepository
 from infrastructure.db.postgres.trades.dao import TradeRepository

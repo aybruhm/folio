@@ -3,7 +3,7 @@ from datetime import date
 import aiohttp
 import pytest
 
-from adapters.outbound.market_data import ngnmarket_adapter as ngn_module
+from infrastructure.market_data import ngnmarket_adapter as ngn_module
 from domain.value_objects.money import Currency
 
 

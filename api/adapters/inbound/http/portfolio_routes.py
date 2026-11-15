@@ -11,8 +11,8 @@ from adapters.inbound.http.dependencies import (
     get_current_user,
     invalidate_benchmark_cache,
 )
-from adapters.outbound.market_data.benchmark_cache import BenchmarkCache
-from adapters.outbound.market_data.providers import (
+from infrastructure.market_data.benchmark_cache import BenchmarkCache
+from infrastructure.market_data.providers import (
     BENCHMARK_PROVIDERS,
     PROVIDER_CURRENCY,
     PROVIDER_LABELS,

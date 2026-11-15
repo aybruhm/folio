@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
 from application.analytics.benchmarks import list_catalog
 from domain.value_objects.money import Currency
 from infrastructure.db.postgres.engine import get_session

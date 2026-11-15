@@ -72,7 +72,7 @@ class FakeValkey:
 @pytest.fixture(autouse=True)
 def fake_valkey(monkeypatch):
     """No test reaches a real Valkey; the benchmark cache gets an in-memory one."""
-    from adapters.outbound.market_data import benchmark_cache
+    from infrastructure.market_data import benchmark_cache
 
     fake = FakeValkey()
     monkeypatch.setattr(benchmark_cache, "get_valkey_client", lambda: fake)

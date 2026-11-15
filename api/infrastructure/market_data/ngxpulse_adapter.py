@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import aiohttp
 
-from adapters.outbound.market_data.price_cache import PriceCache
+from infrastructure.market_data.price_cache import PriceCache
 from domain.value_objects.money import AssetMetadata, Currency
 from infrastructure.config import settings
 
