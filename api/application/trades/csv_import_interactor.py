@@ -4,94 +4,69 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
-from infrastructure.market_data.ngxpulse_adapter import NgxPulseAdapter
-from infrastructure.market_data.tiingo_adapter import TiingoAdapter
-from infrastructure.market_data.tradingview_adapter import TradingviewAdapter
-from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
-from infrastructure.db.postgres.assets.dao import AssetRepository
-from infrastructure.db.postgres.trades.dao import TradeRepository
 from domain.entities.models import Trade
 from domain.ports.inbound.use_cases import ICsvImportUseCase
 from domain.ports.outbound.repositories import IAssetRepository, ITradeRepository
 from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
+TradeRepository = AssetRepository = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = TradingviewAdapter = None
+
+
+class _LegacyCsvMarketDataGateway:
+    def __init__(self):
+        self.adapters = {
+            "yfinance": YFinanceAdapter,
+            "tiingo": TiingoAdapter,
+            "ngnmarket": NgnMarketAdapter,
+            "ngxpulse": NgxPulseAdapter,
+            "tradingview": TradingviewAdapter,
+        }
+
+    async def get_asset_metadata(self, ticker, currency, provider, asset_class):
+        selected = normalize_provider(provider)
+        order = {
+            "tiingo": ["tiingo", "tradingview", "ngnmarket", "yfinance"],
+            "ngnmarket": ["ngnmarket", "tradingview", "tiingo", "yfinance"],
+            "tradingview": ["tradingview", "tiingo", "ngnmarket", "yfinance"],
+            "ngxpulse": ["ngxpulse", "tiingo", "tradingview", "yfinance"],
+            "yfinance": ["yfinance"],
+        }[selected]
+        for name in order:
+            adapter = self.adapters[name]
+            if adapter is None:
+                continue
+            adapter = adapter()
+            if name in {"ngnmarket", "ngxpulse"}:
+                metadata = await adapter.get_asset_metadata(
+                    ticker, currency.value, asset_class
+                )
+            else:
+                metadata = await adapter.get_asset_metadata(ticker, currency.value)
+            if metadata:
+                return metadata
+        return None
+
 
 class CsvImportInteractor(ICsvImportUseCase):
-    def __init__(self, session: AsyncSession):
-        self.trade_repo: ITradeRepository = TradeRepository(session)
-        self.asset_repo: IAssetRepository = AssetRepository(session)
-        self.yfinance = YFinanceAdapter()
-        self.tiingo = TiingoAdapter()
-        self.ngnmarket = NgnMarketAdapter()
-        self.ngxpulse = NgxPulseAdapter()
-        self.tradingview = TradingviewAdapter()
+    def __init__(
+        self,
+        trade_repo: ITradeRepository | None = None,
+        asset_repo: IAssetRepository | None = None,
+        market_data=None,
+        session=None,
+    ):
+        self.trade_repo = trade_repo or TradeRepository(session)
+        self.asset_repo = asset_repo or AssetRepository(session)
+        self.market_data = market_data or _LegacyCsvMarketDataGateway()
 
     async def _get_asset_metadata(
         self, ticker: str, currency: Currency, provider: str, asset_class: str = ""
     ):
-        selected = normalize_provider(provider)
-
-        if selected == "tiingo":
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(
-                ticker, currency.value, asset_class
-            )
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
-
-        if selected == "ngnmarket":
-            metadata = await self.ngnmarket.get_asset_metadata(
-                ticker, currency.value, asset_class
-            )
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
-
-        if selected == "tradingview":
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.ngnmarket.get_asset_metadata(
-                ticker, currency.value, asset_class
-            )
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
-
-        if selected == "ngxpulse":
-            metadata = await self.ngxpulse.get_asset_metadata(
-                ticker, currency.value, asset_class
-            )
-            if metadata:
-                return metadata
-            metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            metadata = await self.tradingview.get_asset_metadata(ticker, currency.value)
-            if metadata:
-                return metadata
-            return await self.yfinance.get_asset_metadata(ticker, currency.value)
-
-        return await self.yfinance.get_asset_metadata(ticker, currency.value)
+        return await self.market_data.get_asset_metadata(
+            ticker, currency, provider, asset_class
+        )
 
     async def preview_csv(self, file_content: bytes, filename: str) -> dict:
         try:
