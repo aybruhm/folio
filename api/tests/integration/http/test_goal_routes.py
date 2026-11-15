@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from adapters.inbound.http import goal_routes
+from adapters.inbound.http import dependencies, goal_routes
 from domain.value_objects.money import Currency
 
 
@@ -75,6 +75,22 @@ class FakeGoalInteractor:
 
 def _patch_goal_interactor(monkeypatch, interactor):
     monkeypatch.setattr(goal_routes, "GoalInteractor", lambda session: interactor)
+    monkeypatch.setattr(
+        dependencies.goal_service,
+        "unit_of_work_factory",
+        lambda: FakeGoalUnitOfWork(interactor),
+    )
+
+
+class FakeGoalUnitOfWork:
+    def __init__(self, interactor):
+        self.interactor = interactor
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
 
 
 @pytest.mark.integration

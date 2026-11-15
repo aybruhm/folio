@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.inbound.http.dependencies import get_current_user
+from adapters.inbound.http.dependencies import get_current_user, get_goal_service
 from application.goals.goal_interactor import GoalInteractor
+from application.goals.goal_service import GoalService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateGoalRequest
 from domain.value_objects.money import Currency
@@ -41,12 +42,10 @@ def _body_to_request(body: GoalBody, user_id: UUID) -> CreateGoalRequest:
 @router.get("/")
 async def list_goals(
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: GoalService = Depends(get_goal_service),
 ):
     try:
-        interactor = GoalInteractor(session)
-        goals = await interactor.list_goals(current_user.id)
-        return goals
+        return await service.list(current_user.id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -55,17 +54,11 @@ async def list_goals(
 async def create_goal(
     body: GoalBody,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: GoalService = Depends(get_goal_service),
 ):
     try:
-        interactor = GoalInteractor(session)
-        goal_id = await interactor.create_goal(_body_to_request(body, current_user.id))
-        await session.commit()
-
-        goal = await interactor.get_goal(goal_id)
-        return goal
+        return await service.create(_body_to_request(body, current_user.id))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -73,12 +66,10 @@ async def create_goal(
 async def get_goal(
     goal_id: UUID,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: GoalService = Depends(get_goal_service),
 ):
     try:
-        interactor = GoalInteractor(session)
-        goal = await interactor.get_goal(goal_id)
-        return goal
+        return await service.get(goal_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -88,20 +79,15 @@ async def update_goal(
     goal_id: UUID,
     body: GoalBody,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: GoalService = Depends(get_goal_service),
 ):
     try:
-        interactor = GoalInteractor(session)
-        await interactor.update_goal(goal_id, _body_to_request(body, current_user.id))
-        await session.commit()
-
-        goal = await interactor.get_goal(goal_id)
-        return goal
+        return await service.update(
+            goal_id, _body_to_request(body, current_user.id)
+        )
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -109,17 +95,13 @@ async def update_goal(
 async def delete_goal(
     goal_id: UUID,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: GoalService = Depends(get_goal_service),
 ):
     try:
-        interactor = GoalInteractor(session)
-        await interactor.delete_goal(goal_id)
-        await session.commit()
+        await service.delete(goal_id)
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -127,12 +109,10 @@ async def delete_goal(
 async def get_projection(
     goal_id: UUID,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: GoalService = Depends(get_goal_service),
 ):
     try:
-        interactor = GoalInteractor(session)
-        projection = await interactor.get_projection(goal_id)
-        return projection
+        return await service.projection(goal_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

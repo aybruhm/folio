@@ -9,9 +9,11 @@ from application.auth.services import AuthService
 from application.portfolio.portfolio_service import PortfolioService
 from application.trades.trade_service import TradeService
 from application.trades.csv_import_service import CsvImportService
+from application.goals.goal_service import GoalService
 from infrastructure.composition import (
     auth_service,
     csv_import_service,
+    goal_service,
     portfolio_service,
     trade_service,
 )
@@ -35,6 +37,10 @@ def get_trade_service() -> TradeService:
 
 def get_csv_import_service() -> CsvImportService:
     return csv_import_service
+
+
+def get_goal_service() -> GoalService:
+    return goal_service
 
 
 async def get_current_user(
