@@ -46,3 +46,15 @@ def test_application_does_not_depend_on_http_adapters():
     )
 
     assert forbidden == []
+
+
+def test_auth_application_does_not_depend_on_web_frameworks():
+    forbidden_prefixes = ("fastapi", "sqlalchemy")
+
+    forbidden = sorted(
+        module
+        for module in _imported_modules("application/auth")
+        if module.startswith(forbidden_prefixes)
+    )
+
+    assert forbidden == []

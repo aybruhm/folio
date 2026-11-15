@@ -2,10 +2,10 @@ from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import HTTPException, status
 
 from application.auth import use_cases
 from application.auth.use_cases import LoginUser, LogoutUser, RefreshToken, RegisterUser
+from application.common.exceptions import AuthenticationError, ConflictError
 from domain.entities.models import User
 
 
@@ -121,10 +121,8 @@ async def test_register_user_rejects_duplicate_email():
     user_repo = FakeUserRepo(users_by_email={existing.email: existing})
     token_repo = FakeTokenRepo()
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(ConflictError, match="Email already registered"):
         await RegisterUser(user_repo, token_repo).execute(existing.email, "password123")
-
-    assert exc.value.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.asyncio
@@ -158,10 +156,8 @@ async def test_login_user_rejects_invalid_credentials(monkeypatch):
     token_repo = FakeTokenRepo()
     monkeypatch.setattr(use_cases, "_verify_password", lambda password, hashed: False)
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AuthenticationError, match="Invalid email or password"):
         await LoginUser(user_repo, token_repo).execute(user.email, "wrong-password")
-
-    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio
@@ -202,10 +198,8 @@ async def test_refresh_token_rejects_missing_record():
     user_repo = FakeUserRepo()
     token_repo = FakeTokenRepo()
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AuthenticationError, match="Invalid or expired refresh token"):
         await RefreshToken(user_repo, token_repo).execute("missing")
-
-    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio
@@ -225,10 +219,10 @@ async def test_refresh_token_revokes_family_on_reuse():
         }
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(
+        AuthenticationError, match="Token reuse detected — all sessions revoked"
+    ):
         await RefreshToken(user_repo, token_repo).execute("reused")
-
-    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
     assert token_repo.revoked_families == [family_id]
 
 
@@ -248,10 +242,8 @@ async def test_refresh_token_rejects_expired_token():
         }
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AuthenticationError, match="Invalid or expired refresh token"):
         await RefreshToken(user_repo, token_repo).execute("expired")
-
-    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio
@@ -271,10 +263,8 @@ async def test_refresh_token_rejects_inactive_user():
         }
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(AuthenticationError, match="Invalid or expired refresh token"):
         await RefreshToken(user_repo, token_repo).execute("inactive")
-
-    assert exc.value.status_code == status.HTTP_401_UNAUTHORIZED
     assert token_repo.revoked == ["inactive"]
 
 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from adapters.inbound.http.dependencies import get_current_user
 from adapters.outbound.persistence.token_repository import RefreshTokenRepository
 from adapters.outbound.persistence.user_repository import UserRepository
+from application.common.exceptions import AuthenticationError, ConflictError
 from application.auth.use_cases import LoginUser, LogoutUser, RefreshToken, RegisterUser
 from domain.entities.models import User
 from infrastructure.config import settings
@@ -84,6 +85,15 @@ def _user_response(user: User) -> dict:
     }
 
 
+def _application_error(error: ConflictError | AuthenticationError) -> HTTPException:
+    code = (
+        status.HTTP_409_CONFLICT
+        if isinstance(error, ConflictError)
+        else status.HTTP_401_UNAUTHORIZED
+    )
+    return HTTPException(status_code=code, detail=str(error))
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterBody,
@@ -113,6 +123,9 @@ async def register(
     except HTTPException:
         await session.rollback()
         raise
+    except (ConflictError, AuthenticationError) as e:
+        await session.rollback()
+        raise _application_error(e)
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -135,6 +148,9 @@ async def login(
     except HTTPException:
         await session.rollback()
         raise
+    except (ConflictError, AuthenticationError) as e:
+        await session.rollback()
+        raise _application_error(e)
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -162,6 +178,9 @@ async def refresh(
     except HTTPException:
         await session.rollback()
         raise
+    except AuthenticationError as e:
+        await session.rollback()
+        raise _application_error(e)
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
