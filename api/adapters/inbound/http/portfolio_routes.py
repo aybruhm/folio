@@ -19,7 +19,6 @@ from adapters.outbound.market_data.providers import (
     build_adapter,
     is_configured,
 )
-from adapters.outbound.market_data.yfinance_closes import last_close, valid_closes
 from application.analytics.analytics_interactor import AnalyticsInteractor
 from application.analytics.benchmark import (
     PERIODS,
@@ -41,11 +40,18 @@ from application.analytics.summary import (
     merge_analytics,
     scale_analytics,
 )
+from application.analytics.portfolio_analytics import (
+    build_portfolio_analytics,
+    dated_factor,
+    fetch_fx_factor,
+    fetch_fx_factor_history,
+    portfolio_analytics_with_inputs,
+)
 from application.analytics.timeframe import timeframe_start
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreatePortfolioRequest
-from domain.services.performance import PerformanceInputs, PerformanceService
+from domain.services.performance import PerformanceInputs
 from domain.value_objects.money import Currency
 from infrastructure.db.postgres.engine import get_session
 
@@ -53,55 +59,29 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
 async def _fetch_fx_factor(from_ccy: str, to_ccy: str) -> float:
-    """Multiplier converting *from_ccy* amounts to *to_ccy*, or 0.0 if unknown.
-
-    A plain float, not a ×100 int: rates like NGN→USD (~0.0007) round to 0
-    at ×100. Falls back to inverting the reverse pair.
-    """
-    if from_ccy == to_ccy:
-        return 1.0
-    import yfinance as yf
-
-    def latest_close(ticker: str) -> float:
-        try:
-            return last_close(yf.Ticker(ticker).history(period="1d")) or 0.0
-        except Exception:
-            return 0.0
-
-    direct = latest_close(f"{from_ccy}{to_ccy}=X")
-    if direct > 0:
-        return direct
-    inverse = latest_close(f"{to_ccy}{from_ccy}=X")
-    return 1 / inverse if inverse > 0 else 0.0
+    return await fetch_fx_factor(from_ccy, to_ccy)
 
 
 async def _fetch_fx_factor_history(
     from_ccy: str, to_ccy: str, start: date, end: date
 ) -> list[tuple[date, float]]:
-    """Daily *from_ccy* → *to_ccy* factors, like `_fetch_fx_factor`; empty if
-    neither pair has data."""
+    return await fetch_fx_factor_history(from_ccy, to_ccy, start, end)
+
+
+async def _dated_factor(
+    from_ccy: Currency, to_ccy: Currency, start: date, end: date
+) -> Callable[[date], float] | None:
     if from_ccy == to_ccy:
-        return []
-    import yfinance as yf
-
-    def closes(ticker: str) -> list[tuple[date, float]]:
-        try:
-            data = yf.Ticker(ticker).history(start=start, end=end + timedelta(days=1))
-            return [(idx.date(), float(c)) for idx, c in valid_closes(data).items()]
-        except Exception:
-            return []
-
-    direct = closes(f"{from_ccy}{to_ccy}=X")
-    if direct:
-        return direct
-    return [(d, 1 / c) for d, c in closes(f"{to_ccy}{from_ccy}=X")]
-
-
-def _check_ownership(portfolio: dict, current_user: User) -> None:
-    if portfolio.get("user_id") != str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        return lambda _day: 1.0
+    current = await _fetch_fx_factor(from_ccy.value, to_ccy.value)
+    if not current:
+        return None
+    lookup = make_factor_lookup(
+        await _fetch_fx_factor_history(
+            from_ccy.value, to_ccy.value, start - timedelta(days=7), end
         )
+    )
+    return lookup or (lambda _day: current)
 
 
 async def _build_portfolio_analytics(
@@ -110,10 +90,9 @@ async def _build_portfolio_analytics(
     timeframe: str,
     base_currency: Currency = Currency.USD,
 ) -> dict:
-    analytics, _ = await _portfolio_analytics_with_inputs(
-        session, portfolio_id, timeframe, base_currency
+    return await build_portfolio_analytics(
+        session, portfolio_id, timeframe, base_currency, AnalyticsInteractor
     )
-    return analytics
 
 
 async def _portfolio_analytics_with_inputs(
@@ -122,81 +101,16 @@ async def _portfolio_analytics_with_inputs(
     timeframe: str,
     base_currency: Currency = Currency.USD,
 ) -> tuple[dict, PerformanceInputs | None]:
-    """Analytics for one portfolio, plus the TWR/MWR inputs for merging.
-
-    TWR, MWR, performance history and contributions cover *timeframe*;
-    holdings and allocation are current.
-    """
-    interactor = AnalyticsInteractor(session, base_currency)
-    start_date = timeframe_start(timeframe)
-
-    holdings = await interactor.get_holdings(portfolio_id, base_currency)
-    performance_inputs = await interactor.get_performance_inputs(
-        portfolio_id, start_date
-    )
-    performance = PerformanceService.summarize(performance_inputs)
-    allocation_raw = await interactor.get_allocation(portfolio_id)
-    performance_history = await interactor.get_performance_history(
-        portfolio_id, timeframe
-    )
-    contribution_history = await interactor.get_contribution_history(
-        portfolio_id, start_date
-    )
-    sector_breakdown = await interactor.get_sector_breakdown(portfolio_id)
-
-    current_value = sum(float(h["market_value"]) for h in holdings)
-    total_invested = sum(float(h["cost_basis"]) for h in holdings)
-    total_gain_loss = current_value - total_invested
-    total_gain_loss_percent = (
-        (total_gain_loss / total_invested * 100) if total_invested > 0 else 0.0
+    return await portfolio_analytics_with_inputs(
+        session, portfolio_id, timeframe, base_currency, AnalyticsInteractor
     )
 
-    allocation = [
-        {"label": a["name"], "value": float(a["value"])} for a in allocation_raw
-    ]
 
-    holdings_with_weight = [
-        {
-            **h,
-            "weight_percent": (
-                round((float(h["market_value"]) / current_value) * 100, 2)
-                if current_value > 0
-                else 0.0
-            ),
-        }
-        for h in holdings
-    ]
-
-    top_holdings_by_weight = sorted(
-        holdings_with_weight,
-        key=lambda h: float(h.get("weight_percent", 0)),
-        reverse=True,
-    )[:10]
-
-    return {
-        "portfolio_id": str(portfolio_id),
-        "total_invested": float(total_invested),
-        "current_value": float(current_value),
-        "total_gain_loss": float(total_gain_loss),
-        "holdings": holdings_with_weight,
-        "total_gain_loss_percent": float(round(total_gain_loss_percent, 2)),
-        "twr": performance.get("twr", "0"),
-        "mwr": performance.get("mwr", "0"),
-        "allocation": allocation,
-        "top_holdings": [
-            {
-                "ticker": h.get("ticker"),
-                "name": h.get("name", h.get("ticker")),
-                "value": float(h.get("market_value", 0)),
-                "percent": float(h.get("weight_percent", 0)),
-            }
-            for h in top_holdings_by_weight
-        ],
-        "performance_history": performance_history,
-        "contribution_history": contribution_history,
-        "sector_breakdown": sector_breakdown,
-        "timeframe": timeframe,
-    }, performance_inputs
+def _check_ownership(portfolio: dict, current_user: User) -> None:
+    if portfolio.get("user_id") != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
 
 @router.get("/", response_model=list[dict])
@@ -323,24 +237,6 @@ async def get_analytics_summary(
 
 _BENCHMARK_SYMBOL = re.compile(r"^[A-Z0-9^.=:\-]{1,24}$")
 _MIN_COMPARISON_DAYS = 7
-
-
-async def _dated_factor(
-    from_ccy: Currency, to_ccy: Currency, start: date, end: date
-) -> Callable[[date], float] | None:
-    """Factor converting `from_ccy` to `to_ccy` on a given date (that day's rate,
-    or the nearest earlier one), or None if no rate is available at all."""
-    if from_ccy == to_ccy:
-        return lambda _day: 1.0
-    current = await _fetch_fx_factor(from_ccy.value, to_ccy.value)
-    if not current:
-        return None
-    lookup = make_factor_lookup(
-        await _fetch_fx_factor_history(
-            from_ccy.value, to_ccy.value, start - timedelta(days=7), end
-        )
-    )
-    return lookup or (lambda _day: current)
 
 
 @router.get("/analytics/benchmark")
