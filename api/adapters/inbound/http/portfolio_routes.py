@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import (
+    get_portfolio_analytics_service,
     get_portfolio_service,
     get_current_user,
     invalidate_benchmark_cache,
@@ -48,6 +49,7 @@ from application.analytics.portfolio_analytics import (
     fetch_fx_factor_history,
     portfolio_analytics_with_inputs,
 )
+from application.analytics.portfolio_analytics_service import PortfolioAnalyticsService
 from application.analytics.timeframe import timeframe_start
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from application.portfolio.portfolio_service import PortfolioService
@@ -561,18 +563,15 @@ async def get_portfolio_analytics(
     portfolio_id: UUID,
     timeframe: str = "1y",
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
 
     try:
-        portfolio_interactor = PortfolioInteractor(session)
-        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
-        _check_ownership(portfolio, current_user)
-
-        base_ccy = Currency(portfolio.get("base_currency", "USD"))
-        return await _build_portfolio_analytics(
-            session, portfolio_id, timeframe, base_ccy
+        return await service.get_portfolio_analytics(
+            portfolio_id, timeframe, current_user.id
         )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -582,48 +581,14 @@ async def get_holdings(
     portfolio_id: UUID,
     in_currency: str | None = None,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
 
     try:
-        portfolio_interactor = PortfolioInteractor(session)
-        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
-        _check_ownership(portfolio, current_user)
-
-        base_currency_str = portfolio.get("base_currency", "USD")
-        base_currency = Currency(base_currency_str)
-        currency = Currency(in_currency) if in_currency else base_currency
-
-        interactor = AnalyticsInteractor(session, base_currency)
-        holdings = await interactor.get_holdings(portfolio_id, currency)
-
-        data = [
-            {
-                "ticker": h["ticker"],
-                "name": h.get("name", h["ticker"]),
-                "quantity": h["quantity"],
-                "avg_price": (
-                    float(h["cost_basis"]) / float(h["quantity"])
-                    if float(h["quantity"]) > 0
-                    else 0.0
-                ),
-                "current_price": h["current_price"],
-                "total_value": h["market_value"],
-                "total_invested": h["total_invested"],
-                "gain_loss": h["total_return"],
-                "gain_loss_percent": h["total_return_percent"],
-            }
-            for h in holdings
-        ]
-        total_value = sum(float(h["market_value"]) for h in holdings)
-        total_invested = sum(float(h["total_invested"]) for h in holdings)
-
-        return {
-            "data": data,
-            "currency": currency.value,
-            "total_value": float(total_value),
-            "total_invested": float(total_invested),
-        }
+        currency = Currency(in_currency) if in_currency else None
+        return await service.get_holdings(portfolio_id, current_user.id, currency)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -632,25 +597,13 @@ async def get_holdings(
 async def get_performance(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
 
     try:
-        portfolio_interactor = PortfolioInteractor(session)
-        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
-        _check_ownership(portfolio, current_user)
-
-        interactor = AnalyticsInteractor(session, Currency.USD)
-        performance = await interactor.calculate_performance(portfolio_id)
-
-        return {
-            "portfolio_id": str(portfolio_id),
-            "returns": float(performance.get("twr", 0)),
-            "returns_percent": float(performance.get("twr", 0)),
-            "start_date": performance.get("start_date", ""),
-            "end_date": performance.get("end_date", ""),
-            "data_points": [],
-        }
+        return await service.get_performance(portfolio_id, current_user.id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -660,29 +613,14 @@ async def get_allocation(
     portfolio_id: UUID,
     group_by: str = "asset_class",
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
 
     try:
-        portfolio_interactor = PortfolioInteractor(session)
-        portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
-        _check_ownership(portfolio, current_user)
-
-        interactor = AnalyticsInteractor(session, Currency.USD)
-        allocation = await interactor.get_allocation(portfolio_id, group_by)
-
-        return {
-            "portfolio_id": str(portfolio_id),
-            "allocations": [
-                {
-                    "category": item["name"],
-                    "value": float(item["value"]),
-                    "percent": float(item["weight_percent"]),
-                    "holdings": [],
-                }
-                for item in allocation
-            ],
-            "group_by": group_by,
-        }
+        return await service.get_allocation(
+            portfolio_id, current_user.id, group_by
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

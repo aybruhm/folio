@@ -185,6 +185,31 @@ def _patch_analytics_interactor(monkeypatch, interactor):
     monkeypatch.setattr(
         portfolio_routes, "AnalyticsInteractor", lambda session, currency: interactor
     )
+    monkeypatch.setattr(
+        dependencies.portfolio_analytics_service,
+        "unit_of_work_factory",
+        lambda: FakePortfolioAnalyticsUnitOfWork(
+            interactor,
+            dependencies.portfolio_service.unit_of_work_factory().interactor,
+        ),
+    )
+
+
+class FakePortfolioAnalyticsUnitOfWork:
+    session = None
+
+    def __init__(self, interactor, portfolio_interactor):
+        self.interactor = interactor
+        self.portfolio_interactor = portfolio_interactor
+
+    def analytics_interactor(self, currency):
+        return self.interactor
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
 
 
 class ErrorAnalyticsInteractor(FakeAnalyticsInteractor):
