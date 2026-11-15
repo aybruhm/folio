@@ -1,15 +1,25 @@
 from collections.abc import Callable
 from datetime import date, timedelta
+from typing import Any
 from uuid import UUID
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from application.analytics.analytics_interactor import AnalyticsInteractor
 from application.analytics.summary import make_factor_lookup
 from application.analytics.timeframe import timeframe_start
 from domain.services.performance import PerformanceInputs, PerformanceService
 from domain.value_objects.money import Currency
-from infrastructure.market_data.yfinance_closes import last_close, valid_closes
+
+
+def valid_closes(data):
+    if data is None or data.empty or "Close" not in data.columns:
+        return []
+    closes = data["Close"]
+    return closes[closes.notna() & (closes > 0)]
+
+
+def last_close(data):
+    closes = valid_closes(data)
+    return float(closes.iloc[-1]) if len(closes) else None
 
 
 async def fetch_fx_factor(from_ccy: str, to_ccy: str) -> float:
@@ -51,7 +61,7 @@ async def fetch_fx_factor_history(
 
 
 async def build_portfolio_analytics(
-    session: AsyncSession,
+    session: Any,
     portfolio_id: UUID,
     timeframe: str,
     base_currency: Currency = Currency.USD,
@@ -64,7 +74,7 @@ async def build_portfolio_analytics(
 
 
 async def portfolio_analytics_with_inputs(
-    session: AsyncSession,
+    session: Any,
     portfolio_id: UUID,
     timeframe: str,
     base_currency: Currency = Currency.USD,

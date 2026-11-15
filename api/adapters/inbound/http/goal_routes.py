@@ -3,7 +3,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import get_current_user, get_goal_service
 from application.goals.goal_interactor import GoalInteractor
@@ -11,7 +10,6 @@ from application.goals.goal_service import GoalService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateGoalRequest
 from domain.value_objects.money import Currency
-from infrastructure.db.postgres.engine import get_session
 
 router = APIRouter(prefix="/goals", tags=["goals"])
 

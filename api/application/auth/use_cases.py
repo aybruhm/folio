@@ -1,13 +1,32 @@
 from datetime import datetime, timedelta
+import os
+from types import SimpleNamespace
 from uuid import uuid4
 
 import bcrypt
+from jose import jwt
 
 from application.common.exceptions import AuthenticationError, ConflictError
 from domain.entities.models import User
 from domain.ports.outbound.repositories import ITokenRepository, IUserRepository
-from infrastructure.config import settings
-from infrastructure.security.jwt import create_access_token
+
+settings = SimpleNamespace(
+    REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
+    ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
+    SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret-key-change-in-production"),
+)
+_JWT_ALGORITHM = "HS256"
+
+
+def create_access_token(user_id, email: str) -> tuple[str, datetime]:
+    expires_at = datetime.now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "exp": expires_at,
+        "iat": datetime.now(),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=_JWT_ALGORITHM), expires_at
 
 
 def _hash_password(plain: str) -> str:

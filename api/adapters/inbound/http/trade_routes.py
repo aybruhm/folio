@@ -5,7 +5,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import (
     get_csv_import_service,
@@ -20,7 +19,6 @@ from application.trades.trade_service import TradeService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
-from infrastructure.db.postgres.engine import get_session
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
