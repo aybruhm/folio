@@ -12,6 +12,7 @@ from infrastructure.db.postgres.goal_uow import GoalUnitOfWork
 from infrastructure.db.postgres.portfolio_analytics_uow import (
     PortfolioAnalyticsUnitOfWork,
 )
+from infrastructure.market_data.benchmark_gateway import BenchmarkGateway
 
 
 auth_service = AuthService(AuthUnitOfWork)
@@ -19,4 +20,6 @@ portfolio_service = PortfolioService(PortfolioUnitOfWork)
 trade_service = TradeService(TradeUnitOfWork)
 csv_import_service = CsvImportService(CsvImportUnitOfWork)
 goal_service = GoalService(GoalUnitOfWork)
-portfolio_analytics_service = PortfolioAnalyticsService(PortfolioAnalyticsUnitOfWork)
+portfolio_analytics_service = PortfolioAnalyticsService(
+    PortfolioAnalyticsUnitOfWork, BenchmarkGateway()
+)

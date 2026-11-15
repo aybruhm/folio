@@ -8,6 +8,7 @@ from application.analytics import portfolio_analytics_service
 from application.analytics.timeframe import timeframe_start
 from domain.services.performance import PerformanceInputs, PerformanceService
 from domain.value_objects.money import Currency
+from infrastructure.market_data.benchmark_cache import BenchmarkCache
 
 
 class FakePortfolioInteractor:
@@ -118,9 +119,6 @@ class FakePortfolioInteractor:
 
 def _patch_portfolio_interactor(monkeypatch, interactor):
     monkeypatch.setattr(
-        portfolio_routes, "PortfolioInteractor", lambda session: interactor
-    )
-    monkeypatch.setattr(
         dependencies.portfolio_service,
         "unit_of_work_factory",
         lambda: FakePortfolioUnitOfWork(interactor),
@@ -183,9 +181,6 @@ class FakeAnalyticsInteractor:
 
 
 def _patch_analytics_interactor(monkeypatch, interactor):
-    monkeypatch.setattr(
-        portfolio_routes, "AnalyticsInteractor", lambda session, currency: interactor
-    )
     monkeypatch.setattr(
         dependencies.portfolio_analytics_service,
         "unit_of_work_factory",
@@ -530,12 +525,7 @@ def _patch_summary(monkeypatch, fake_user, fx_factor, fx_history=()):
     async def fake_fx_history(from_ccy, to_ccy, start, end):
         return list(fx_history)
 
-    monkeypatch.setattr(
-        portfolio_routes, "PortfolioInteractor", lambda session: portfolios
-    )
     _patch_analytics_interactor(monkeypatch, analytics)
-    monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor", fake_fx)
-    monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor_history", fake_fx_history)
     monkeypatch.setattr(portfolio_analytics_service, "fetch_fx_factor", fake_fx)
     monkeypatch.setattr(
         portfolio_analytics_service, "fetch_fx_factor_history", fake_fx_history
@@ -760,16 +750,55 @@ def _setup_benchmark(
     async def history(from_ccy, to_ccy, start, end):
         return fx_history.get((from_ccy, to_ccy), [])
 
+    monkeypatch.setattr(portfolio_analytics_service, "fetch_fx_factor", factor)
     monkeypatch.setattr(
-        portfolio_routes, "PortfolioInteractor",
-        lambda s: FakeBenchmarkPortfolios(portfolios),
+        portfolio_analytics_service, "fetch_fx_factor_history", history
     )
-    monkeypatch.setattr(portfolio_routes, "AnalyticsInteractor", FakeBenchmarkAnalytics)
     monkeypatch.setattr(
-        portfolio_routes, "build_adapter", lambda provider: FakeBenchmarkYahoo()
+        dependencies.portfolio_analytics_service,
+        "unit_of_work_factory",
+        lambda: FakeBenchmarkUnitOfWork(FakeBenchmarkPortfolios(portfolios)),
     )
-    monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor", factor)
-    monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor_history", history)
+    monkeypatch.setattr(
+        dependencies.portfolio_analytics_service,
+        "benchmark_gateway",
+        FakeBenchmarkGateway(),
+    )
+
+
+class FakeBenchmarkUnitOfWork:
+    session = None
+
+    def __init__(self, portfolios):
+        self.portfolio_interactor = portfolios
+
+    def analytics_interactor(self, currency):
+        return FakeBenchmarkAnalytics(self.session, currency)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
+
+
+class FakeBenchmarkGateway:
+    providers = ("yfinance", "ngxpulse", "ngnmarket")
+    provider_currencies = {"ngxpulse": "NGN", "ngnmarket": "NGN"}
+    provider_labels = {
+        "yfinance": "Yahoo Finance",
+        "ngxpulse": "NGXPulse",
+        "ngnmarket": "NGNMarket",
+    }
+
+    def __init__(self):
+        self.cache = BenchmarkCache()
+
+    def build_adapter(self, provider):
+        return FakeBenchmarkYahoo()
+
+    def is_configured(self, adapter):
+        return getattr(adapter, "_enabled", True)
 
 
 def _get(client, **params):
@@ -1132,7 +1161,11 @@ def _use_providers(monkeypatch, chosen):
         chosen.append(provider)
         return FakeNgxPulse() if provider != "yfinance" else FakeBenchmarkYahoo()
 
-    monkeypatch.setattr(portfolio_routes, "build_adapter", build)
+    monkeypatch.setattr(
+        dependencies.portfolio_analytics_service.benchmark_gateway,
+        "build_adapter",
+        build,
+    )
 
 
 def _one_portfolio(monkeypatch, fake_user, **kwargs):

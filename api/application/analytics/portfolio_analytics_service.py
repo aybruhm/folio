@@ -1,8 +1,23 @@
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
+import re
 from typing import Protocol
 from uuid import UUID
 
+from application.analytics.benchmark import (
+    PERIODS,
+    annualized,
+    chain_returns,
+    effective_start,
+    normalize_currency,
+    price_return_series,
+    sample_dates,
+)
+from application.analytics.benchmarks import (
+    benchmark_currency,
+    benchmark_name,
+    benchmark_provider,
+)
 from application.analytics.analytics_interactor import AnalyticsInteractor
 from application.analytics.portfolio_analytics import (
     build_portfolio_analytics,
@@ -20,6 +35,13 @@ from application.portfolio.portfolio_interactor import PortfolioInteractor
 from domain.value_objects.money import Currency
 
 
+class BenchmarkError(Exception):
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
 class PortfolioAnalyticsUnitOfWork(Protocol):
     session: object
     portfolio_interactor: PortfolioInteractor
@@ -33,9 +55,12 @@ class PortfolioAnalyticsUnitOfWork(Protocol):
 
 class PortfolioAnalyticsService:
     def __init__(
-        self, unit_of_work_factory: Callable[[], PortfolioAnalyticsUnitOfWork]
+        self,
+        unit_of_work_factory: Callable[[], PortfolioAnalyticsUnitOfWork],
+        benchmark_gateway=None,
     ):
         self.unit_of_work_factory = unit_of_work_factory
+        self.benchmark_gateway = benchmark_gateway
 
     async def get_portfolio_analytics(
         self, portfolio_id: UUID, timeframe: str, user_id: UUID
@@ -199,6 +224,246 @@ class PortfolioAnalyticsService:
             summary = merge_analytics(items, display_currency.value, timeframe)
             summary["excluded_portfolio_ids"] = excluded
             return summary
+
+    async def get_benchmark_comparison(
+        self,
+        benchmark: str,
+        period: str,
+        in_currency: str,
+        portfolio_id: UUID | None,
+        provider: str | None,
+        user_id: UUID,
+    ) -> tuple[dict, str]:
+        symbol = benchmark.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9^.=:\-]{1,24}", symbol):
+            raise BenchmarkError(422, "Invalid benchmark ticker")
+        period_key = period.strip().lower()
+        if period_key not in PERIODS:
+            raise BenchmarkError(
+                422, f"period must be one of: {', '.join(PERIODS)}"
+            )
+        try:
+            display_currency = Currency(in_currency)
+        except ValueError:
+            raise BenchmarkError(422, "Unknown currency")
+
+        gateway = self.benchmark_gateway
+        source = (provider or benchmark_provider(symbol)).strip().lower()
+        if source not in gateway.providers:
+            raise BenchmarkError(
+                422,
+                f"provider must be one of: {', '.join(gateway.providers)}",
+            )
+        adapter = gateway.build_adapter(source)
+        if not gateway.is_configured(adapter):
+            raise BenchmarkError(
+                503,
+                f"{gateway.provider_labels[source]} isn't set up on this server, "
+                f"so {symbol} can't be loaded.",
+            )
+
+        async with self.unit_of_work_factory() as unit_of_work:
+            if portfolio_id:
+                try:
+                    portfolio = await unit_of_work.portfolio_interactor.get_portfolio(
+                        portfolio_id
+                    )
+                except ValueError:
+                    raise BenchmarkError(404, "Portfolio not found")
+                if portfolio.get("user_id") != str(user_id):
+                    raise BenchmarkError(403, "Access denied")
+                portfolios = [portfolio]
+            else:
+                portfolios = await unit_of_work.portfolio_interactor.list_portfolios(
+                    user_id
+                )
+            if not portfolios:
+                raise BenchmarkError(404, "No portfolios to benchmark")
+
+            today = date.today()
+            cache = gateway.cache
+            cache_key = await cache.key(
+                str(user_id),
+                str(portfolio_id) if portfolio_id else "all",
+                symbol,
+                source,
+                period_key,
+                display_currency.value,
+                today.isoformat(),
+            )
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached, "HIT"
+
+            period_start = self._timeframe_start(period_key, today)
+            history = await adapter.get_price_history(
+                symbol, period_start - timedelta(days=14), today
+            )
+            closes = sorted((d, price / 100) for d, price in history if price > 0)
+            if not closes:
+                detail = (
+                    f"No price history found for {symbol} on "
+                    f"{gateway.provider_labels[source]}"
+                )
+                if source != "yfinance":
+                    detail += ". Check the index code and that the server's API key for it is valid."
+                raise BenchmarkError(404, detail)
+
+            interactors = {}
+            first_trades = []
+            for portfolio in portfolios:
+                interactor = unit_of_work.analytics_interactor(
+                    Currency(portfolio["base_currency"])
+                )
+                interactors[portfolio["id"]] = interactor
+                first = await interactor.get_first_trade_date(
+                    UUID(portfolio["id"])
+                )
+                if first:
+                    first_trades.append(first)
+            if not first_trades:
+                raise BenchmarkError(404, "No trades to benchmark yet")
+
+            start, limited_by = effective_start(
+                period_start, min(first_trades), closes[0][0]
+            )
+            if (today - start).days < 7:
+                raise BenchmarkError(
+                    422,
+                    "Not enough history to compare yet: at least a week is needed.",
+                )
+            dates = sample_dates(start, today)
+            totals = [0.0] * len(dates)
+            flows = []
+            excluded = []
+            used = 0
+            for portfolio in portfolios:
+                series = await interactors[portfolio["id"]].get_value_series(
+                    UUID(portfolio["id"]), dates
+                )
+                if series is None:
+                    continue
+                factor_on = await self._dated_factor(
+                    Currency(portfolio["base_currency"]),
+                    display_currency,
+                    start,
+                    today,
+                )
+                if factor_on is None:
+                    excluded.append(portfolio["id"])
+                    continue
+                values, portfolio_flows = series
+                for index, (day, value) in enumerate(zip(dates, values)):
+                    totals[index] += value * factor_on(day)
+                flows += [
+                    (day, amount * factor_on(day))
+                    for day, amount in portfolio_flows
+                ]
+                used += 1
+            if not used:
+                raise BenchmarkError(
+                    422,
+                    f"Exchange rates to {display_currency.value} are unavailable right now.",
+                )
+
+            quote_currency = normalize_currency(
+                await adapter.get_quote_currency(symbol)
+                if source == "yfinance"
+                else benchmark_currency(symbol) or gateway.provider_currencies.get(source)
+            )
+            converted = False
+            if quote_currency and quote_currency != display_currency.value:
+                try:
+                    benchmark_factor = await self._dated_factor(
+                        Currency(quote_currency), display_currency, start, today
+                    )
+                except ValueError:
+                    benchmark_factor = None
+                if benchmark_factor:
+                    closes = [
+                        (day, price * benchmark_factor(day))
+                        for day, price in closes
+                    ]
+                    converted = True
+
+            portfolio_cumulative = chain_returns(dates, totals, flows)
+            benchmark_cumulative = price_return_series(closes, dates)
+            if not benchmark_cumulative:
+                raise BenchmarkError(404, f"No usable prices for {symbol}")
+
+            days = (today - start).days
+            portfolio_return = portfolio_cumulative[-1]
+            benchmark_return = benchmark_cumulative[-1]
+
+            def pct(fraction):
+                return None if fraction is None else round(fraction * 100, 2)
+
+            payload = {
+                "generated_at": datetime.now(UTC).isoformat(),
+                "period": period_key,
+                "currency": display_currency.value,
+                "requested_start": period_start.isoformat(),
+                "start_date": start.isoformat(),
+                "end_date": today.isoformat(),
+                "limited_by": limited_by,
+                "portfolio_count": used,
+                "excluded_portfolio_ids": excluded,
+                "portfolio": {
+                    "return_pct": pct(portfolio_return),
+                    "annualized_pct": pct(annualized(portfolio_return, days)),
+                },
+                "benchmark": {
+                    "ticker": symbol,
+                    "provider": source,
+                    "name": benchmark_name(symbol),
+                    "quote_currency": quote_currency,
+                    "converted": converted
+                    or quote_currency in (None, display_currency.value),
+                    "return_pct": pct(benchmark_return),
+                    "annualized_pct": pct(annualized(benchmark_return, days)),
+                },
+                "excess_return_pct": pct(portfolio_return - benchmark_return),
+                "series": [
+                    {
+                        "date": day.isoformat(),
+                        "portfolio": pct(portfolio_value),
+                        "benchmark": pct(benchmark_value),
+                    }
+                    for day, portfolio_value, benchmark_value in zip(
+                        dates, portfolio_cumulative, benchmark_cumulative
+                    )
+                ],
+            }
+            await cache.set(cache_key, payload)
+            return payload, "MISS"
+
+    @staticmethod
+    def _timeframe_start(period: str, today: date) -> date:
+        from application.analytics.timeframe import timeframe_start
+
+        return timeframe_start(period, today) or today
+
+    @staticmethod
+    async def _dated_factor(
+        from_currency: Currency,
+        to_currency: Currency,
+        start: date,
+        end: date,
+    ):
+        if from_currency == to_currency:
+            return lambda _day: 1.0
+        current = await fetch_fx_factor(from_currency.value, to_currency.value)
+        if not current:
+            return None
+        lookup = make_factor_lookup(
+            await fetch_fx_factor_history(
+                from_currency.value,
+                to_currency.value,
+                start - timedelta(days=7),
+                end,
+            )
+        )
+        return lookup or (lambda _day: current)
 
     @staticmethod
     async def _owned_portfolio(

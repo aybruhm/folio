@@ -1,10 +1,6 @@
-import re
-from collections.abc import Callable
-from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import (
     get_portfolio_analytics_service,
@@ -12,73 +8,16 @@ from adapters.inbound.http.dependencies import (
     get_current_user,
     invalidate_benchmark_cache,
 )
-from infrastructure.market_data.benchmark_cache import BenchmarkCache
-from infrastructure.market_data.providers import (
-    BENCHMARK_PROVIDERS,
-    PROVIDER_CURRENCY,
-    PROVIDER_LABELS,
-    build_adapter,
-    is_configured,
+from application.analytics.portfolio_analytics_service import (
+    BenchmarkError,
+    PortfolioAnalyticsService,
 )
-from application.analytics.analytics_interactor import AnalyticsInteractor
-from application.analytics.benchmark import (
-    PERIODS,
-    annualized,
-    chain_returns,
-    effective_start,
-    normalize_currency,
-    price_return_series,
-    sample_dates,
-)
-from application.analytics.benchmarks import (
-    benchmark_currency,
-    benchmark_name,
-    benchmark_provider,
-)
-from application.analytics.summary import (
-    make_factor_lookup,
-)
-from application.analytics.portfolio_analytics import (
-    dated_factor,
-    fetch_fx_factor,
-    fetch_fx_factor_history,
-)
-from application.analytics.portfolio_analytics_service import PortfolioAnalyticsService
-from application.analytics.timeframe import timeframe_start
-from application.portfolio.portfolio_interactor import PortfolioInteractor
 from application.portfolio.portfolio_service import PortfolioService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreatePortfolioRequest
 from domain.value_objects.money import Currency
-from infrastructure.db.postgres.engine import get_session
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
-
-
-async def _fetch_fx_factor(from_ccy: str, to_ccy: str) -> float:
-    return await fetch_fx_factor(from_ccy, to_ccy)
-
-
-async def _fetch_fx_factor_history(
-    from_ccy: str, to_ccy: str, start: date, end: date
-) -> list[tuple[date, float]]:
-    return await fetch_fx_factor_history(from_ccy, to_ccy, start, end)
-
-
-async def _dated_factor(
-    from_ccy: Currency, to_ccy: Currency, start: date, end: date
-) -> Callable[[date], float] | None:
-    if from_ccy == to_ccy:
-        return lambda _day: 1.0
-    current = await _fetch_fx_factor(from_ccy.value, to_ccy.value)
-    if not current:
-        return None
-    lookup = make_factor_lookup(
-        await _fetch_fx_factor_history(
-            from_ccy.value, to_ccy.value, start - timedelta(days=7), end
-        )
-    )
-    return lookup or (lambda _day: current)
 
 
 def _check_ownership(portfolio: dict, current_user: User) -> None:
@@ -145,10 +84,6 @@ async def get_analytics_summary(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-_BENCHMARK_SYMBOL = re.compile(r"^[A-Z0-9^.=:\-]{1,24}$")
-_MIN_COMPARISON_DAYS = 7
-
-
 @router.get("/analytics/benchmark")
 async def get_benchmark_comparison(
     benchmark: str,
@@ -158,7 +93,7 @@ async def get_benchmark_comparison(
     portfolio_id: UUID | None = None,
     provider: str | None = None,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
     """Cumulative return of a portfolio (or all of them) against a benchmark.
 
@@ -171,212 +106,21 @@ async def get_benchmark_comparison(
     or ngnmarket); it defaults to the catalog's choice for known tickers and
     to yfinance otherwise. Results are cached for 35 minutes.
     """
-    symbol = benchmark.strip().upper()
-    if not _BENCHMARK_SYMBOL.match(symbol):
-        raise HTTPException(status_code=422, detail="Invalid benchmark ticker")
-    period_key = period.strip().lower()
-    if period_key not in PERIODS:
-        raise HTTPException(
-            status_code=422, detail=f"period must be one of: {', '.join(PERIODS)}"
-        )
     try:
-        display_ccy = Currency(in_currency)
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Unknown currency")
-    source = (provider or benchmark_provider(symbol)).strip().lower()
-    if source not in BENCHMARK_PROVIDERS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"provider must be one of: {', '.join(BENCHMARK_PROVIDERS)}",
+        payload, cache_status = await service.get_benchmark_comparison(
+            benchmark,
+            period,
+            in_currency,
+            portfolio_id,
+            provider,
+            current_user.id,
         )
-    adapter = build_adapter(source)
-    if not is_configured(adapter):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                f"{PROVIDER_LABELS[source]} isn't set up on this server, so "
-                f"{symbol} can't be loaded."
-            ),
-        )
-
-    try:
-        portfolio_interactor = PortfolioInteractor(session)
-        if portfolio_id:
-            try:
-                portfolio = await portfolio_interactor.get_portfolio(portfolio_id)
-            except ValueError:
-                raise HTTPException(status_code=404, detail="Portfolio not found")
-            _check_ownership(portfolio, current_user)
-            portfolios = [portfolio]
-        else:
-            portfolios = await portfolio_interactor.list_portfolios(current_user.id)
-        if not portfolios:
-            raise HTTPException(status_code=404, detail="No portfolios to benchmark")
-
-        today = date.today()
-        cache = BenchmarkCache()
-        cache_key = await cache.key(
-            str(current_user.id),
-            str(portfolio_id) if portfolio_id else "all",
-            symbol,
-            source,
-            period_key,
-            display_ccy.value,
-            today.isoformat(),
-        )
-        cached = await cache.get(cache_key)
-        if cached is not None:
-            response.headers["X-Cache"] = "HIT"
-            return cached
-        response.headers["X-Cache"] = "MISS"
-
-        period_start = timeframe_start(period_key, today) or today
-
-        history = await adapter.get_price_history(
-            symbol, period_start - timedelta(days=14), today
-        )
-        closes = sorted((d, price / 100) for d, price in history if price > 0)
-        if not closes:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    f"No price history found for {symbol} on "
-                    f"{PROVIDER_LABELS[source]}"
-                    + (
-                        ""
-                        if source == "yfinance"
-                        else ". Check the index code and that the server's "
-                        "API key for it is valid."
-                    )
-                ),
-            )
-
-        interactors: dict[str, AnalyticsInteractor] = {}
-        first_trades: list[date] = []
-        for p in portfolios:
-            interactor = AnalyticsInteractor(session, Currency(p["base_currency"]))
-            interactors[p["id"]] = interactor
-            first = await interactor.get_first_trade_date(UUID(p["id"]))
-            if first:
-                first_trades.append(first)
-        if not first_trades:
-            raise HTTPException(status_code=404, detail="No trades to benchmark yet")
-
-        start, limited_by = effective_start(
-            period_start, min(first_trades), closes[0][0]
-        )
-        if (today - start).days < _MIN_COMPARISON_DAYS:
-            raise HTTPException(
-                status_code=422,
-                detail="Not enough history to compare yet: at least a week is needed.",
-            )
-        dates = sample_dates(start, today)
-
-        totals = [0.0] * len(dates)
-        flows: list[tuple[date, float]] = []
-        excluded: list[str] = []
-        used = 0
-        for p in portfolios:
-            series = await interactors[p["id"]].get_value_series(UUID(p["id"]), dates)
-            if series is None:
-                continue
-            factor_on = await _dated_factor(
-                Currency(p["base_currency"]), display_ccy, start, today
-            )
-            if factor_on is None:
-                excluded.append(p["id"])
-                continue
-            values, portfolio_flows = series
-            for i, (day, value) in enumerate(zip(dates, values)):
-                totals[i] += value * factor_on(day)
-            flows += [(day, amount * factor_on(day)) for day, amount in portfolio_flows]
-            used += 1
-        if not used:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    f"Exchange rates to {display_ccy.value} are unavailable "
-                    "right now."
-                ),
-            )
-
-        # The benchmark in the same currency, at each day's rate, so a falling
-        # local currency doesn't flatter or hide the comparison.
-        quote_ccy = normalize_currency(
-            await adapter.get_quote_currency(symbol)
-            if source == "yfinance"
-            else benchmark_currency(symbol) or PROVIDER_CURRENCY.get(source)
-        )
-        converted = False
-        if quote_ccy and quote_ccy != display_ccy.value:
-            try:
-                bench_factor = await _dated_factor(
-                    Currency(quote_ccy), display_ccy, start, today
-                )
-            except ValueError:
-                bench_factor = None
-            if bench_factor:
-                closes = [(d, price * bench_factor(d)) for d, price in closes]
-                converted = True
-
-        portfolio_cumulative = chain_returns(dates, totals, flows)
-        benchmark_cumulative = price_return_series(closes, dates)
-        if not benchmark_cumulative:
-            raise HTTPException(
-                status_code=404, detail=f"No usable prices for {symbol}"
-            )
-
-        days = (today - start).days
-        portfolio_return = portfolio_cumulative[-1]
-        benchmark_return = benchmark_cumulative[-1]
-
-        def pct(fraction: float | None) -> float | None:
-            return None if fraction is None else round(fraction * 100, 2)
-
-        payload = {
-            "generated_at": datetime.now(UTC).isoformat(),
-            "period": period_key,
-            "currency": display_ccy.value,
-            "requested_start": period_start.isoformat(),
-            "start_date": start.isoformat(),
-            "end_date": today.isoformat(),
-            "limited_by": limited_by,
-            "portfolio_count": used,
-            "excluded_portfolio_ids": excluded,
-            "portfolio": {
-                "return_pct": pct(portfolio_return),
-                "annualized_pct": pct(annualized(portfolio_return, days)),
-            },
-            "benchmark": {
-                "ticker": symbol,
-                "provider": source,
-                "name": benchmark_name(symbol),
-                "quote_currency": quote_ccy,
-                # False when the benchmark is quoted in another currency and no
-                # rate was available, so its return is in its own currency.
-                "converted": converted or quote_ccy in (None, display_ccy.value),
-                "return_pct": pct(benchmark_return),
-                "annualized_pct": pct(annualized(benchmark_return, days)),
-            },
-            "excess_return_pct": pct(portfolio_return - benchmark_return),
-            "series": [
-                {
-                    "date": day.isoformat(),
-                    "portfolio": pct(p_value),
-                    "benchmark": pct(b_value),
-                }
-                for day, p_value, b_value in zip(
-                    dates, portfolio_cumulative, benchmark_cumulative
-                )
-            ],
-        }
-        await cache.set(cache_key, payload)
+        response.headers["X-Cache"] = cache_status
         return payload
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+    except BenchmarkError as error:
+        raise HTTPException(error.status_code, detail=error.detail)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 @router.get("/{portfolio_id}", response_model=dict)
 async def get_portfolio(
