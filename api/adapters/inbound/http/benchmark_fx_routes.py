@@ -1,54 +1,46 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
-from application.analytics.benchmarks import list_catalog
-from domain.value_objects.money import Currency
-from infrastructure.db.postgres.engine import get_session
+from adapters.inbound.http.dependencies import (
+    get_benchmark_fx_service,
+)
+from application.market_data.benchmark_fx_service import BenchmarkFxService
 
 router_benchmarks = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
 router_fx = APIRouter(prefix="/fx", tags=["fx"])
 
 
 @router_benchmarks.get("/")
-async def list_benchmarks(session: AsyncSession = Depends(get_session)):
-    return list_catalog()
+async def list_benchmarks(
+    service: BenchmarkFxService = Depends(get_benchmark_fx_service),
+):
+    return service.list_benchmarks()
 
 
 @router_benchmarks.post("/")
 async def add_benchmark(
-    ticker: str, name: str, session: AsyncSession = Depends(get_session)
+    ticker: str,
+    name: str,
+    service: BenchmarkFxService = Depends(get_benchmark_fx_service),
 ):
-    return {"ticker": ticker, "name": name}
+    return service.add_benchmark(ticker, name)
 
 
 @router_benchmarks.delete("/{benchmark_id}")
 async def delete_benchmark(
-    benchmark_id: UUID, session: AsyncSession = Depends(get_session)
+    benchmark_id: UUID,
+    service: BenchmarkFxService = Depends(get_benchmark_fx_service),
 ):
-    return {"status": "deleted"}
+    return service.delete_benchmark(benchmark_id)
 
 
 @router_fx.get("/rates")
 async def get_fx_rates(
-    currencies: list[str] = None, session: AsyncSession = Depends(get_session)
+    currencies: list[str] = None,
+    service: BenchmarkFxService = Depends(get_benchmark_fx_service),
 ):
     try:
-        if not currencies:
-            currencies = ["USD", "GBP", "EUR", "JPY"]
-
-        yfinance = YFinanceAdapter()
-        rates = {}
-
-        for ccy in currencies:
-            try:
-                rate = await yfinance.get_current_rate(Currency("USD"), Currency(ccy))
-                rates[f"USD{ccy}"] = str(rate / 100) if rate else None
-            except:
-                rates[f"USD{ccy}"] = None
-
-        return rates
+        return await service.get_fx_rates(currencies)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

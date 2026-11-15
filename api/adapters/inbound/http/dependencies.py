@@ -11,6 +11,7 @@ from application.trades.trade_service import TradeService
 from application.trades.csv_import_service import CsvImportService
 from application.goals.goal_service import GoalService
 from application.analytics.portfolio_analytics_service import PortfolioAnalyticsService
+from application.market_data.benchmark_fx_service import BenchmarkFxService
 from infrastructure.composition import (
     auth_service,
     csv_import_service,
@@ -18,6 +19,7 @@ from infrastructure.composition import (
     portfolio_analytics_service,
     portfolio_service,
     trade_service,
+    benchmark_fx_service,
 )
 from infrastructure.db.postgres.users.dao import UserRepository
 from domain.entities.models import User
@@ -47,6 +49,10 @@ def get_goal_service() -> GoalService:
 
 def get_portfolio_analytics_service() -> PortfolioAnalyticsService:
     return portfolio_analytics_service
+
+
+def get_benchmark_fx_service() -> BenchmarkFxService:
+    return benchmark_fx_service
 
 
 async def get_current_user(

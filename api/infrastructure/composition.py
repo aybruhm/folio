@@ -13,6 +13,8 @@ from infrastructure.db.postgres.portfolio_analytics_uow import (
     PortfolioAnalyticsUnitOfWork,
 )
 from infrastructure.market_data.benchmark_gateway import BenchmarkGateway
+from infrastructure.market_data.benchmark_fx_gateway import BenchmarkFxGateway
+from application.market_data.benchmark_fx_service import BenchmarkFxService
 
 
 auth_service = AuthService(AuthUnitOfWork)
@@ -23,3 +25,4 @@ goal_service = GoalService(GoalUnitOfWork)
 portfolio_analytics_service = PortfolioAnalyticsService(
     PortfolioAnalyticsUnitOfWork, BenchmarkGateway()
 )
+benchmark_fx_service = BenchmarkFxService(BenchmarkFxGateway().adapter)
