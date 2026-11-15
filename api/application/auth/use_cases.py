@@ -1,13 +1,36 @@
 from datetime import datetime, timedelta
+import os
+from types import SimpleNamespace
 from uuid import uuid4
 
 import bcrypt
-from fastapi import HTTPException, status
+from jose import jwt
 
+from application.common.exceptions import AuthenticationError, ConflictError
 from domain.entities.models import User
 from domain.ports.outbound.repositories import ITokenRepository, IUserRepository
-from infrastructure.config import settings
-from infrastructure.security.jwt import create_access_token
+
+settings = SimpleNamespace(
+    REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
+    ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
+    SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret-key-change-in-production"),
+)
+_JWT_ALGORITHM = "HS256"
+
+
+def create_access_token(user_id, email: str) -> tuple[str, datetime]:
+    expires_at = datetime.now() + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "exp": expires_at,
+        "iat": datetime.now(),
+    }
+    return jwt.encode(
+        payload, settings.SECRET_KEY, algorithm=_JWT_ALGORITHM
+    ), expires_at
 
 
 def _hash_password(plain: str) -> str:
@@ -32,10 +55,7 @@ class RegisterUser:
     async def execute(self, email: str, password: str) -> tuple[User, str, str]:
         existing = await self.user_repo.get_by_email(email)
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered",
-            )
+            raise ConflictError("Email already registered")
 
         hashed = _hash_password(password)
         user = await self.user_repo.create(email, hashed)
@@ -58,10 +78,7 @@ class LoginUser:
     async def execute(self, email: str, password: str) -> tuple[User, str, str]:
         user = await self.user_repo.get_by_email(email)
         if not user or not _verify_password(password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-            )
+            raise AuthenticationError("Invalid email or password")
 
         access_token, _ = create_access_token(user.id, user.email)
         refresh_token = str(uuid4())
@@ -82,32 +99,20 @@ class RefreshToken:
         record = await self.token_repo.get_by_token(refresh_token)
 
         if not record:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired refresh token",
-            )
+            raise AuthenticationError("Invalid or expired refresh token")
 
         if record["is_revoked"]:
             await self.token_repo.revoke_family(record["family_id"])
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token reuse detected — all sessions revoked",
-            )
+            raise AuthenticationError("Token reuse detected — all sessions revoked")
 
         if record["expires_at"] < datetime.now():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired refresh token",
-            )
+            raise AuthenticationError("Invalid or expired refresh token")
 
         await self.token_repo.revoke(refresh_token)
 
         user = await self.user_repo.get_by_id(record["user_id"])
         if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired refresh token",
-            )
+            raise AuthenticationError("Invalid or expired refresh token")
 
         new_access_token, _ = create_access_token(user.id, user.email)
         new_refresh_token = str(uuid4())

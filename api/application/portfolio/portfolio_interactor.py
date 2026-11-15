@@ -5,13 +5,17 @@ from domain.entities.models import Portfolio
 from domain.value_objects.money import Currency
 from domain.ports.inbound.use_cases import IPortfolioUseCase, CreatePortfolioRequest
 from domain.ports.outbound.repositories import IPortfolioRepository
-from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
-from sqlalchemy.ext.asyncio import AsyncSession
+
+PortfolioRepository = None
 
 
 class PortfolioInteractor(IPortfolioUseCase):
-    def __init__(self, session: AsyncSession):
-        self.repository: IPortfolioRepository = PortfolioRepository(session)
+    def __init__(self, repository: IPortfolioRepository | None = None, session=None):
+        if repository is None:
+            if PortfolioRepository is None:
+                raise ValueError("A portfolio repository is required")
+            repository = PortfolioRepository(session)
+        self.repository = repository
 
     async def create_portfolio(
         self, request: CreatePortfolioRequest, user_id: UUID

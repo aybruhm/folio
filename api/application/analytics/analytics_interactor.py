@@ -1,21 +1,6 @@
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
-from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
-from adapters.outbound.market_data.price_cache import PriceCache
-from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
-from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from adapters.outbound.market_data.yfinance_closes import last_close
-from adapters.outbound.persistence.asset_repository import AssetRepository
-from adapters.outbound.persistence.price_repository import (
-    FxRateRepository,
-    PriceHistoryRepository,
-)
-from adapters.outbound.persistence.trade_repository import TradeRepository
 from application.analytics.timeframe import timeframe_start
 from domain.ports.inbound.use_cases import IAnalyticsUseCase
 from domain.ports.outbound.repositories import (
@@ -29,7 +14,57 @@ from domain.services.performance import (
     PerformanceInputs,
     PerformanceService,
 )
+from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, Currency
+
+TradeRepository = AssetRepository = PriceHistoryRepository = FxRateRepository = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = (
+    TradingviewAdapter
+) = None
+PriceCache = None
+
+
+def last_close(history):
+    if history is None or getattr(history, "empty", False):
+        return None
+    try:
+        values = history["Close"].dropna()
+        return float(values.iloc[-1]) if len(values) else None
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+
+
+class _LegacyAnalyticsGateway:
+    def __init__(self):
+        self.adapters = {
+            "yfinance": YFinanceAdapter,
+            "tiingo": TiingoAdapter,
+            "ngnmarket": NgnMarketAdapter,
+            "ngxpulse": NgxPulseAdapter,
+            "tradingview": TradingviewAdapter,
+        }
+
+    async def current_price(self, provider, symbol):
+        if provider == "ngnmarket":
+            chart = await self.adapters[provider]().get_index_chart(symbol)
+            if chart and chart.get("data"):
+                item = chart["data"][-1]
+                price = item.get("index_value")
+                if price is not None:
+                    return date.today(), round(float(price) * 100)
+            return date.today(), 0
+        return await self.adapters[provider]().get_current_price(symbol)
+
+    def cache(self):
+        return PriceCache()
+
+    def ticker(self, symbol):
+        import yfinance as yf
+
+        return yf.Ticker(symbol)
+
+    def last_close(self, history):
+        return last_close(history)
 
 
 def _trade_day(trade) -> date:
@@ -38,50 +73,50 @@ def _trade_day(trade) -> date:
 
 
 class AnalyticsInteractor(IAnalyticsUseCase):
-    def __init__(self, session: AsyncSession, portfolio_base_currency: Currency):
-        self.trade_repo: ITradeRepository = TradeRepository(session)
-        self.asset_repo: IAssetRepository = AssetRepository(session)
-        self.price_repo: IPriceHistoryRepository = PriceHistoryRepository(session)
-        self.fx_repo: IFxRateRepository = FxRateRepository(session)
-        self.yfinance = YFinanceAdapter()
-        self.tiingo = TiingoAdapter()
-        self.ngnmarket = NgnMarketAdapter()
-        self.ngxpulse = NgxPulseAdapter()
-        self.tradingview = TradingviewAdapter()
+    def __init__(
+        self,
+        trade_repo: ITradeRepository | None = None,
+        asset_repo: IAssetRepository | None = None,
+        price_repo: IPriceHistoryRepository | None = None,
+        fx_repo: IFxRateRepository | None = None,
+        portfolio_base_currency: Currency = Currency.USD,
+        market_data=None,
+        session=None,
+    ):
+        if isinstance(asset_repo, Currency) and session is None:
+            legacy_currency = asset_repo
+            session = trade_repo
+            trade_repo = None
+            asset_repo = None
+            portfolio_base_currency = legacy_currency
+        self.trade_repo = trade_repo or TradeRepository(session)
+        self.asset_repo = asset_repo or AssetRepository(session)
+        self.price_repo = price_repo or PriceHistoryRepository(session)
+        self.fx_repo = fx_repo or FxRateRepository(session)
+        self.market_data = market_data or _LegacyAnalyticsGateway()
+        self.yfinance = self._adapter("yfinance")
+        self.tiingo = self._adapter("tiingo")
+        self.ngnmarket = self._adapter("ngnmarket")
+        self.ngxpulse = self._adapter("ngxpulse")
+        self.tradingview = self._adapter("tradingview")
         self.base_currency = portfolio_base_currency
 
-    @staticmethod
-    def _normalize_provider(provider: str | None) -> str:
-        normalized = (provider or "yfinance").strip().lower()
-        return (
-            normalized
-            if normalized
-            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
-            else "yfinance"
-        )
+    def _adapter(self, provider):
+        adapter = self.market_data.adapters[provider]
+        return adapter() if isinstance(adapter, type) else adapter
 
     async def _get_price_from_provider(self, symbol: str, provider: str):
-        selected = self._normalize_provider(provider)
-
-        if selected == "tiingo":
-            return await self.tiingo.get_current_price(symbol)
+        selected = normalize_provider(provider)
 
         if selected == "ngnmarket":
             chart = await self.ngnmarket.get_index_chart(symbol)
             if chart and chart.get("data"):
-                last = chart["data"][-1]
-                price = last.get("index_value")
+                item = chart["data"][-1]
+                price = item.get("index_value")
                 if price is not None:
-                    return (date.today(), round(float(price) * 100))
-            return (date.today(), 0)
-
-        if selected == "ngxpulse":
-            return await self.ngxpulse.get_current_price(symbol)
-
-        if selected == "tradingview":
-            return await self.tradingview.get_current_price(symbol)
-
-        return await self.yfinance.get_current_price(symbol)
+                    return date.today(), round(float(price) * 100)
+            return date.today(), 0
+        return await getattr(self, selected).get_current_price(symbol)
 
     async def _resolve_price(
         self, asset_id: UUID, ticker: str, provider_hint: str | None = None
@@ -91,7 +126,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if asset and asset.asset_class.value == "crypto" and "-" not in symbol:
             symbol = f"{symbol}-{asset.currency.value}"
 
-        provider = self._normalize_provider(
+        provider = normalize_provider(
             provider_hint or (asset.market_data_provider if asset else "yfinance")
         )
 
@@ -101,7 +136,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         # Check Valkey cache before making any upstream calls.
         # A cached sentinel (price=0) means the ticker previously
         # returned no price — skip the lookup entirely.
-        cache = PriceCache()
+        cache = self.market_data.cache()
         cached = await cache.get_price(symbol)
         if cached is not None:
             return cached[1]
@@ -139,7 +174,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
             return self._fx_rate_cache[mem_key]
 
         # Check Valkey cache first
-        cache = PriceCache()
+        cache = self.market_data.cache()
         cached = await cache.get_fx_rate(from_ccy, to_ccy)
         if cached is not None:
             self._fx_rate_cache[mem_key] = cached
@@ -148,15 +183,13 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         # Allow tests to inject a fake Ticker via _fx_ticker_factory
         factory = getattr(self, "_fx_ticker_factory", None)
         if factory is None:
-            import yfinance as yf
-
-            factory = yf.Ticker
+            factory = self.market_data.ticker
 
         async def _fetch_one(frm: str, to: str) -> int:
             ticker = f"{frm}{to}=X"
             try:
                 t = factory(ticker)
-                close = last_close(t.history(period="1d"))
+                close = self.market_data.last_close(t.history(period="1d"))
                 return round(close * 100) if close is not None else 0
             except Exception:
                 return 0

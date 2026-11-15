@@ -1,6 +1,6 @@
 import pytest
 
-from adapters.outbound.market_data import tiingo_adapter as tiingo_module
+from infrastructure.market_data import tiingo_adapter as tiingo_module
 from domain.value_objects.money import Currency
 
 

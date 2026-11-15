@@ -1,6 +1,6 @@
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
-from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
+from infrastructure.market_data.ngxpulse_adapter import NgxPulseAdapter
+from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
 
 # Providers that can supply a daily price or index series for a benchmark.
 # Tiingo and TradingView are for holdings only: neither serves index history.

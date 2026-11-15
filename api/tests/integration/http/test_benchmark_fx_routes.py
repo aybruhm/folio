@@ -1,6 +1,6 @@
 import pytest
 
-from adapters.inbound.http import benchmark_fx_routes
+from adapters.inbound.http import dependencies
 
 
 class FakeYFinanceAdapter:
@@ -25,7 +25,9 @@ def test_benchmark_routes(client):
     assert {"^GSPC", "VOO", "BTC-USD"} <= {item["ticker"] for item in catalog}
     assert len({item["ticker"] for item in catalog}) == len(catalog)
 
-    created = client.post("/api/v1/benchmarks/", params={"ticker": "SPY", "name": "S&P 500"})
+    created = client.post(
+        "/api/v1/benchmarks/", params={"ticker": "SPY", "name": "S&P 500"}
+    )
     assert created.status_code == 200
     assert created.json() == {"ticker": "SPY", "name": "S&P 500"}
 
@@ -37,9 +39,15 @@ def test_benchmark_routes(client):
 @pytest.mark.integration
 @pytest.mark.edge_case
 def test_fx_rates_route(client, monkeypatch):
-    monkeypatch.setattr(benchmark_fx_routes, "YFinanceAdapter", lambda: FakeYFinanceAdapter())
+    monkeypatch.setattr(
+        dependencies.benchmark_fx_service,
+        "adapter_factory",
+        lambda: FakeYFinanceAdapter(),
+    )
 
-    response = client.get("/api/v1/fx/rates", params=[("currencies", "GBP"), ("currencies", "JPY")])
+    response = client.get(
+        "/api/v1/fx/rates", params=[("currencies", "GBP"), ("currencies", "JPY")]
+    )
     assert response.status_code == 200
     assert response.json()["USDGBP"] == "1.0"
     assert response.json()["USDJPY"] == "150.0"
@@ -52,7 +60,11 @@ def test_fx_rates_route_handles_bad_currency(client, monkeypatch):
         async def get_current_rate(self, from_currency, to_currency):
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(benchmark_fx_routes, "YFinanceAdapter", lambda: BrokenYFinance())
+    monkeypatch.setattr(
+        dependencies.benchmark_fx_service,
+        "adapter_factory",
+        lambda: BrokenYFinance(),
+    )
     response = client.get("/api/v1/fx/rates", params=[("currencies", "GBP")])
     assert response.status_code == 200
     assert response.json()["USDGBP"] is None
@@ -61,7 +73,11 @@ def test_fx_rates_route_handles_bad_currency(client, monkeypatch):
 @pytest.mark.integration
 @pytest.mark.edge_case
 def test_fx_rates_route_uses_default_currency_set(client, monkeypatch):
-    monkeypatch.setattr(benchmark_fx_routes, "YFinanceAdapter", lambda: FakeYFinanceAdapter())
+    monkeypatch.setattr(
+        dependencies.benchmark_fx_service,
+        "adapter_factory",
+        lambda: FakeYFinanceAdapter(),
+    )
     response = client.get("/api/v1/fx/rates")
     assert response.status_code == 200
     assert set(response.json().keys()) == {"USDUSD", "USDGBP", "USDEUR", "USDJPY"}
@@ -74,6 +90,10 @@ def test_fx_rates_route_outer_exception_returns_400(client, monkeypatch):
         def __init__(self):
             raise RuntimeError("init failed")
 
-    monkeypatch.setattr(benchmark_fx_routes, "YFinanceAdapter", BrokenInitYFinance)
+    monkeypatch.setattr(
+        dependencies.benchmark_fx_service,
+        "adapter_factory",
+        BrokenInitYFinance,
+    )
     response = client.get("/api/v1/fx/rates")
     assert response.status_code == 400

@@ -1,14 +1,11 @@
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.inbound.http.dependencies import get_current_user
-from adapters.outbound.persistence.token_repository import RefreshTokenRepository
-from adapters.outbound.persistence.user_repository import UserRepository
-from application.auth.use_cases import LoginUser, LogoutUser, RefreshToken, RegisterUser
+from adapters.inbound.http.dependencies import get_auth_service, get_current_user
+from application.common.exceptions import AuthenticationError, ConflictError
+from application.auth.services import AuthService
 from domain.entities.models import User
 from infrastructure.config import settings
-from infrastructure.db.session import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -84,11 +81,20 @@ def _user_response(user: User) -> dict:
     }
 
 
+def _application_error(error: ConflictError | AuthenticationError) -> HTTPException:
+    code = (
+        status.HTTP_409_CONFLICT
+        if isinstance(error, ConflictError)
+        else status.HTTP_401_UNAUTHORIZED
+    )
+    return HTTPException(status_code=code, detail=str(error))
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     body: RegisterBody,
     response: Response,
-    session: AsyncSession = Depends(get_session),
+    service: AuthService = Depends(get_auth_service),
 ):
     if not settings.ENABLE_REGISTRATION:
         raise HTTPException(
@@ -101,20 +107,16 @@ async def register(
             detail="Password must be at least 8 characters",
         )
     try:
-        use_case = RegisterUser(
-            UserRepository(session), RefreshTokenRepository(session)
-        )
-        user, access_token, refresh_token = await use_case.execute(
+        user, access_token, refresh_token = await service.register(
             body.email, body.password
         )
-        await session.commit()
         _set_auth_cookies(response, access_token, refresh_token)
         return _user_response(user)
     except HTTPException:
-        await session.rollback()
         raise
+    except (ConflictError, AuthenticationError) as e:
+        raise _application_error(e)
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -122,28 +124,26 @@ async def register(
 async def login(
     body: LoginBody,
     response: Response,
-    session: AsyncSession = Depends(get_session),
+    service: AuthService = Depends(get_auth_service),
 ):
     try:
-        use_case = LoginUser(UserRepository(session), RefreshTokenRepository(session))
-        user, access_token, refresh_token = await use_case.execute(
+        user, access_token, refresh_token = await service.login(
             body.email, body.password
         )
-        await session.commit()
         _set_auth_cookies(response, access_token, refresh_token)
         return _user_response(user)
     except HTTPException:
-        await session.rollback()
         raise
+    except (ConflictError, AuthenticationError) as e:
+        raise _application_error(e)
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/refresh")
 async def refresh(
     response: Response,
-    session: AsyncSession = Depends(get_session),
+    service: AuthService = Depends(get_auth_service),
     refresh_token: str | None = Cookie(default=None),
 ):
     if not refresh_token:
@@ -152,33 +152,27 @@ async def refresh(
             detail="Refresh token not found",
         )
     try:
-        use_case = RefreshToken(
-            UserRepository(session), RefreshTokenRepository(session)
-        )
-        _, new_access_token, new_refresh_token = await use_case.execute(refresh_token)
-        await session.commit()
+        _, new_access_token, new_refresh_token = await service.refresh(refresh_token)
         _set_auth_cookies(response, new_access_token, new_refresh_token)
         return {"message": "Token refreshed"}
     except HTTPException:
-        await session.rollback()
         raise
+    except AuthenticationError as e:
+        raise _application_error(e)
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     response: Response,
-    session: AsyncSession = Depends(get_session),
+    service: AuthService = Depends(get_auth_service),
     refresh_token: str | None = Cookie(default=None),
 ):
     try:
-        use_case = LogoutUser(RefreshTokenRepository(session))
-        await use_case.execute(refresh_token)
-        await session.commit()
+        await service.logout(refresh_token)
     except Exception:
-        await session.rollback()
+        pass
     finally:
         _clear_auth_cookies(response)
 

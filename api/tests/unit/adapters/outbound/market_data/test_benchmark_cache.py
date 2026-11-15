@@ -1,7 +1,7 @@
 import pytest
 
-from adapters.outbound.market_data import benchmark_cache
-from adapters.outbound.market_data.benchmark_cache import BenchmarkCache
+from infrastructure.market_data import benchmark_cache
+from infrastructure.market_data.benchmark_cache import BenchmarkCache
 from application.analytics.benchmarks import (
     benchmark_currency,
     benchmark_provider,

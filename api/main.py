@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
         await shutdown_scheduler()
 
-        from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
+        from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
         from infrastructure.cache.valkey_client import close_valkey_client
 
         await NgnMarketAdapter.close_shared_session()

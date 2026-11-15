@@ -2,10 +2,10 @@ import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
-from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
-from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
+from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
+from infrastructure.market_data.tiingo_adapter import TiingoAdapter
+from infrastructure.market_data.tradingview_adapter import TradingviewAdapter
+from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
 from infrastructure.config import settings
 
 logging.basicConfig()
@@ -62,9 +62,9 @@ async def warm_cache_prices_job():
 
     logger.info("Starting cache warm (prices)")
     try:
-        from adapters.outbound.persistence.asset_repository import AssetRepository
+        from infrastructure.db.postgres.assets.dao import AssetRepository
         from domain.value_objects.money import AssetClass
-        from infrastructure.db.session import async_session
+        from infrastructure.db.postgres.engine import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()
@@ -95,7 +95,9 @@ async def warm_cache_prices_job():
                     warmed += 1
                     logger.debug(f"Cache warmed for {ticker} via {provider}")
                 except Exception as exc:
-                    logger.warning(f"Cache warm failed for {ticker} ({provider}): {exc}")
+                    logger.warning(
+                        f"Cache warm failed for {ticker} ({provider}): {exc}"
+                    )
 
         logger.info(f"Cache warm (prices) completed — {warmed} assets")
     except Exception as e:
@@ -112,11 +114,11 @@ async def warm_cache_fx_job():
 
     logger.info("Starting cache warm (FX)")
     try:
-        from adapters.outbound.persistence.portfolio_repository import (
+        from infrastructure.db.postgres.portfolios.dao import (
             PortfolioRepository,
         )
         from domain.value_objects.money import Currency
-        from infrastructure.db.session import async_session
+        from infrastructure.db.postgres.engine import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()

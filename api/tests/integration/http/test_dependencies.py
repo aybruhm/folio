@@ -17,7 +17,9 @@ class FakeUserRepository:
 
 
 def _patch_dependency_repo(monkeypatch, user=None):
-    monkeypatch.setattr(dependencies, "UserRepository", lambda session: FakeUserRepository(user))
+    monkeypatch.setattr(
+        dependencies, "UserRepository", lambda session: FakeUserRepository(user)
+    )
 
 
 @pytest.mark.integration
@@ -30,7 +32,9 @@ def _patch_dependency_repo(monkeypatch, user=None):
         ({"sub": "not-a-uuid"}, None),
     ],
 )
-def test_get_current_user_rejects_bad_token_payload(client, monkeypatch, decoded_payload, error_cls):
+def test_get_current_user_rejects_bad_token_payload(
+    client, monkeypatch, decoded_payload, error_cls
+):
     if error_cls is not None:
         monkeypatch.setattr(
             dependencies,
@@ -38,7 +42,9 @@ def test_get_current_user_rejects_bad_token_payload(client, monkeypatch, decoded
             lambda token: (_ for _ in ()).throw(error_cls("bad token")),
         )
     else:
-        monkeypatch.setattr(dependencies, "decode_access_token", lambda token: decoded_payload)
+        monkeypatch.setattr(
+            dependencies, "decode_access_token", lambda token: decoded_payload
+        )
     _patch_dependency_repo(monkeypatch, user=None)
     client.cookies.set("access_token", "token")
 
@@ -50,7 +56,9 @@ def test_get_current_user_rejects_bad_token_payload(client, monkeypatch, decoded
 @pytest.mark.grumpy_path
 def test_get_current_user_rejects_missing_or_inactive_user(client, monkeypatch):
     active_payload = {"sub": str(uuid4())}
-    monkeypatch.setattr(dependencies, "decode_access_token", lambda token: active_payload)
+    monkeypatch.setattr(
+        dependencies, "decode_access_token", lambda token: active_payload
+    )
     _patch_dependency_repo(monkeypatch, user=None)
     client.cookies.set("access_token", "token")
 
@@ -79,7 +87,9 @@ def test_get_current_user_returns_active_user(client, monkeypatch):
         is_active=True,
         created_at=datetime(2024, 1, 1, 12, 0),
     )
-    monkeypatch.setattr(dependencies, "decode_access_token", lambda token: {"sub": str(user.id)})
+    monkeypatch.setattr(
+        dependencies, "decode_access_token", lambda token: {"sub": str(user.id)}
+    )
     _patch_dependency_repo(monkeypatch, user=user)
     client.cookies.set("access_token", "token")
 

@@ -83,7 +83,9 @@ class TiingoAdapter:
         for symbol in candidates:
             if not self._can_make_request():
                 return []
-            logger.debug("Tiingo: fetching price history for %s (%s → %s)", symbol, start, end)
+            logger.debug(
+                "Tiingo: fetching price history for %s (%s → %s)", symbol, start, end
+            )
             try:
                 rows = client.get_ticker_price(
                     symbol,
@@ -93,7 +95,9 @@ class TiingoAdapter:
                 )
                 self._register_usage_bytes(self._estimate_bytes(rows))
                 if not rows:
-                    logger.debug("Tiingo: no price history rows returned for %s", symbol)
+                    logger.debug(
+                        "Tiingo: no price history rows returned for %s", symbol
+                    )
                     continue
 
                 result = []
@@ -111,7 +115,9 @@ class TiingoAdapter:
                         continue
                 if result:
                     logger.info(
-                        "Tiingo: price history OK for %s — %d data points", symbol, len(result)
+                        "Tiingo: price history OK for %s — %d data points",
+                        symbol,
+                        len(result),
                     )
                     return sorted(result)
             except Exception as e:
@@ -138,13 +144,17 @@ class TiingoAdapter:
 
                 rows = payload if isinstance(payload, list) else []
                 if not rows:
-                    logger.debug("Tiingo: no current price rows returned for %s", symbol)
+                    logger.debug(
+                        "Tiingo: no current price rows returned for %s", symbol
+                    )
                     continue
 
                 row = rows[-1]
                 close = row.get("close") or row.get("adjClose")
                 if close is None:
-                    logger.debug("Tiingo: close price missing in response for %s", symbol)
+                    logger.debug(
+                        "Tiingo: close price missing in response for %s", symbol
+                    )
                     continue
 
                 date_str = str(row.get("date") or "")
@@ -160,7 +170,9 @@ class TiingoAdapter:
                 price_cents = round(float(close) * 100)
                 logger.info(
                     "Tiingo: current price OK for %s — %.2f on %s",
-                    symbol, price_cents / 100, parsed_date,
+                    symbol,
+                    price_cents / 100,
+                    parsed_date,
                 )
                 return (parsed_date, price_cents)
             except Exception as e:
@@ -227,7 +239,9 @@ class TiingoAdapter:
                 if info and info.get("ticker"):
                     logger.info(
                         "Tiingo: metadata OK for %s — name=%r exchange=%s",
-                        symbol, info.get("name", ""), info.get("exchangeCode", ""),
+                        symbol,
+                        info.get("name", ""),
+                        info.get("exchangeCode", ""),
                     )
                     return info
             except Exception as e:
@@ -275,7 +289,10 @@ class TiingoAdapter:
             self._register_usage_bytes(self._estimate_bytes(tickers))
             self._ticker_catalog_cache = tickers
             self._ticker_catalog_cached_at = now
-            logger.info("Tiingo: ticker catalog fetched — %d entries", len(tickers) if tickers else 0)
+            logger.info(
+                "Tiingo: ticker catalog fetched — %d entries",
+                len(tickers) if tickers else 0,
+            )
             return tickers
         except Exception as e:
             logger.warning("Tiingo: ticker catalog fetch failed: %s", e)

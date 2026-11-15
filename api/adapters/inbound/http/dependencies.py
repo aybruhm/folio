@@ -4,11 +4,61 @@ from fastapi import Depends, HTTPException, Request, status
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.outbound.market_data.benchmark_cache import BenchmarkCache
-from adapters.outbound.persistence.user_repository import UserRepository
+from infrastructure.market_data.benchmark_cache import BenchmarkCache
+from application.auth.services import AuthService
+from application.portfolio.portfolio_service import PortfolioService
+from application.trades.trade_service import TradeService
+from application.trades.csv_import_service import CsvImportService
+from application.goals.goal_service import GoalService
+from application.analytics.portfolio_analytics_service import PortfolioAnalyticsService
+from application.market_data.benchmark_fx_service import BenchmarkFxService
+from application.assets.asset_service import AssetService
+from infrastructure.composition import (
+    auth_service,
+    csv_import_service,
+    goal_service,
+    portfolio_analytics_service,
+    portfolio_service,
+    trade_service,
+    benchmark_fx_service,
+    asset_service,
+)
+from infrastructure.db.postgres.users.dao import UserRepository
 from domain.entities.models import User
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 from infrastructure.security.jwt import decode_access_token
+
+
+def get_auth_service() -> AuthService:
+    return auth_service
+
+
+def get_portfolio_service() -> PortfolioService:
+    return portfolio_service
+
+
+def get_trade_service() -> TradeService:
+    return trade_service
+
+
+def get_csv_import_service() -> CsvImportService:
+    return csv_import_service
+
+
+def get_goal_service() -> GoalService:
+    return goal_service
+
+
+def get_portfolio_analytics_service() -> PortfolioAnalyticsService:
+    return portfolio_analytics_service
+
+
+def get_benchmark_fx_service() -> BenchmarkFxService:
+    return benchmark_fx_service
+
+
+def get_asset_service() -> AssetService:
+    return asset_service
 
 
 async def get_current_user(

@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from adapters.inbound.http import auth_routes
+from adapters.inbound.http import dependencies
 from application.auth import use_cases as auth_use_cases
 from domain.entities.models import User
 from fastapi import HTTPException
@@ -62,10 +62,23 @@ class FakeTokenRepo:
         self.revoked_families.append(family_id)
 
 
+class FakeAuthUnitOfWork:
+    def __init__(self, user_repo, token_repo):
+        self.user_repo = user_repo
+        self.token_repo = token_repo
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
+
+
 def _patch_auth_repos(monkeypatch, user_repo, token_repo):
-    monkeypatch.setattr(auth_routes, "UserRepository", lambda session: user_repo)
     monkeypatch.setattr(
-        auth_routes, "RefreshTokenRepository", lambda session: token_repo
+        dependencies.auth_service,
+        "unit_of_work_factory",
+        lambda: FakeAuthUnitOfWork(user_repo, token_repo),
     )
 
 
@@ -197,7 +210,9 @@ class _RaiseHTTPUseCase:
 @pytest.mark.grumpy_path
 def test_register_http_exception_branch_rolls_back_and_rethrows(client, monkeypatch):
     _patch_auth_repos(monkeypatch, FakeUserRepo(), FakeTokenRepo())
-    monkeypatch.setattr(auth_routes, "RegisterUser", _RaiseHTTPUseCase)
+    monkeypatch.setattr(
+        dependencies.auth_service, "register_use_case", _RaiseHTTPUseCase
+    )
     response = client.post(
         "/api/v1/auth/register",
         json={"email": "dup@example.com", "password": "password123"},
@@ -209,7 +224,7 @@ def test_register_http_exception_branch_rolls_back_and_rethrows(client, monkeypa
 @pytest.mark.grumpy_path
 def test_register_generic_exception_branch_returns_400(client, monkeypatch):
     _patch_auth_repos(monkeypatch, FakeUserRepo(), FakeTokenRepo())
-    monkeypatch.setattr(auth_routes, "RegisterUser", _RaiseUseCase)
+    monkeypatch.setattr(dependencies.auth_service, "register_use_case", _RaiseUseCase)
     response = client.post(
         "/api/v1/auth/register",
         json={"email": "err@example.com", "password": "password123"},
@@ -221,7 +236,7 @@ def test_register_generic_exception_branch_returns_400(client, monkeypatch):
 @pytest.mark.grumpy_path
 def test_login_generic_exception_branch_returns_400(client, monkeypatch):
     _patch_auth_repos(monkeypatch, FakeUserRepo(), FakeTokenRepo())
-    monkeypatch.setattr(auth_routes, "LoginUser", _RaiseUseCase)
+    monkeypatch.setattr(dependencies.auth_service, "login_use_case", _RaiseUseCase)
     response = client.post(
         "/api/v1/auth/login",
         json={"email": "err@example.com", "password": "password123"},
@@ -233,7 +248,7 @@ def test_login_generic_exception_branch_returns_400(client, monkeypatch):
 @pytest.mark.grumpy_path
 def test_refresh_generic_exception_branch_returns_400(client, monkeypatch):
     _patch_auth_repos(monkeypatch, FakeUserRepo(), FakeTokenRepo())
-    monkeypatch.setattr(auth_routes, "RefreshToken", _RaiseUseCase)
+    monkeypatch.setattr(dependencies.auth_service, "refresh_use_case", _RaiseUseCase)
     client.cookies.set("refresh_token", "token")
     response = client.post("/api/v1/auth/refresh")
     assert response.status_code == 400
@@ -243,6 +258,6 @@ def test_refresh_generic_exception_branch_returns_400(client, monkeypatch):
 @pytest.mark.grumpy_path
 def test_logout_exception_branch_still_returns_204(client, monkeypatch):
     _patch_auth_repos(monkeypatch, FakeUserRepo(), FakeTokenRepo())
-    monkeypatch.setattr(auth_routes, "LogoutUser", _RaiseUseCase)
+    monkeypatch.setattr(dependencies.auth_service, "logout_use_case", _RaiseUseCase)
     response = client.post("/api/v1/auth/logout")
     assert response.status_code == 204

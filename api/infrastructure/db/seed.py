@@ -17,7 +17,7 @@ from infrastructure.db.models import (
     TradeModel,
     UserModel,
 )
-from infrastructure.db.session import async_session
+from infrastructure.db.postgres.engine import async_session
 
 _SEED_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 _SEED_USER_EMAIL = "demo@example.com"

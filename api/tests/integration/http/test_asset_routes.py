@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from adapters.inbound.http import asset_routes
+from adapters.inbound.http import dependencies
 from domain.entities.models import Asset
 from domain.value_objects.money import AssetClass, Currency
 
@@ -61,6 +61,30 @@ class FakeTradingviewAdapter:
         return self.metadata
 
 
+class FakeAssetUnitOfWork:
+    def __init__(self, repository):
+        self.repository = repository
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
+
+
+def _patch_assets(monkeypatch, repository, adapters):
+    monkeypatch.setattr(
+        dependencies.asset_service,
+        "unit_of_work_factory",
+        lambda: FakeAssetUnitOfWork(repository),
+    )
+    monkeypatch.setattr(
+        dependencies.asset_service.gateway,
+        "adapter",
+        lambda provider: adapters[provider],
+    )
+
+
 @pytest.mark.integration
 @pytest.mark.happy_path
 def test_asset_search_and_history_routes(client, monkeypatch):
@@ -76,8 +100,7 @@ def test_asset_search_and_history_routes(client, monkeypatch):
     history = [(date(2024, 1, 1), 18520)]
     repo = FakeAssetRepository(assets)
     yfinance = FakeYFinanceAdapter(history)
-    monkeypatch.setattr(asset_routes, "AssetRepository", lambda session: repo)
-    monkeypatch.setattr(asset_routes, "YFinanceAdapter", lambda: yfinance)
+    _patch_assets(monkeypatch, repo, {"yfinance": yfinance})
 
     search = client.get("/api/v1/assets/search", params={"q": "AAP"})
     assert search.status_code == 200
@@ -95,18 +118,14 @@ def test_asset_search_and_history_routes(client, monkeypatch):
 @pytest.mark.integration
 @pytest.mark.grumpy_path
 def test_asset_routes_reject_bad_search_and_history_errors(client, monkeypatch):
-    monkeypatch.setattr(
-        asset_routes, "AssetRepository", lambda session: FakeAssetRepository([])
-    )
-
-    bad_search = client.get("/api/v1/assets/search", params={"q": ""})
-    assert bad_search.status_code == 400
-
     class BrokenYFinance:
         async def get_price_history(self, ticker, start, end):
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(asset_routes, "YFinanceAdapter", lambda: BrokenYFinance())
+    _patch_assets(monkeypatch, FakeAssetRepository([]), {"yfinance": BrokenYFinance()})
+    bad_search = client.get("/api/v1/assets/search", params={"q": ""})
+    assert bad_search.status_code == 400
+
     broken_history = client.get("/api/v1/assets/AAPL/history")
     assert broken_history.status_code == 400
 
@@ -115,8 +134,7 @@ def test_asset_routes_reject_bad_search_and_history_errors(client, monkeypatch):
 @pytest.mark.edge_case
 def test_asset_history_defaults_date_range_when_not_provided(client, monkeypatch):
     yfinance = FakeYFinanceAdapter([(date(2024, 1, 1), 10000)])
-    monkeypatch.setattr(asset_routes, "AssetRepository", lambda session: FakeAssetRepository([]))
-    monkeypatch.setattr(asset_routes, "YFinanceAdapter", lambda: yfinance)
+    _patch_assets(monkeypatch, FakeAssetRepository([]), {"yfinance": yfinance})
 
     response = client.get("/api/v1/assets/MSFT/history")
     assert response.status_code == 200
@@ -129,8 +147,8 @@ def test_asset_history_defaults_date_range_when_not_provided(client, monkeypatch
 @pytest.mark.integration
 @pytest.mark.happy_path
 def test_asset_search_accepts_single_character_query(client, monkeypatch):
-    monkeypatch.setattr(
-        asset_routes, "AssetRepository", lambda session: FakeAssetRepository([])
+    _patch_assets(
+        monkeypatch, FakeAssetRepository([]), {"yfinance": FakeYFinanceAdapter()}
     )
     response = client.get("/api/v1/assets/search", params={"q": "A"})
     assert response.status_code == 200
@@ -140,25 +158,16 @@ def test_asset_search_accepts_single_character_query(client, monkeypatch):
 @pytest.mark.integration
 @pytest.mark.happy_path
 def test_validate_ticker_route_supports_all_providers(client, monkeypatch):
-    monkeypatch.setattr(
-        asset_routes,
-        "YFinanceAdapter",
-        lambda: FakeYFinanceAdapter(metadata={"ticker": "AAPL"}),
-    )
-    monkeypatch.setattr(
-        asset_routes,
-        "TiingoAdapter",
-        lambda: FakeTiingoAdapter(metadata={"ticker": "AAPL"}),
-    )
-    monkeypatch.setattr(
-        asset_routes,
-        "NgnMarketAdapter",
-        lambda: FakeNgnMarketAdapter(metadata={"ticker": "NGX30"}),
-    )
-    monkeypatch.setattr(
-        asset_routes,
-        "TradingviewAdapter",
-        lambda: FakeTradingviewAdapter(metadata={"ticker": "NASDAQ:AAPL"}),
+    _patch_assets(
+        monkeypatch,
+        FakeAssetRepository([]),
+        {
+            "yfinance": FakeYFinanceAdapter(metadata={"ticker": "AAPL"}),
+            "tiingo": FakeTiingoAdapter(metadata={"ticker": "AAPL"}),
+            "ngnmarket": FakeNgnMarketAdapter(metadata={"ticker": "NGX30"}),
+            "tradingview": FakeTradingviewAdapter(metadata={"ticker": "NASDAQ:AAPL"}),
+            "ngxpulse": FakeNgnMarketAdapter(metadata={"ticker": "NGX30"}),
+        },
     )
 
     yfinance_response = client.get(

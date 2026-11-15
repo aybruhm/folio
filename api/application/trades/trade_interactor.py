@@ -2,16 +2,6 @@ from dataclasses import replace
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from adapters.outbound.market_data.ngnmarket_adapter import NgnMarketAdapter
-from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
-from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
-from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
-from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from adapters.outbound.persistence.asset_repository import AssetRepository
-from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
-from adapters.outbound.persistence.trade_repository import TradeRepository
 from domain.entities.models import Asset, Trade
 from domain.ports.inbound.use_cases import CreateTradeRequest, ITradeUseCase
 from domain.ports.outbound.repositories import (
@@ -19,7 +9,28 @@ from domain.ports.outbound.repositories import (
     IPortfolioRepository,
     ITradeRepository,
 )
+from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
+
+TradeRepository = AssetRepository = PortfolioRepository = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = (
+    TradingviewAdapter
+) = None
+
+
+class _LegacyMarketDataGateway:
+    def __init__(self):
+        self.adapters = {
+            "yfinance": YFinanceAdapter,
+            "tiingo": TiingoAdapter,
+            "ngnmarket": NgnMarketAdapter,
+            "ngxpulse": NgxPulseAdapter,
+            "tradingview": TradingviewAdapter,
+        }
+
+    async def get_asset_metadata(self, ticker, currency, provider):
+        adapter = self.adapters[normalize_provider(provider)]()
+        return await adapter.get_asset_metadata(ticker, currency.value)
 
 
 class BulkTradeError(ValueError):
@@ -32,42 +43,21 @@ class BulkTradeError(ValueError):
 
 
 class TradeInteractor(ITradeUseCase):
-    def __init__(self, session: AsyncSession):
-        self.trade_repo: ITradeRepository = TradeRepository(session)
-        self.asset_repo: IAssetRepository = AssetRepository(session)
-        self.portfolio_repo: IPortfolioRepository = PortfolioRepository(session)
-        self.yfinance = YFinanceAdapter()
-        self.tiingo = TiingoAdapter()
-        self.ngnmarket = NgnMarketAdapter()
-        self.ngxpulse = NgxPulseAdapter()
-        self.tradingview = TradingviewAdapter()
-
-    @staticmethod
-    def _normalize_provider(provider: str | None) -> str:
-        normalized = (provider or "yfinance").strip().lower()
-        return (
-            normalized
-            if normalized
-            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
-            else "yfinance"
-        )
+    def __init__(
+        self,
+        trade_repo: ITradeRepository | None = None,
+        asset_repo: IAssetRepository | None = None,
+        portfolio_repo: IPortfolioRepository | None = None,
+        market_data=None,
+        session=None,
+    ):
+        self.trade_repo = trade_repo or TradeRepository(session)
+        self.asset_repo = asset_repo or AssetRepository(session)
+        self.portfolio_repo = portfolio_repo or PortfolioRepository(session)
+        self.market_data = market_data or _LegacyMarketDataGateway()
 
     async def _get_asset_metadata(self, ticker: str, currency: Currency, provider: str):
-        selected = self._normalize_provider(provider)
-
-        if selected == "tiingo":
-            return await self.tiingo.get_asset_metadata(ticker, currency.value)
-
-        if selected == "ngnmarket":
-            return await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-
-        if selected == "tradingview":
-            return await self.tradingview.get_asset_metadata(ticker, currency.value)
-
-        if selected == "ngxpulse":
-            return await self.ngxpulse.get_asset_metadata(ticker, currency.value)
-
-        return await self.yfinance.get_asset_metadata(ticker, currency.value)
+        return await self.market_data.get_asset_metadata(ticker, currency, provider)
 
     async def _resolve_asset(
         self,
@@ -85,7 +75,7 @@ class TradeInteractor(ITradeUseCase):
                     name=ticker,
                     asset_class=AssetClass.CASH,
                     currency=currency,
-                    market_data_provider=self._normalize_provider(market_data_provider),
+                    market_data_provider=normalize_provider(market_data_provider),
                 )
                 await self.asset_repo.add(asset)
             else:
@@ -94,7 +84,7 @@ class TradeInteractor(ITradeUseCase):
                 )
                 if not metadata:
                     raise ValueError(f"Cannot find asset metadata for {ticker}")
-                selected_provider = self._normalize_provider(market_data_provider)
+                selected_provider = normalize_provider(market_data_provider)
                 asset = Asset.from_metadata(
                     ticker, metadata, market_data_provider=selected_provider
                 )
@@ -105,7 +95,7 @@ class TradeInteractor(ITradeUseCase):
             metadata = await self._get_asset_metadata(
                 ticker, currency, effective_provider
             )
-            selected_provider = self._normalize_provider(effective_provider)
+            selected_provider = normalize_provider(effective_provider)
             if metadata and (
                 asset.asset_class.value != metadata.asset_class
                 or asset.currency.value != metadata.currency.value
@@ -144,7 +134,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
-            market_data_provider=self._normalize_provider(request.market_data_provider),
+            market_data_provider=normalize_provider(request.market_data_provider),
             created_at=datetime.now(),
         )
 
@@ -234,7 +224,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
-            market_data_provider=self._normalize_provider(request.market_data_provider),
+            market_data_provider=normalize_provider(request.market_data_provider),
         )
 
         await self.trade_repo.update(updated_trade)
