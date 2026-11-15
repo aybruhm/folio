@@ -4,7 +4,6 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,9 +12,8 @@ from adapters.inbound.http.dependencies import (
     get_current_user,
     invalidate_benchmark_cache,
 )
-from application.portfolio.portfolio_interactor import PortfolioInteractor
 from application.trades.csv_import_interactor import CsvImportInteractor
-from application.trades.trade_interactor import BulkTradeError, TradeInteractor
+from application.trades.trade_interactor import TradeInteractor
 from application.trades.trade_service import TradeService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
@@ -115,62 +113,40 @@ async def create_trade(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-async def _require_portfolio_access(
-    session: AsyncSession, portfolio_id: UUID, user: User
-) -> None:
-    try:
-        portfolio = await PortfolioInteractor(session).get_portfolio(portfolio_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Portfolio not found")
-    if portfolio.get("user_id") != str(user.id):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-
 @router.post("/bulk", status_code=status.HTTP_201_CREATED, dependencies=[Depends(invalidate_benchmark_cache)])
 async def create_trades_bulk(
     body: BulkTradeBody,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
-    """Create several trades in one portfolio, all or none.
-
-    If any row is rejected nothing is saved, and the 422 response lists every
-    rejected row as details.errors = [{"index": <row position>, "message": ...}].
-    """
     try:
-        await _require_portfolio_access(session, body.portfolio_id, current_user)
+        await service.ensure_portfolio_access(body.portfolio_id, current_user.id)
 
-        requests: list[CreateTradeRequest] = []
+        requests: list[tuple[int, CreateTradeRequest]] = []
         errors: list[dict] = []
         for index, row in enumerate(body.trades):
             try:
-                requests.append(_fields_to_request(row, body.portfolio_id))
+                requests.append(
+                    (index, _fields_to_request(row, body.portfolio_id))
+                )
             except ValueError as e:
                 errors.append({"index": index, "message": str(e)})
-        if errors:
-            raise BulkTradeError(errors)
 
-        interactor = TradeInteractor(session)
-        trade_ids = await interactor.create_trades(requests)
-        await session.commit()
-
-        trades = [await interactor.get_trade(trade_id) for trade_id in trade_ids]
-        return {"created": len(trades), "trades": trades}
+        result = await service.create_bulk(requests)
+        errors.extend(result["errors"])
+        return {
+            "created": len(result["trades"]),
+            "trades": result["trades"],
+            "failed": len(errors),
+            "errors": errors,
+        }
     except HTTPException:
-        await session.rollback()
         raise
-    except BulkTradeError as e:
-        await session.rollback()
-        return JSONResponse(
-            status_code=422,
-            content={
-                "message": "No trades were saved. Fix the rows listed and try again.",
-                "code": "bulk_trade_invalid",
-                "details": {"errors": e.errors},
-            },
-        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 

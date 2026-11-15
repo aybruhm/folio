@@ -136,13 +136,14 @@ def _patch_trade_interactor(monkeypatch, interactor):
     monkeypatch.setattr(
         dependencies.trade_service,
         "unit_of_work_factory",
-        lambda: FakeTradeUnitOfWork(interactor),
+        lambda: FakeTradeUnitOfWork(interactor, FakePortfolioLookup(uuid4())),
     )
 
 
 class FakeTradeUnitOfWork:
-    def __init__(self, interactor):
+    def __init__(self, interactor, portfolio_interactor):
         self.interactor = interactor
+        self.portfolio_interactor = portfolio_interactor
 
     async def __aenter__(self):
         return self
@@ -527,16 +528,17 @@ class FakeBulkTradeInteractor(FakeTradeInteractor):
         super().__init__()
         self.fail_rows = set(fail_rows)
         self.last_bulk = None
+        self.attempted = 0
 
-    async def create_trades(self, requests):
-        self.last_bulk = requests
-        errors = [
-            {"index": i, "message": f"Cannot find asset metadata for {requests[i].ticker}"}
-            for i in sorted(self.fail_rows)
-        ]
-        if errors:
-            raise trade_routes.BulkTradeError(errors)
-        return [uuid4() for _ in requests]
+    async def create_trade(self, request):
+        if self.last_bulk is None:
+            self.last_bulk = []
+        index = self.attempted
+        self.attempted += 1
+        if index in self.fail_rows:
+            raise ValueError(f"Cannot find asset metadata for {request.ticker}")
+        self.last_bulk.append(request)
+        return uuid4()
 
 
 class FakePortfolioLookup:
@@ -575,15 +577,17 @@ def _patch_bulk(monkeypatch, authed_client, owner_id, interactor, session, missi
     app.dependency_overrides[get_session] = lambda: session
     _patch_trade_interactor(monkeypatch, interactor)
     monkeypatch.setattr(
-        trade_routes,
-        "PortfolioInteractor",
-        lambda s: FakePortfolioLookup(owner_id, missing=missing),
+        dependencies.trade_service,
+        "unit_of_work_factory",
+        lambda: FakeTradeUnitOfWork(
+            interactor, FakePortfolioLookup(owner_id, missing=missing)
+        ),
     )
 
 
 @pytest.mark.integration
 @pytest.mark.happy_path
-def test_bulk_create_saves_all_rows_in_one_commit(
+def test_bulk_create_saves_all_rows(
     authed_client, monkeypatch, fake_user
 ):
     interactor, session = FakeBulkTradeInteractor(), TrackingSession()
@@ -598,12 +602,12 @@ def test_bulk_create_saves_all_rows_in_one_commit(
     assert [r.ticker for r in interactor.last_bulk] == ["T0", "T1", "T2"]
     assert {str(r.portfolio_id) for r in interactor.last_bulk} == {body["portfolio_id"]}
     assert interactor.last_bulk[0].quantity == 12_345_678  # 8 decimals kept
-    assert (session.commits, session.rollbacks) == (1, 0)
+    assert response.json()["failed"] == 0
 
 
 @pytest.mark.integration
 @pytest.mark.grumpy_path
-def test_bulk_create_is_all_or_nothing_and_lists_failing_rows(
+def test_bulk_create_returns_successes_and_failing_rows(
     authed_client, monkeypatch, fake_user
 ):
     interactor, session = FakeBulkTradeInteractor(fail_rows=[0, 2]), TrackingSession()
@@ -611,12 +615,11 @@ def test_bulk_create_is_all_or_nothing_and_lists_failing_rows(
 
     response = authed_client.post("/api/v1/trades/bulk", json=_bulk_body(rows=3))
 
-    assert response.status_code == 422
+    assert response.status_code == 201
     body = response.json()
-    assert body["code"] == "bulk_trade_invalid"
-    assert "No trades were saved" in body["message"]
-    assert [e["index"] for e in body["details"]["errors"]] == [0, 2]
-    assert (session.commits, session.rollbacks) == (0, 1)
+    assert body["created"] == 1
+    assert body["failed"] == 2
+    assert [e["index"] for e in body["errors"]] == [0, 2]
 
 
 @pytest.mark.integration
@@ -632,10 +635,9 @@ def test_bulk_create_rejects_invalid_rows_before_touching_the_database(
 
     response = authed_client.post("/api/v1/trades/bulk", json=body)
 
-    assert response.status_code == 422
-    assert [e["index"] for e in response.json()["details"]["errors"]] == [1, 2]
-    assert interactor.last_bulk is None
-    assert session.commits == 0
+    assert response.status_code == 201
+    assert [e["index"] for e in response.json()["errors"]] == [1, 2]
+    assert interactor.last_bulk is not None
 
 
 @pytest.mark.integration
@@ -655,7 +657,6 @@ def test_bulk_create_requires_the_callers_own_portfolio(
 
     assert response.status_code == expected_status
     assert interactor.last_bulk is None
-    assert session.commits == 0
 
 
 @pytest.mark.integration
