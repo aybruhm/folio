@@ -42,9 +42,7 @@ class AssetService:
             "supported": metadata is not None,
         }
 
-    async def history(
-        self, ticker: str, start: date | None, end: date | None
-    ) -> dict:
+    async def history(self, ticker: str, start: date | None, end: date | None) -> dict:
         end = end or date.today()
         start = start or (end - timedelta(days=365))
         async with self.unit_of_work_factory() as unit_of_work:
@@ -95,9 +93,7 @@ class AssetService:
                     if not rate:
                         return str(price / 100)
                     converted = (
-                        (price * 100) // (-rate)
-                        if rate < 0
-                        else (price * rate) // 100
+                        (price * 100) // (-rate) if rate < 0 else (price * rate) // 100
                     )
                     return str(converted / 100)
 

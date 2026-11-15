@@ -19,14 +19,18 @@ _JWT_ALGORITHM = "HS256"
 
 
 def create_access_token(user_id, email: str) -> tuple[str, datetime]:
-    expires_at = datetime.now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expires_at = datetime.now() + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
     payload = {
         "sub": str(user_id),
         "email": email,
         "exp": expires_at,
         "iat": datetime.now(),
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=_JWT_ALGORITHM), expires_at
+    return jwt.encode(
+        payload, settings.SECRET_KEY, algorithm=_JWT_ALGORITHM
+    ), expires_at
 
 
 def _hash_password(plain: str) -> str:

@@ -80,9 +80,7 @@ async def update_goal(
     service: GoalService = Depends(get_goal_service),
 ):
     try:
-        return await service.update(
-            goal_id, _body_to_request(body, current_user.id)
-        )
+        return await service.update(goal_id, _body_to_request(body, current_user.id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

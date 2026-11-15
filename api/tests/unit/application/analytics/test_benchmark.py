@@ -83,7 +83,10 @@ def test_a_period_with_no_capital_counts_as_zero():
 @pytest.mark.edge_case
 def test_flows_outside_the_window_are_ignored():
     dates = [D(2026, 1, 8), D(2026, 1, 15)]
-    flows = [(D(2026, 1, 8), 999.0), (D(2026, 2, 1), 999.0)]  # on the start day, after the end
+    flows = [
+        (D(2026, 1, 8), 999.0),
+        (D(2026, 2, 1), 999.0),
+    ]  # on the start day, after the end
 
     assert chain_returns(dates, [100.0, 110.0], flows) == pytest.approx([0.0, 0.10])
 
@@ -166,7 +169,15 @@ def test_effective_start_uses_the_latest_of_the_three_dates(
 @pytest.mark.edge_case
 @pytest.mark.parametrize(
     "code,expected",
-    [("GBp", "GBP"), ("GBX", "GBP"), ("ZAc", "ZAR"), ("usd", "USD"), ("EUR", "EUR"), ("", None), (None, None)],
+    [
+        ("GBp", "GBP"),
+        ("GBX", "GBP"),
+        ("ZAc", "ZAR"),
+        ("usd", "USD"),
+        ("EUR", "EUR"),
+        ("", None),
+        (None, None),
+    ],
 )
 def test_normalize_currency(code, expected):
     assert normalize_currency(code) == expected

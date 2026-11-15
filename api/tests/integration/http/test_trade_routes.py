@@ -586,7 +586,9 @@ def _bulk_body(rows=2, **overrides):
     }
 
 
-def _patch_bulk(monkeypatch, authed_client, owner_id, interactor, session, missing=False):
+def _patch_bulk(
+    monkeypatch, authed_client, owner_id, interactor, session, missing=False
+):
     from infrastructure.db.postgres.engine import get_session
     from main import app
 
@@ -603,9 +605,7 @@ def _patch_bulk(monkeypatch, authed_client, owner_id, interactor, session, missi
 
 @pytest.mark.integration
 @pytest.mark.happy_path
-def test_bulk_create_saves_all_rows(
-    authed_client, monkeypatch, fake_user
-):
+def test_bulk_create_saves_all_rows(authed_client, monkeypatch, fake_user):
     interactor, session = FakeBulkTradeInteractor(), TrackingSession()
     _patch_bulk(monkeypatch, authed_client, fake_user.id, interactor, session)
     body = _bulk_body(rows=3)
@@ -677,7 +677,9 @@ def test_bulk_create_requires_the_callers_own_portfolio(
 
 @pytest.mark.integration
 @pytest.mark.edge_case
-@pytest.mark.parametrize("rows,expected_status", [(0, 422), (1, 201), (50, 201), (51, 422)])
+@pytest.mark.parametrize(
+    "rows,expected_status", [(0, 422), (1, 201), (50, 201), (51, 422)]
+)
 def test_bulk_create_enforces_row_limits(
     authed_client, monkeypatch, fake_user, rows, expected_status
 ):

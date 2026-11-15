@@ -13,7 +13,9 @@ from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 TradeRepository = AssetRepository = PortfolioRepository = None
-YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = TradingviewAdapter = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = (
+    TradingviewAdapter
+) = None
 
 
 class _LegacyMarketDataGateway:
@@ -28,9 +30,7 @@ class _LegacyMarketDataGateway:
 
     async def get_asset_metadata(self, ticker, currency, provider):
         adapter = self.adapters[normalize_provider(provider)]()
-        return await adapter.get_asset_metadata(
-            ticker, currency.value
-        )
+        return await adapter.get_asset_metadata(ticker, currency.value)
 
 
 class BulkTradeError(ValueError):

@@ -95,7 +95,9 @@ async def warm_cache_prices_job():
                     warmed += 1
                     logger.debug(f"Cache warmed for {ticker} via {provider}")
                 except Exception as exc:
-                    logger.warning(f"Cache warm failed for {ticker} ({provider}): {exc}")
+                    logger.warning(
+                        f"Cache warm failed for {ticker} ({provider}): {exc}"
+                    )
 
         logger.info(f"Cache warm (prices) completed — {warmed} assets")
     except Exception as e:

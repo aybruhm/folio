@@ -27,20 +27,30 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
     async def get_price_history(
         self, ticker: str, start: date, end: date
     ) -> list[tuple[date, int]]:
-        logger.debug("yfinance: fetching price history for %s (%s → %s)", ticker, start, end)
+        logger.debug(
+            "yfinance: fetching price history for %s (%s → %s)", ticker, start, end
+        )
         try:
             t = yf.Ticker(ticker)
             data = t.history(start=start, end=end)
             closes = valid_closes(data)
             if closes.empty:
-                logger.warning("yfinance: no price history returned for %s (%s → %s)", ticker, start, end)
+                logger.warning(
+                    "yfinance: no price history returned for %s (%s → %s)",
+                    ticker,
+                    start,
+                    end,
+                )
                 return []
 
             result = [
-                (idx.date(), round(float(close) * 100))
-                for idx, close in closes.items()
+                (idx.date(), round(float(close) * 100)) for idx, close in closes.items()
             ]
-            logger.info("yfinance: price history OK for %s — %d data points", ticker, len(result))
+            logger.info(
+                "yfinance: price history OK for %s — %d data points",
+                ticker,
+                len(result),
+            )
             return result
         except Exception as e:
             logger.error("yfinance: price history failed for %s: %s", ticker, e)
@@ -72,7 +82,12 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
 
             price_date = closes.index[-1].date()
             close = round(float(closes.iloc[-1]) * 100)
-            logger.info("yfinance: current price OK for %s — %.2f on %s", ticker, close / 100, price_date)
+            logger.info(
+                "yfinance: current price OK for %s — %.2f on %s",
+                ticker,
+                close / 100,
+                price_date,
+            )
 
             await self.cache.set_price(ticker, price_date, close)
             return (price_date, close)
@@ -96,7 +111,9 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
                 [f"{ticker.upper()}=X", f"{ticker[:3].upper()}{ticker[3:].upper()}=X"]
             )
         for symbol in symbols:
-            logger.debug("yfinance: fetching metadata for %s (symbol=%s)", ticker, symbol)
+            logger.debug(
+                "yfinance: fetching metadata for %s (symbol=%s)", ticker, symbol
+            )
             try:
                 info = yf.Ticker(symbol).info
                 if not info or "currency" not in info:
@@ -118,14 +135,21 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
                 )
                 logger.info(
                     "yfinance: metadata OK for %s — name=%r asset_class=%s currency=%s",
-                    ticker, name, asset_class, info.get("currency", currency),
+                    ticker,
+                    name,
+                    asset_class,
+                    info.get("currency", currency),
                 )
                 await self.cache.set_metadata(metadata)
                 return metadata
             except Exception as e:
                 logger.error("yfinance: metadata failed for symbol=%s: %s", symbol, e)
 
-        logger.warning("yfinance: no metadata found for %s (tried %d symbols)", ticker, len(symbols))
+        logger.warning(
+            "yfinance: no metadata found for %s (tried %d symbols)",
+            ticker,
+            len(symbols),
+        )
         return None
 
     async def get_fx_rate(
@@ -144,7 +168,9 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         ticker = f"{from_currency.value}{to_currency.value}=X"
         logger.debug(
             "yfinance: fetching historical FX rate %s/%s on %s",
-            from_currency.value, to_currency.value, on_date,
+            from_currency.value,
+            to_currency.value,
+            on_date,
         )
         try:
             t = yf.Ticker(ticker)
@@ -154,14 +180,19 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             if close is None:
                 logger.warning(
                     "yfinance: no historical FX rate returned for %s/%s on %s",
-                    from_currency.value, to_currency.value, on_date,
+                    from_currency.value,
+                    to_currency.value,
+                    on_date,
                 )
                 return None
 
             rate = round(close * 100)
             logger.info(
                 "yfinance: historical FX rate OK for %s/%s on %s — %.4f",
-                from_currency.value, to_currency.value, on_date, rate / 100,
+                from_currency.value,
+                to_currency.value,
+                on_date,
+                rate / 100,
             )
             await self.cache.set_historical_fx_rate(
                 from_currency.value, to_currency.value, on_date, rate
@@ -170,7 +201,10 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         except Exception as e:
             logger.error(
                 "yfinance: historical FX rate failed for %s/%s on %s: %s",
-                from_currency.value, to_currency.value, on_date, e,
+                from_currency.value,
+                to_currency.value,
+                on_date,
+                e,
             )
             return None
 
@@ -188,7 +222,8 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
         ticker = f"{from_currency.value}{to_currency.value}=X"
         logger.debug(
             "yfinance: fetching current FX rate %s/%s",
-            from_currency.value, to_currency.value,
+            from_currency.value,
+            to_currency.value,
         )
         try:
             t = yf.Ticker(ticker)
@@ -198,21 +233,26 @@ class YFinanceAdapter(IAssetPricePort, IFxRatePort):
             if close is None:
                 logger.warning(
                     "yfinance: no current FX rate returned for %s/%s",
-                    from_currency.value, to_currency.value,
+                    from_currency.value,
+                    to_currency.value,
                 )
                 return None
 
             rate = round(close * 100)
             logger.info(
                 "yfinance: current FX rate OK for %s/%s — %.4f",
-                from_currency.value, to_currency.value, rate / 100,
+                from_currency.value,
+                to_currency.value,
+                rate / 100,
             )
             await self.cache.set_fx_rate(from_currency.value, to_currency.value, rate)
             return rate
         except Exception as e:
             logger.error(
                 "yfinance: current FX rate failed for %s/%s: %s",
-                from_currency.value, to_currency.value, e,
+                from_currency.value,
+                to_currency.value,
+                e,
             )
             return None
 

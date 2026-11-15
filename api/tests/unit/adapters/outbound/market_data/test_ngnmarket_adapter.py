@@ -73,7 +73,9 @@ async def test_get_asset_metadata_from_etf_detail(monkeypatch):
 
     monkeypatch.setattr(adapter, "get_etf_detail", fake_get_etf_detail)
 
-    metadata = await adapter.get_asset_metadata("NGX:STANBICETF30", "NGN", asset_class="etf")
+    metadata = await adapter.get_asset_metadata(
+        "NGX:STANBICETF30", "NGN", asset_class="etf"
+    )
 
     assert metadata is not None
     assert metadata.ticker == "NGX:STANBICETF30"
@@ -111,7 +113,9 @@ async def test_get_asset_metadata_etf_falls_back_to_index(monkeypatch):
     monkeypatch.setattr(adapter, "get_etf_detail", fake_get_etf_detail)
     monkeypatch.setattr(adapter, "get_index_detail", fake_get_index_detail)
 
-    metadata = await adapter.get_asset_metadata("NGX:SOMETOKEN", "NGN", asset_class="etf")
+    metadata = await adapter.get_asset_metadata(
+        "NGX:SOMETOKEN", "NGN", asset_class="etf"
+    )
 
     assert metadata is not None
     assert metadata.name == "Fallback Index"

@@ -18,7 +18,9 @@ from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, Currency
 
 TradeRepository = AssetRepository = PriceHistoryRepository = FxRateRepository = None
-YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = TradingviewAdapter = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = (
+    TradingviewAdapter
+) = None
 PriceCache = None
 
 

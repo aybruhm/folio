@@ -23,7 +23,9 @@ class AssetGateway:
     def adapter(self, provider: str):
         return self.adapters[provider]()
 
-    async def fx_history(self, currency: str, start: date, end: date) -> dict[date, int]:
+    async def fx_history(
+        self, currency: str, start: date, end: date
+    ) -> dict[date, int]:
         if currency == "USD":
             return {}
         if currency == "NGN":
@@ -32,7 +34,9 @@ class AssetGateway:
                     Currency.NGN, Currency.USD, start_date=start, end_date=end
                 )
                 result = {
-                    date.fromisoformat(str(item["date"])): round(float(item["rate"]) * 100)
+                    date.fromisoformat(str(item["date"])): round(
+                        float(item["rate"]) * 100
+                    )
                     for item in history
                     if item.get("date") and item.get("rate") is not None
                 }

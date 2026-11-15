@@ -1,9 +1,12 @@
 from application.analytics.analytics_interactor import AnalyticsInteractor
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from domain.value_objects.money import Currency
-from infrastructure.db.postgres.engine import async_session
 from infrastructure.db.postgres.assets.dao import AssetRepository
-from infrastructure.db.postgres.prices.dao import FxRateRepository, PriceHistoryRepository
+from infrastructure.db.postgres.engine import async_session
+from infrastructure.db.postgres.prices.dao import (
+    FxRateRepository,
+    PriceHistoryRepository,
+)
 from infrastructure.db.postgres.trades.dao import TradeRepository
 from infrastructure.market_data.analytics_gateway import AnalyticsMarketDataGateway
 

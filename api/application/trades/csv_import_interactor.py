@@ -11,7 +11,9 @@ from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 TradeRepository = AssetRepository = None
-YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = TradingviewAdapter = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = (
+    TradingviewAdapter
+) = None
 
 
 class _LegacyCsvMarketDataGateway:

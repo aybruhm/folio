@@ -66,9 +66,7 @@ class PortfolioAnalyticsService:
         self, portfolio_id: UUID, timeframe: str, user_id: UUID
     ) -> dict:
         async with self.unit_of_work_factory() as unit_of_work:
-            portfolio = await self._owned_portfolio(
-                unit_of_work, portfolio_id, user_id
-            )
+            portfolio = await self._owned_portfolio(unit_of_work, portfolio_id, user_id)
             base_currency = Currency(portfolio.get("base_currency", "USD"))
             return await build_portfolio_analytics(
                 unit_of_work.session,
@@ -190,7 +188,9 @@ class PortfolioAnalyticsService:
         self, user_id: UUID, timeframe: str, display_currency: Currency
     ) -> dict:
         async with self.unit_of_work_factory() as unit_of_work:
-            portfolios = await unit_of_work.portfolio_interactor.list_portfolios(user_id)
+            portfolios = await unit_of_work.portfolio_interactor.list_portfolios(
+                user_id
+            )
             items = []
             excluded = []
             for portfolio in portfolios:
@@ -239,9 +239,7 @@ class PortfolioAnalyticsService:
             raise BenchmarkError(422, "Invalid benchmark ticker")
         period_key = period.strip().lower()
         if period_key not in PERIODS:
-            raise BenchmarkError(
-                422, f"period must be one of: {', '.join(PERIODS)}"
-            )
+            raise BenchmarkError(422, f"period must be one of: {', '.join(PERIODS)}")
         try:
             display_currency = Currency(in_currency)
         except ValueError:
@@ -316,9 +314,7 @@ class PortfolioAnalyticsService:
                     Currency(portfolio["base_currency"])
                 )
                 interactors[portfolio["id"]] = interactor
-                first = await interactor.get_first_trade_date(
-                    UUID(portfolio["id"])
-                )
+                first = await interactor.get_first_trade_date(UUID(portfolio["id"]))
                 if first:
                     first_trades.append(first)
             if not first_trades:
@@ -356,8 +352,7 @@ class PortfolioAnalyticsService:
                 for index, (day, value) in enumerate(zip(dates, values)):
                     totals[index] += value * factor_on(day)
                 flows += [
-                    (day, amount * factor_on(day))
-                    for day, amount in portfolio_flows
+                    (day, amount * factor_on(day)) for day, amount in portfolio_flows
                 ]
                 used += 1
             if not used:
@@ -369,7 +364,8 @@ class PortfolioAnalyticsService:
             quote_currency = normalize_currency(
                 await adapter.get_quote_currency(symbol)
                 if source == "yfinance"
-                else benchmark_currency(symbol) or gateway.provider_currencies.get(source)
+                else benchmark_currency(symbol)
+                or gateway.provider_currencies.get(source)
             )
             converted = False
             if quote_currency and quote_currency != display_currency.value:
@@ -381,8 +377,7 @@ class PortfolioAnalyticsService:
                     benchmark_factor = None
                 if benchmark_factor:
                     closes = [
-                        (day, price * benchmark_factor(day))
-                        for day, price in closes
+                        (day, price * benchmark_factor(day)) for day, price in closes
                     ]
                     converted = True
 

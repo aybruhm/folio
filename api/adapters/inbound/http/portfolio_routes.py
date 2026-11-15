@@ -122,6 +122,7 @@ async def get_benchmark_comparison(
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
 
+
 @router.get("/{portfolio_id}", response_model=dict)
 async def get_portfolio(
     portfolio_id: UUID,
@@ -159,7 +160,11 @@ async def update_portfolio(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(invalidate_benchmark_cache)])
+@router.delete(
+    "/{portfolio_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(invalidate_benchmark_cache)],
+)
 async def delete_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -197,7 +202,9 @@ async def _set_archived(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{portfolio_id}/archive", dependencies=[Depends(invalidate_benchmark_cache)])
+@router.post(
+    "/{portfolio_id}/archive", dependencies=[Depends(invalidate_benchmark_cache)]
+)
 async def archive_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -206,7 +213,9 @@ async def archive_portfolio(
     return await _set_archived(portfolio_id, True, current_user, service)
 
 
-@router.post("/{portfolio_id}/unarchive", dependencies=[Depends(invalidate_benchmark_cache)])
+@router.post(
+    "/{portfolio_id}/unarchive", dependencies=[Depends(invalidate_benchmark_cache)]
+)
 async def unarchive_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -274,9 +283,7 @@ async def get_allocation(
 ):
 
     try:
-        return await service.get_allocation(
-            portfolio_id, current_user.id, group_by
-        )
+        return await service.get_allocation(portfolio_id, current_user.id, group_by)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:

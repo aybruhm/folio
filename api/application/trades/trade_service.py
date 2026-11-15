@@ -68,9 +68,7 @@ class TradeService:
             if portfolio.get("user_id") != str(user_id):
                 raise PermissionError("Access denied")
 
-    async def create_bulk(
-        self, requests: list[tuple[int, CreateTradeRequest]]
-    ) -> dict:
+    async def create_bulk(self, requests: list[tuple[int, CreateTradeRequest]]) -> dict:
         async def create_one(index: int, request: CreateTradeRequest):
             try:
                 async with self.unit_of_work_factory() as unit_of_work:

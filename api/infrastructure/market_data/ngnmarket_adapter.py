@@ -83,9 +83,15 @@ class NgnMarketAdapter:
                 result.append((d, round(float(value) * 100)))
 
         if result:
-            logger.info("NGNMarket: price history OK for %s — %d data points", ticker, len(result))
+            logger.info(
+                "NGNMarket: price history OK for %s — %d data points",
+                ticker,
+                len(result),
+            )
         else:
-            logger.warning("NGNMarket: no price history data for %s (%s → %s)", ticker, start, end)
+            logger.warning(
+                "NGNMarket: no price history data for %s (%s → %s)", ticker, start, end
+            )
         return sorted(result)
 
     async def get_current_forex_rates(self) -> dict | None:
@@ -137,14 +143,18 @@ class NgnMarketAdapter:
         if rate_float is None:
             logger.warning(
                 "NGNMarket: could not extract rate for %s/%s from payload (base=%s)",
-                from_currency.value, to_currency.value, base,
+                from_currency.value,
+                to_currency.value,
+                base,
             )
             return None
 
         rate_cents = round(rate_float * 100)
         logger.info(
             "NGNMarket: current FX rate OK for %s/%s — %.4f",
-            from_currency.value, to_currency.value, rate_float,
+            from_currency.value,
+            to_currency.value,
+            rate_float,
         )
         return rate_cents
 

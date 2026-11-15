@@ -25,7 +25,9 @@ def test_benchmark_routes(client):
     assert {"^GSPC", "VOO", "BTC-USD"} <= {item["ticker"] for item in catalog}
     assert len({item["ticker"] for item in catalog}) == len(catalog)
 
-    created = client.post("/api/v1/benchmarks/", params={"ticker": "SPY", "name": "S&P 500"})
+    created = client.post(
+        "/api/v1/benchmarks/", params={"ticker": "SPY", "name": "S&P 500"}
+    )
     assert created.status_code == 200
     assert created.json() == {"ticker": "SPY", "name": "S&P 500"}
 
@@ -43,7 +45,9 @@ def test_fx_rates_route(client, monkeypatch):
         lambda: FakeYFinanceAdapter(),
     )
 
-    response = client.get("/api/v1/fx/rates", params=[("currencies", "GBP"), ("currencies", "JPY")])
+    response = client.get(
+        "/api/v1/fx/rates", params=[("currencies", "GBP"), ("currencies", "JPY")]
+    )
     assert response.status_code == 200
     assert response.json()["USDGBP"] == "1.0"
     assert response.json()["USDJPY"] == "150.0"

@@ -101,7 +101,11 @@ async def list_trades(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(invalidate_benchmark_cache)])
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(invalidate_benchmark_cache)],
+)
 async def create_trade(
     body: TradeBody,
     _: User = Depends(get_current_user),
@@ -113,7 +117,11 @@ async def create_trade(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/bulk", status_code=status.HTTP_201_CREATED, dependencies=[Depends(invalidate_benchmark_cache)])
+@router.post(
+    "/bulk",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(invalidate_benchmark_cache)],
+)
 async def create_trades_bulk(
     body: BulkTradeBody,
     current_user: User = Depends(get_current_user),
@@ -126,9 +134,7 @@ async def create_trades_bulk(
         errors: list[dict] = []
         for index, row in enumerate(body.trades):
             try:
-                requests.append(
-                    (index, _fields_to_request(row, body.portfolio_id))
-                )
+                requests.append((index, _fields_to_request(row, body.portfolio_id)))
             except ValueError as e:
                 errors.append({"index": index, "message": str(e)})
 
@@ -177,7 +183,11 @@ async def update_trade(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{trade_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(invalidate_benchmark_cache)])
+@router.delete(
+    "/{trade_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(invalidate_benchmark_cache)],
+)
 async def delete_trade(
     trade_id: UUID,
     _: User = Depends(get_current_user),
@@ -191,7 +201,11 @@ async def delete_trade(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/bulk/delete", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(invalidate_benchmark_cache)])
+@router.post(
+    "/bulk/delete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(invalidate_benchmark_cache)],
+)
 async def bulk_delete_trades(
     request: BulkDeleteRequest,
     _: User = Depends(get_current_user),
