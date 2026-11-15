@@ -13,10 +13,10 @@ from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.market_data.yfinance_closes import valid_closes
-from adapters.outbound.persistence.asset_repository import AssetRepository
+from infrastructure.db.postgres.assets.dao import AssetRepository
 from domain.services.market_data import normalize_provider
 from domain.value_objects.money import Currency
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 
 logger = logging.getLogger(__name__)
 

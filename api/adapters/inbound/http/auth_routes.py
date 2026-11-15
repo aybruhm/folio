@@ -3,13 +3,13 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import get_current_user
-from adapters.outbound.persistence.token_repository import RefreshTokenRepository
-from adapters.outbound.persistence.user_repository import UserRepository
+from infrastructure.db.postgres.tokens.dao import RefreshTokenRepository
+from infrastructure.db.postgres.users.dao import UserRepository
 from application.common.exceptions import AuthenticationError, ConflictError
 from application.auth.use_cases import LoginUser, LogoutUser, RefreshToken, RegisterUser
 from domain.entities.models import User
 from infrastructure.config import settings
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

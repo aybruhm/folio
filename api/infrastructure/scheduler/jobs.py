@@ -62,9 +62,9 @@ async def warm_cache_prices_job():
 
     logger.info("Starting cache warm (prices)")
     try:
-        from adapters.outbound.persistence.asset_repository import AssetRepository
+        from infrastructure.db.postgres.assets.dao import AssetRepository
         from domain.value_objects.money import AssetClass
-        from infrastructure.db.session import async_session
+        from infrastructure.db.postgres.engine import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()
@@ -112,11 +112,11 @@ async def warm_cache_fx_job():
 
     logger.info("Starting cache warm (FX)")
     try:
-        from adapters.outbound.persistence.portfolio_repository import (
+        from infrastructure.db.postgres.portfolios.dao import (
             PortfolioRepository,
         )
         from domain.value_objects.money import Currency
-        from infrastructure.db.session import async_session
+        from infrastructure.db.postgres.engine import async_session
 
         async with async_session() as session:
             yfinance = YFinanceAdapter()

@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from adapters.inbound.http.dependencies import get_current_user
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 from main import app
 from domain.entities.models import User
 

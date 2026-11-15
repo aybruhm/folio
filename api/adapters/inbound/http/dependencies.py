@@ -5,9 +5,9 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.outbound.market_data.benchmark_cache import BenchmarkCache
-from adapters.outbound.persistence.user_repository import UserRepository
+from infrastructure.db.postgres.users.dao import UserRepository
 from domain.entities.models import User
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 from infrastructure.security.jwt import decode_access_token
 
 

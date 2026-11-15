@@ -9,9 +9,9 @@ from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from adapters.outbound.persistence.asset_repository import AssetRepository
-from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
-from adapters.outbound.persistence.trade_repository import TradeRepository
+from infrastructure.db.postgres.assets.dao import AssetRepository
+from infrastructure.db.postgres.portfolios.dao import PortfolioRepository
+from infrastructure.db.postgres.trades.dao import TradeRepository
 from domain.entities.models import Asset, Trade
 from domain.ports.inbound.use_cases import CreateTradeRequest, ITradeUseCase
 from domain.ports.outbound.repositories import (

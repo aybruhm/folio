@@ -18,7 +18,7 @@ from application.trades.trade_interactor import BulkTradeError, TradeInteractor
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 

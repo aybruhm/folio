@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from application.analytics.benchmarks import list_catalog
 from domain.value_objects.money import Currency
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 
 router_benchmarks = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
 router_fx = APIRouter(prefix="/fx", tags=["fx"])

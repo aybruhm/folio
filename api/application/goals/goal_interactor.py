@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.outbound.persistence.goal_repository import GoalRepository
+from infrastructure.db.postgres.goals.dao import GoalRepository
 from domain.entities.models import Goal
 from domain.ports.inbound.use_cases import CreateGoalRequest, IGoalUseCase
 from domain.ports.outbound.repositories import IGoalRepository

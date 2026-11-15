@@ -553,7 +553,7 @@ def _bulk_body(rows=2, **overrides):
 
 
 def _patch_bulk(monkeypatch, authed_client, owner_id, interactor, session, missing=False):
-    from infrastructure.db.session import get_session
+    from infrastructure.db.postgres.engine import get_session
     from main import app
 
     app.dependency_overrides[get_session] = lambda: session

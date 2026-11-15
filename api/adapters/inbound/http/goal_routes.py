@@ -10,7 +10,7 @@ from application.goals.goal_interactor import GoalInteractor
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateGoalRequest
 from domain.value_objects.money import Currency
-from infrastructure.db.session import get_session
+from infrastructure.db.postgres.engine import get_session
 
 router = APIRouter(prefix="/goals", tags=["goals"])
 

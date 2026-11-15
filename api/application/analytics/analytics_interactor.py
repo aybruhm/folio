@@ -10,12 +10,12 @@ from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.market_data.yfinance_closes import last_close
-from adapters.outbound.persistence.asset_repository import AssetRepository
-from adapters.outbound.persistence.price_repository import (
+from infrastructure.db.postgres.assets.dao import AssetRepository
+from infrastructure.db.postgres.prices.dao import (
     FxRateRepository,
     PriceHistoryRepository,
 )
-from adapters.outbound.persistence.trade_repository import TradeRepository
+from infrastructure.db.postgres.trades.dao import TradeRepository
 from application.analytics.timeframe import timeframe_start
 from domain.ports.inbound.use_cases import IAnalyticsUseCase
 from domain.ports.outbound.repositories import (

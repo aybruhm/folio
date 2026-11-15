@@ -1,6 +1,6 @@
 import pytest
 
-from adapters.outbound.persistence.portfolio_repository import natural_name_key
+from infrastructure.db.postgres.portfolios.dao import natural_name_key
 
 
 def _sorted(names):

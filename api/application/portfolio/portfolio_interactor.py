@@ -5,7 +5,7 @@ from domain.entities.models import Portfolio
 from domain.value_objects.money import Currency
 from domain.ports.inbound.use_cases import IPortfolioUseCase, CreatePortfolioRequest
 from domain.ports.outbound.repositories import IPortfolioRepository
-from adapters.outbound.persistence.portfolio_repository import PortfolioRepository
+from infrastructure.db.postgres.portfolios.dao import PortfolioRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
