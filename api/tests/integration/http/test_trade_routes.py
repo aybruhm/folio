@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from adapters.inbound.http import trade_routes
+from adapters.inbound.http import dependencies, trade_routes
 from domain.entities.models import Asset
 from domain.value_objects.money import AssetMetadata, Currency, TradeType
 
@@ -133,6 +133,22 @@ class FakeCsvImportInteractor:
 
 def _patch_trade_interactor(monkeypatch, interactor):
     monkeypatch.setattr(trade_routes, "TradeInteractor", lambda session: interactor)
+    monkeypatch.setattr(
+        dependencies.trade_service,
+        "unit_of_work_factory",
+        lambda: FakeTradeUnitOfWork(interactor),
+    )
+
+
+class FakeTradeUnitOfWork:
+    def __init__(self, interactor):
+        self.interactor = interactor
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
 
 
 def _patch_csv_interactor(monkeypatch, interactor):

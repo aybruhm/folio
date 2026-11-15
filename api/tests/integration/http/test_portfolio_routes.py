@@ -1286,7 +1286,7 @@ def test_failures_are_not_cached(authed_client, monkeypatch, fake_user, fake_val
 def test_changing_trades_drops_cached_comparisons(
     authed_client, monkeypatch, fake_user
 ):
-    from adapters.inbound.http import trade_routes
+    from adapters.inbound.http import dependencies, trade_routes
 
     class FakeTrades:
         def __init__(self, session):
@@ -1296,6 +1296,19 @@ def test_changing_trades_drops_cached_comparisons(
             return len(trade_ids)
 
     monkeypatch.setattr(trade_routes, "TradeInteractor", FakeTrades)
+    class FakeTradeUnitOfWork:
+        async def __aenter__(self):
+            self.interactor = FakeTrades(None)
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return None
+
+    monkeypatch.setattr(
+        dependencies.trade_service,
+        "unit_of_work_factory",
+        lambda: FakeTradeUnitOfWork(),
+    )
     _one_portfolio(monkeypatch, fake_user)
     assert _get(authed_client).headers["X-Cache"] == "MISS"
     assert _get(authed_client).headers["X-Cache"] == "HIT"

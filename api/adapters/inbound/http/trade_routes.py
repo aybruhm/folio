@@ -9,12 +9,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import (
+    get_trade_service,
     get_current_user,
     invalidate_benchmark_cache,
 )
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from application.trades.csv_import_interactor import CsvImportInteractor
 from application.trades.trade_interactor import BulkTradeError, TradeInteractor
+from application.trades.trade_service import TradeService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreateTradeRequest
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
@@ -83,12 +85,11 @@ async def list_trades(
     skip: int = 0,
     limit: int = 100,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
     try:
-        interactor = TradeInteractor(session)
         trade_type_enum = TradeType(trade_type) if trade_type else None
-        trades, total = await interactor.list_trades(
+        trades, total = await service.list_trades(
             portfolio_id,
             ticker,
             trade_type_enum,
@@ -106,17 +107,11 @@ async def list_trades(
 async def create_trade(
     body: TradeBody,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
     try:
-        interactor = TradeInteractor(session)
-        trade_id = await interactor.create_trade(_body_to_request(body))
-        await session.commit()
-
-        trade = await interactor.get_trade(trade_id)
-        return trade
+        return await service.create(_body_to_request(body))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -183,12 +178,10 @@ async def create_trades_bulk(
 async def get_trade(
     trade_id: UUID,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
     try:
-        interactor = TradeInteractor(session)
-        trade = await interactor.get_trade(trade_id)
-        return trade
+        return await service.get(trade_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -198,20 +191,13 @@ async def update_trade(
     trade_id: UUID,
     body: TradeBody,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
     try:
-        interactor = TradeInteractor(session)
-        await interactor.update_trade(trade_id, _body_to_request(body))
-        await session.commit()
-
-        trade = await interactor.get_trade(trade_id)
-        return trade
+        return await service.update(trade_id, _body_to_request(body))
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -219,17 +205,13 @@ async def update_trade(
 async def delete_trade(
     trade_id: UUID,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
     try:
-        interactor = TradeInteractor(session)
-        await interactor.delete_trade(trade_id)
-        await session.commit()
+        await service.delete(trade_id)
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -237,17 +219,13 @@ async def delete_trade(
 async def bulk_delete_trades(
     request: BulkDeleteRequest,
     _: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: TradeService = Depends(get_trade_service),
 ):
     try:
-        interactor = TradeInteractor(session)
-        await interactor.delete_batch_trades(request.trade_ids)
-        await session.commit()
+        await service.delete_batch(request.trade_ids)
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 

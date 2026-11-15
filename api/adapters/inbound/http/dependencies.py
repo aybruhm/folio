@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from infrastructure.market_data.benchmark_cache import BenchmarkCache
 from application.auth.services import AuthService
 from application.portfolio.portfolio_service import PortfolioService
-from infrastructure.composition import auth_service, portfolio_service
+from application.trades.trade_service import TradeService
+from infrastructure.composition import auth_service, portfolio_service, trade_service
 from infrastructure.db.postgres.users.dao import UserRepository
 from domain.entities.models import User
 from infrastructure.db.postgres.engine import get_session
@@ -20,6 +21,10 @@ def get_auth_service() -> AuthService:
 
 def get_portfolio_service() -> PortfolioService:
     return portfolio_service
+
+
+def get_trade_service() -> TradeService:
+    return trade_service
 
 
 async def get_current_user(
