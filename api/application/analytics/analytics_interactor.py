@@ -29,6 +29,7 @@ from domain.services.performance import (
     PerformanceInputs,
     PerformanceService,
 )
+from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, Currency
 
 
@@ -50,18 +51,8 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         self.tradingview = TradingviewAdapter()
         self.base_currency = portfolio_base_currency
 
-    @staticmethod
-    def _normalize_provider(provider: str | None) -> str:
-        normalized = (provider or "yfinance").strip().lower()
-        return (
-            normalized
-            if normalized
-            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
-            else "yfinance"
-        )
-
     async def _get_price_from_provider(self, symbol: str, provider: str):
-        selected = self._normalize_provider(provider)
+        selected = normalize_provider(provider)
 
         if selected == "tiingo":
             return await self.tiingo.get_current_price(symbol)
@@ -91,7 +82,7 @@ class AnalyticsInteractor(IAnalyticsUseCase):
         if asset and asset.asset_class.value == "crypto" and "-" not in symbol:
             symbol = f"{symbol}-{asset.currency.value}"
 
-        provider = self._normalize_provider(
+        provider = normalize_provider(
             provider_hint or (asset.market_data_provider if asset else "yfinance")
         )
 

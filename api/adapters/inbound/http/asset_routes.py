@@ -14,21 +14,13 @@ from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
 from adapters.outbound.market_data.yfinance_closes import valid_closes
 from adapters.outbound.persistence.asset_repository import AssetRepository
+from domain.services.market_data import normalize_provider
 from domain.value_objects.money import Currency
 from infrastructure.db.session import get_session
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assets", tags=["assets"])
-
-
-def _normalize_provider(provider: str) -> str:
-    normalized = (provider or "yfinance").strip().lower()
-    return (
-        normalized
-        if normalized in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
-        else "yfinance"
-    )
 
 
 async def _fetch_fx_history(from_ccy: str, start: date, end: date) -> dict[date, int]:
@@ -108,7 +100,7 @@ async def get_price_history_batch(
     ngxpulse = NgxPulseAdapter()
 
     def _pick_adapter(ticker: str):
-        provider = _normalize_provider(provider_map.get(ticker.upper(), "yfinance"))
+        provider = normalize_provider(provider_map.get(ticker.upper(), "yfinance"))
         if provider == "tradingview":
             return tradingview
         if provider == "tiingo":
@@ -200,7 +192,7 @@ async def validate_ticker(
 ):
     try:
         _ = session
-        selected = _normalize_provider(provider)
+        selected = normalize_provider(provider)
 
         if selected == "tiingo":
             adapter = TiingoAdapter()
@@ -241,7 +233,7 @@ async def get_price_history(
 
         repo = AssetRepository(session)
         asset = await repo.get_by_ticker(ticker)
-        provider = _normalize_provider(
+        provider = normalize_provider(
             asset.market_data_provider if asset else "yfinance"
         )
 

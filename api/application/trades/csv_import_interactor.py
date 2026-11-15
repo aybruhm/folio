@@ -16,6 +16,7 @@ from adapters.outbound.persistence.trade_repository import TradeRepository
 from domain.entities.models import Trade
 from domain.ports.inbound.use_cases import ICsvImportUseCase
 from domain.ports.outbound.repositories import IAssetRepository, ITradeRepository
+from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 
@@ -29,20 +30,10 @@ class CsvImportInteractor(ICsvImportUseCase):
         self.ngxpulse = NgxPulseAdapter()
         self.tradingview = TradingviewAdapter()
 
-    @staticmethod
-    def _normalize_provider(provider: str | None) -> str:
-        normalized = (provider or "yfinance").strip().lower()
-        return (
-            normalized
-            if normalized
-            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
-            else "yfinance"
-        )
-
     async def _get_asset_metadata(
         self, ticker: str, currency: Currency, provider: str, asset_class: str = ""
     ):
-        selected = self._normalize_provider(provider)
+        selected = normalize_provider(provider)
 
         if selected == "tiingo":
             metadata = await self.tiingo.get_asset_metadata(ticker, currency.value)
@@ -182,7 +173,7 @@ class CsvImportInteractor(ICsvImportUseCase):
                     row_provider = (
                         trade_data.get("market_data_provider") or market_data_provider
                     )
-                    selected_provider = self._normalize_provider(row_provider)
+                    selected_provider = normalize_provider(row_provider)
                     asset = await self.asset_repo.get_by_ticker(ticker)
                     if not asset:
                         from domain.entities.models import Asset

@@ -19,6 +19,7 @@ from domain.ports.outbound.repositories import (
     IPortfolioRepository,
     ITradeRepository,
 )
+from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
 
 
@@ -42,18 +43,8 @@ class TradeInteractor(ITradeUseCase):
         self.ngxpulse = NgxPulseAdapter()
         self.tradingview = TradingviewAdapter()
 
-    @staticmethod
-    def _normalize_provider(provider: str | None) -> str:
-        normalized = (provider or "yfinance").strip().lower()
-        return (
-            normalized
-            if normalized
-            in {"yfinance", "tiingo", "ngnmarket", "ngxpulse", "tradingview"}
-            else "yfinance"
-        )
-
     async def _get_asset_metadata(self, ticker: str, currency: Currency, provider: str):
-        selected = self._normalize_provider(provider)
+        selected = normalize_provider(provider)
 
         if selected == "tiingo":
             return await self.tiingo.get_asset_metadata(ticker, currency.value)
@@ -85,7 +76,7 @@ class TradeInteractor(ITradeUseCase):
                     name=ticker,
                     asset_class=AssetClass.CASH,
                     currency=currency,
-                    market_data_provider=self._normalize_provider(market_data_provider),
+                    market_data_provider=normalize_provider(market_data_provider),
                 )
                 await self.asset_repo.add(asset)
             else:
@@ -94,7 +85,7 @@ class TradeInteractor(ITradeUseCase):
                 )
                 if not metadata:
                     raise ValueError(f"Cannot find asset metadata for {ticker}")
-                selected_provider = self._normalize_provider(market_data_provider)
+                selected_provider = normalize_provider(market_data_provider)
                 asset = Asset.from_metadata(
                     ticker, metadata, market_data_provider=selected_provider
                 )
@@ -105,7 +96,7 @@ class TradeInteractor(ITradeUseCase):
             metadata = await self._get_asset_metadata(
                 ticker, currency, effective_provider
             )
-            selected_provider = self._normalize_provider(effective_provider)
+            selected_provider = normalize_provider(effective_provider)
             if metadata and (
                 asset.asset_class.value != metadata.asset_class
                 or asset.currency.value != metadata.currency.value
@@ -144,7 +135,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
-            market_data_provider=self._normalize_provider(request.market_data_provider),
+            market_data_provider=normalize_provider(request.market_data_provider),
             created_at=datetime.now(),
         )
 
@@ -234,7 +225,7 @@ class TradeInteractor(ITradeUseCase):
             price=request.price,
             trade_currency=request.trade_currency,
             fees=request.fees,
-            market_data_provider=self._normalize_provider(request.market_data_provider),
+            market_data_provider=normalize_provider(request.market_data_provider),
         )
 
         await self.trade_repo.update(updated_trade)
