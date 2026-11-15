@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import yfinance as yf
 
 from adapters.outbound.market_data.price_cache import PriceCache
-from adapters.outbound.market_data.yfinance_closes import last_close, valid_closes
+from infrastructure.market_data.yfinance_closes import last_close, valid_closes
 from domain.ports.outbound.repositories import IAssetPricePort, IFxRatePort
 from domain.value_objects.money import AssetMetadata, Currency
 

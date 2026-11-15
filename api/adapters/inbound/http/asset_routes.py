@@ -12,7 +12,7 @@ from adapters.outbound.market_data.ngxpulse_adapter import NgxPulseAdapter
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from adapters.outbound.market_data.yfinance_closes import valid_closes
+from infrastructure.market_data.yfinance_closes import valid_closes
 from infrastructure.db.postgres.assets.dao import AssetRepository
 from domain.services.market_data import normalize_provider
 from domain.value_objects.money import Currency

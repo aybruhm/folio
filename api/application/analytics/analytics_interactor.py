@@ -9,7 +9,7 @@ from adapters.outbound.market_data.price_cache import PriceCache
 from adapters.outbound.market_data.tiingo_adapter import TiingoAdapter
 from adapters.outbound.market_data.tradingview_adapter import TradingviewAdapter
 from adapters.outbound.market_data.yfinance_adapter import YFinanceAdapter
-from adapters.outbound.market_data.yfinance_closes import last_close
+from infrastructure.market_data.yfinance_closes import last_close
 from infrastructure.db.postgres.assets.dao import AssetRepository
 from infrastructure.db.postgres.prices.dao import (
     FxRateRepository,

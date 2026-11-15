@@ -4,12 +4,12 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from adapters.outbound.market_data.yfinance_closes import last_close, valid_closes
 from application.analytics.analytics_interactor import AnalyticsInteractor
 from application.analytics.summary import make_factor_lookup
 from application.analytics.timeframe import timeframe_start
 from domain.services.performance import PerformanceInputs, PerformanceService
 from domain.value_objects.money import Currency
+from infrastructure.market_data.yfinance_closes import last_close, valid_closes
 
 
 async def fetch_fx_factor(from_ccy: str, to_ccy: str) -> float:
