@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adapters.inbound.http.dependencies import (
+    get_portfolio_service,
     get_current_user,
     invalidate_benchmark_cache,
 )
@@ -49,6 +50,7 @@ from application.analytics.portfolio_analytics import (
 )
 from application.analytics.timeframe import timeframe_start
 from application.portfolio.portfolio_interactor import PortfolioInteractor
+from application.portfolio.portfolio_service import PortfolioService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreatePortfolioRequest
 from domain.services.performance import PerformanceInputs
@@ -117,27 +119,20 @@ def _check_ownership(portfolio: dict, current_user: User) -> None:
 async def list_portfolios(
     include_archived: bool = False,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
-    interactor = PortfolioInteractor(session)
-    return await interactor.list_portfolios(current_user.id, include_archived)
+    return await service.list(current_user.id, include_archived)
 
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
     request: CreatePortfolioRequest,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
     try:
-        interactor = PortfolioInteractor(session)
-        portfolio_id = await interactor.create_portfolio(request, current_user.id)
-        await session.commit()
-
-        portfolio = await interactor.get_portfolio(portfolio_id)
-        return portfolio
+        return await service.create(request, current_user.id)
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -472,11 +467,10 @@ async def get_benchmark_comparison(
 async def get_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
     try:
-        interactor = PortfolioInteractor(session)
-        portfolio = await interactor.get_portfolio(portfolio_id)
+        portfolio = await service.get(portfolio_id)
         _check_ownership(portfolio, current_user)
         return portfolio
     except HTTPException:
@@ -491,25 +485,18 @@ async def update_portfolio(
     name: str | None = None,
     description: str | None = None,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
     try:
-        interactor = PortfolioInteractor(session)
-        portfolio = await interactor.get_portfolio(portfolio_id)
+        portfolio = await service.get(portfolio_id)
         _check_ownership(portfolio, current_user)
 
-        await interactor.update_portfolio(portfolio_id, name, description)
-        await session.commit()
-
-        return await interactor.get_portfolio(portfolio_id)
+        return await service.update(portfolio_id, name, description)
     except HTTPException:
-        await session.rollback()
         raise
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -517,46 +504,37 @@ async def update_portfolio(
 async def delete_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
     try:
-        interactor = PortfolioInteractor(session)
-        portfolio = await interactor.get_portfolio(portfolio_id)
+        portfolio = await service.get(portfolio_id)
         _check_ownership(portfolio, current_user)
 
-        await interactor.delete_portfolio(portfolio_id)
-        await session.commit()
+        await service.delete(portfolio_id)
     except HTTPException:
-        await session.rollback()
         raise
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
 async def _set_archived(
-    portfolio_id: UUID, archived: bool, current_user: User, session: AsyncSession
+    portfolio_id: UUID,
+    archived: bool,
+    current_user: User,
+    service: PortfolioService,
 ) -> dict:
     try:
-        interactor = PortfolioInteractor(session)
-        portfolio = await interactor.get_portfolio(portfolio_id)
+        portfolio = await service.get(portfolio_id)
         _check_ownership(portfolio, current_user)
 
-        await interactor.set_archived(portfolio_id, archived)
-        await session.commit()
-
-        return await interactor.get_portfolio(portfolio_id)
+        return await service.set_archived(portfolio_id, archived)
     except HTTPException:
-        await session.rollback()
         raise
     except ValueError as e:
-        await session.rollback()
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -564,18 +542,18 @@ async def _set_archived(
 async def archive_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
-    return await _set_archived(portfolio_id, True, current_user, session)
+    return await _set_archived(portfolio_id, True, current_user, service)
 
 
 @router.post("/{portfolio_id}/unarchive", dependencies=[Depends(invalidate_benchmark_cache)])
 async def unarchive_portfolio(
     portfolio_id: UUID,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioService = Depends(get_portfolio_service),
 ):
-    return await _set_archived(portfolio_id, False, current_user, session)
+    return await _set_archived(portfolio_id, False, current_user, service)
 
 
 @router.get("/{portfolio_id}/analytics")

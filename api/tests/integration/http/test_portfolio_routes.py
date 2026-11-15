@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from adapters.inbound.http import portfolio_routes
+from adapters.inbound.http import dependencies, portfolio_routes
 from application.analytics.timeframe import timeframe_start
 from domain.services.performance import PerformanceInputs, PerformanceService
 from domain.value_objects.money import Currency
@@ -119,6 +119,22 @@ def _patch_portfolio_interactor(monkeypatch, interactor):
     monkeypatch.setattr(
         portfolio_routes, "PortfolioInteractor", lambda session: interactor
     )
+    monkeypatch.setattr(
+        dependencies.portfolio_service,
+        "unit_of_work_factory",
+        lambda: FakePortfolioUnitOfWork(interactor),
+    )
+
+
+class FakePortfolioUnitOfWork:
+    def __init__(self, interactor):
+        self.interactor = interactor
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return None
 
 
 _FAKE_PERFORMANCE_INPUTS = PerformanceInputs(
