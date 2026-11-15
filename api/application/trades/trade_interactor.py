@@ -2,16 +2,6 @@ from dataclasses import replace
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from infrastructure.market_data.ngnmarket_adapter import NgnMarketAdapter
-from infrastructure.market_data.ngxpulse_adapter import NgxPulseAdapter
-from infrastructure.market_data.tiingo_adapter import TiingoAdapter
-from infrastructure.market_data.tradingview_adapter import TradingviewAdapter
-from infrastructure.market_data.yfinance_adapter import YFinanceAdapter
-from infrastructure.db.postgres.assets.dao import AssetRepository
-from infrastructure.db.postgres.portfolios.dao import PortfolioRepository
-from infrastructure.db.postgres.trades.dao import TradeRepository
 from domain.entities.models import Asset, Trade
 from domain.ports.inbound.use_cases import CreateTradeRequest, ITradeUseCase
 from domain.ports.outbound.repositories import (
@@ -21,6 +11,26 @@ from domain.ports.outbound.repositories import (
 )
 from domain.services.market_data import normalize_provider
 from domain.value_objects.money import QUANTITY_SCALE, AssetClass, Currency, TradeType
+
+TradeRepository = AssetRepository = PortfolioRepository = None
+YFinanceAdapter = TiingoAdapter = NgnMarketAdapter = NgxPulseAdapter = TradingviewAdapter = None
+
+
+class _LegacyMarketDataGateway:
+    def __init__(self):
+        self.adapters = {
+            "yfinance": YFinanceAdapter,
+            "tiingo": TiingoAdapter,
+            "ngnmarket": NgnMarketAdapter,
+            "ngxpulse": NgxPulseAdapter,
+            "tradingview": TradingviewAdapter,
+        }
+
+    async def get_asset_metadata(self, ticker, currency, provider):
+        adapter = self.adapters[normalize_provider(provider)]()
+        return await adapter.get_asset_metadata(
+            ticker, currency.value
+        )
 
 
 class BulkTradeError(ValueError):
@@ -33,32 +43,21 @@ class BulkTradeError(ValueError):
 
 
 class TradeInteractor(ITradeUseCase):
-    def __init__(self, session: AsyncSession):
-        self.trade_repo: ITradeRepository = TradeRepository(session)
-        self.asset_repo: IAssetRepository = AssetRepository(session)
-        self.portfolio_repo: IPortfolioRepository = PortfolioRepository(session)
-        self.yfinance = YFinanceAdapter()
-        self.tiingo = TiingoAdapter()
-        self.ngnmarket = NgnMarketAdapter()
-        self.ngxpulse = NgxPulseAdapter()
-        self.tradingview = TradingviewAdapter()
+    def __init__(
+        self,
+        trade_repo: ITradeRepository | None = None,
+        asset_repo: IAssetRepository | None = None,
+        portfolio_repo: IPortfolioRepository | None = None,
+        market_data=None,
+        session=None,
+    ):
+        self.trade_repo = trade_repo or TradeRepository(session)
+        self.asset_repo = asset_repo or AssetRepository(session)
+        self.portfolio_repo = portfolio_repo or PortfolioRepository(session)
+        self.market_data = market_data or _LegacyMarketDataGateway()
 
     async def _get_asset_metadata(self, ticker: str, currency: Currency, provider: str):
-        selected = normalize_provider(provider)
-
-        if selected == "tiingo":
-            return await self.tiingo.get_asset_metadata(ticker, currency.value)
-
-        if selected == "ngnmarket":
-            return await self.ngnmarket.get_asset_metadata(ticker, currency.value)
-
-        if selected == "tradingview":
-            return await self.tradingview.get_asset_metadata(ticker, currency.value)
-
-        if selected == "ngxpulse":
-            return await self.ngxpulse.get_asset_metadata(ticker, currency.value)
-
-        return await self.yfinance.get_asset_metadata(ticker, currency.value)
+        return await self.market_data.get_asset_metadata(ticker, currency, provider)
 
     async def _resolve_asset(
         self,
