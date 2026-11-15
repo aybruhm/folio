@@ -1,6 +1,5 @@
-import asyncio
 import re
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
@@ -37,17 +36,12 @@ from application.analytics.benchmarks import (
     benchmark_provider,
 )
 from application.analytics.summary import (
-    convert_analytics,
     make_factor_lookup,
-    merge_analytics,
-    scale_analytics,
 )
 from application.analytics.portfolio_analytics import (
-    build_portfolio_analytics,
     dated_factor,
     fetch_fx_factor,
     fetch_fx_factor_history,
-    portfolio_analytics_with_inputs,
 )
 from application.analytics.portfolio_analytics_service import PortfolioAnalyticsService
 from application.analytics.timeframe import timeframe_start
@@ -55,7 +49,6 @@ from application.portfolio.portfolio_interactor import PortfolioInteractor
 from application.portfolio.portfolio_service import PortfolioService
 from domain.entities.models import User
 from domain.ports.inbound.use_cases import CreatePortfolioRequest
-from domain.services.performance import PerformanceInputs
 from domain.value_objects.money import Currency
 from infrastructure.db.postgres.engine import get_session
 
@@ -86,28 +79,6 @@ async def _dated_factor(
         )
     )
     return lookup or (lambda _day: current)
-
-
-async def _build_portfolio_analytics(
-    session: AsyncSession,
-    portfolio_id: UUID,
-    timeframe: str,
-    base_currency: Currency = Currency.USD,
-) -> dict:
-    return await build_portfolio_analytics(
-        session, portfolio_id, timeframe, base_currency, AnalyticsInteractor
-    )
-
-
-async def _portfolio_analytics_with_inputs(
-    session: AsyncSession,
-    portfolio_id: UUID,
-    timeframe: str,
-    base_currency: Currency = Currency.USD,
-) -> tuple[dict, PerformanceInputs | None]:
-    return await portfolio_analytics_with_inputs(
-        session, portfolio_id, timeframe, base_currency, AnalyticsInteractor
-    )
 
 
 def _check_ownership(portfolio: dict, current_user: User) -> None:
@@ -144,39 +115,13 @@ async def list_portfolio_analytics(
     in_currency: str | None = None,
     include_archived: bool = False,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
     try:
-        portfolio_interactor = PortfolioInteractor(session)
-        portfolios = await portfolio_interactor.list_portfolios(
-            current_user.id, include_archived
+        display_currency = Currency(in_currency) if in_currency else None
+        return await service.list_analytics(
+            current_user.id, timeframe, display_currency, include_archived
         )
-        if not portfolios:
-            return []
-
-        analytics_tasks: list[Coroutine] = []
-        for portfolio in portfolios:
-            base_ccy = Currency(portfolio.get("base_currency", "USD"))
-            analytics_tasks.append(
-                _build_portfolio_analytics(
-                    session, UUID(portfolio["id"]), timeframe, base_ccy
-                )
-            )
-
-        analytics = await asyncio.gather(*analytics_tasks)
-
-        # If a display currency is requested, convert monetary fields
-        if in_currency:
-            display_ccy = Currency(in_currency)
-            for i, item in enumerate(analytics):
-                portfolio_ccy = Currency(portfolios[i].get("base_currency", "USD"))
-                if portfolio_ccy != display_ccy:
-                    factor = await _fetch_fx_factor(
-                        portfolio_ccy.value, display_ccy.value
-                    )
-                    if factor and factor != 1:
-                        scale_analytics(item, factor)
-        return list(analytics)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -186,7 +131,7 @@ async def get_analytics_summary(
     timeframe: str = "1y",
     in_currency: str = "USD",
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    service: PortfolioAnalyticsService = Depends(get_portfolio_analytics_service),
 ):
     """All active portfolios merged into one analytics view in *in_currency*.
 
@@ -195,39 +140,7 @@ async def get_analytics_summary(
     """
     try:
         display_ccy = Currency(in_currency)
-        portfolios = await PortfolioInteractor(session).list_portfolios(current_user.id)
-
-        items: list[tuple[dict, PerformanceInputs | None]] = []
-        excluded: list[str] = []
-        # Sequential: the portfolios share one AsyncSession.
-        for portfolio in portfolios:
-            base_ccy = Currency(portfolio.get("base_currency", "USD"))
-            analytics, inputs = await _portfolio_analytics_with_inputs(
-                session, UUID(portfolio["id"]), timeframe, base_ccy
-            )
-            if base_ccy != display_ccy:
-                factor = await _fetch_fx_factor(base_ccy.value, display_ccy.value)
-                if not factor:
-                    excluded.append(portfolio["id"])
-                    continue
-                # Past values at their own date's rate; falls back to today's
-                # rate when no history is available.
-                factor_on = None
-                if inputs:
-                    factor_on = make_factor_lookup(
-                        await _fetch_fx_factor_history(
-                            base_ccy.value,
-                            display_ccy.value,
-                            inputs.start_date - timedelta(days=7),
-                            date.today(),
-                        )
-                    )
-                inputs = convert_analytics(analytics, inputs, factor, factor_on)
-            items.append((analytics, inputs))
-
-        summary = merge_analytics(items, display_ccy.value, timeframe)
-        summary["excluded_portfolio_ids"] = excluded
-        return summary
+        return await service.get_summary(current_user.id, timeframe, display_ccy)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

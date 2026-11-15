@@ -1,9 +1,21 @@
 from collections.abc import Callable
+from datetime import date, timedelta
 from typing import Protocol
 from uuid import UUID
 
 from application.analytics.analytics_interactor import AnalyticsInteractor
-from application.analytics.portfolio_analytics import build_portfolio_analytics
+from application.analytics.portfolio_analytics import (
+    build_portfolio_analytics,
+    fetch_fx_factor,
+    fetch_fx_factor_history,
+    portfolio_analytics_with_inputs,
+)
+from application.analytics.summary import (
+    convert_analytics,
+    make_factor_lookup,
+    merge_analytics,
+    scale_analytics,
+)
 from application.portfolio.portfolio_interactor import PortfolioInteractor
 from domain.value_objects.money import Currency
 
@@ -118,6 +130,75 @@ class PortfolioAnalyticsService:
                 ],
                 "group_by": group_by,
             }
+
+    async def list_analytics(
+        self,
+        user_id: UUID,
+        timeframe: str,
+        in_currency: Currency | None,
+        include_archived: bool,
+    ) -> list[dict]:
+        async with self.unit_of_work_factory() as unit_of_work:
+            portfolios = await unit_of_work.portfolio_interactor.list_portfolios(
+                user_id, include_archived
+            )
+            analytics = []
+            for portfolio in portfolios:
+                base_currency = Currency(portfolio.get("base_currency", "USD"))
+                item = await build_portfolio_analytics(
+                    unit_of_work.session,
+                    UUID(portfolio["id"]),
+                    timeframe,
+                    base_currency,
+                    lambda _, currency: unit_of_work.analytics_interactor(currency),
+                )
+                if in_currency and base_currency != in_currency:
+                    factor = await fetch_fx_factor(
+                        base_currency.value, in_currency.value
+                    )
+                    if factor and factor != 1:
+                        scale_analytics(item, factor)
+                analytics.append(item)
+            return analytics
+
+    async def get_summary(
+        self, user_id: UUID, timeframe: str, display_currency: Currency
+    ) -> dict:
+        async with self.unit_of_work_factory() as unit_of_work:
+            portfolios = await unit_of_work.portfolio_interactor.list_portfolios(user_id)
+            items = []
+            excluded = []
+            for portfolio in portfolios:
+                base_currency = Currency(portfolio.get("base_currency", "USD"))
+                analytics, inputs = await portfolio_analytics_with_inputs(
+                    unit_of_work.session,
+                    UUID(portfolio["id"]),
+                    timeframe,
+                    base_currency,
+                    lambda _, currency: unit_of_work.analytics_interactor(currency),
+                )
+                if base_currency != display_currency:
+                    factor = await fetch_fx_factor(
+                        base_currency.value, display_currency.value
+                    )
+                    if not factor:
+                        excluded.append(portfolio["id"])
+                        continue
+                    factor_on = None
+                    if inputs:
+                        factor_on = make_factor_lookup(
+                            await fetch_fx_factor_history(
+                                base_currency.value,
+                                display_currency.value,
+                                inputs.start_date - timedelta(days=7),
+                                date.today(),
+                            )
+                        )
+                    inputs = convert_analytics(analytics, inputs, factor, factor_on)
+                items.append((analytics, inputs))
+            summary = merge_analytics(items, display_currency.value, timeframe)
+            summary["excluded_portfolio_ids"] = excluded
+            return summary
 
     @staticmethod
     async def _owned_portfolio(

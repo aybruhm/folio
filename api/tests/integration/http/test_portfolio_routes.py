@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from adapters.inbound.http import dependencies, portfolio_routes
+from application.analytics import portfolio_analytics_service
 from application.analytics.timeframe import timeframe_start
 from domain.services.performance import PerformanceInputs, PerformanceService
 from domain.value_objects.money import Currency
@@ -535,6 +536,15 @@ def _patch_summary(monkeypatch, fake_user, fx_factor, fx_history=()):
     _patch_analytics_interactor(monkeypatch, analytics)
     monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor", fake_fx)
     monkeypatch.setattr(portfolio_routes, "_fetch_fx_factor_history", fake_fx_history)
+    monkeypatch.setattr(portfolio_analytics_service, "fetch_fx_factor", fake_fx)
+    monkeypatch.setattr(
+        portfolio_analytics_service, "fetch_fx_factor_history", fake_fx_history
+    )
+    monkeypatch.setattr(
+        dependencies.portfolio_service,
+        "unit_of_work_factory",
+        lambda: FakePortfolioUnitOfWork(portfolios),
+    )
     return portfolios, analytics, fx_calls
 
 
