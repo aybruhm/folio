@@ -2,8 +2,6 @@
 
 A self-hosted investment tracker. Record your trades, see what you own and how it has performed, compare yourself against the market, and plan toward your goals. Your data stays on your own machine.
 
-> **Disclaimer:** This is a personal vibe-coded project and my second public attempt at vibe coding. The current implementation may not reflect best practices in architecture or code design, that's intentional for now. A refactor is planned in the coming weeks to address that, given that my intentions for this project is to make use of it as my own portfolio tracking tool.
-
 ## Preview
 
 [folio-tour.webm](https://github.com/user-attachments/assets/4f254d53-49a3-4b02-8f92-55e6c3c12a83)
