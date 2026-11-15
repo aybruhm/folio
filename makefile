@@ -1,4 +1,4 @@
-.PHONY: help setup up down logs clean test lint format
+.PHONY: help setup up up-core down logs clean test lint format
 PROD_COMPOSE = docker compose -f docker-compose.prod.yml
 RAILWAY_COMPOSE = docker compose -f docker-compose.railway.yml
 
@@ -8,6 +8,7 @@ help:
 	@echo "Infrastructure Commands:"
 	@echo "  make setup          Setup environment (.env files from examples)"
 	@echo "  make up             Start all services (Docker Compose)"
+	@echo "  make up-core        Start core services (API, DB) without dependencies"
 	@echo "  make down           Stop all services"
 	@echo "  make restart        Restart all services"
 	@echo "  make logs           View logs from all services"
@@ -93,6 +94,14 @@ validate:
 up:
 	@echo "Starting services..."
 	@docker compose up -d --build
+	@echo ""
+	@echo "Services starting. Wait for health checks..."
+	@sleep 3
+	@make health
+
+up-core:
+	@echo "Starting services without dependencies..."
+	@docker compose up -d --build --no-deps web api
 	@echo ""
 	@echo "Services starting. Wait for health checks..."
 	@sleep 3
